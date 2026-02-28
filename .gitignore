@@ -1,0 +1,25 @@
+# Archives
+*.tar.gz
+*.zip
+
+# IDE
+.idea/
+*.iml
+
+# Build
+build/
+*.apk
+*.aab
+
+# Gradle
+.gradle/
+
+# Local config
+local.properties
+
+# Keystore
+*.keystore
+*.jks
+
+# Claude
+.claude/

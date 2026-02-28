@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Dharma wheel simplified -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,27 A27,27 0 1,1 53.99,27 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3" />
+    <path
+        android:fillColor="#E8891D"
+        android:pathData="M54,33 A21,21 0 1,1 53.99,33 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,44 A10,10 0 1,1 53.99,44 Z" />
+    <path
+        android:fillColor="#E8891D"
+        android:pathData="M54,48 A6,6 0 1,1 53.99,48 Z" />
+    <!-- Spokes -->
+    <path android:fillColor="#FFFFFF" android:pathData="M53,33 L55,33 L55,44 L53,44 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M53,60 L55,60 L55,71 L53,71 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M33,53 L33,55 L44,55 L44,53 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M64,53 L64,55 L75,55 L75,53 Z" />
+</vector>
