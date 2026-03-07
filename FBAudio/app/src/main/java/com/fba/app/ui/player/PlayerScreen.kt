@@ -172,10 +172,10 @@ fun PlayerScreen(
                     if (!sp.isNullOrBlank()) onSpeakerClick(sp)
                 },
             )
-            // Track info
+            // Chapter info
             if (hasMultipleTracks) {
                 Text(
-                    text = "Track ${state.currentTrackIndex + 1} of ${tracks.size}",
+                    text = "Chapter ${state.currentTrackIndex + 1} of ${tracks.size}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -297,7 +297,7 @@ fun PlayerScreen(
                 }) {
                     Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Tracks (${tracks.size})")
+                    Text("Chapters (${tracks.size})")
                 }
             }
         }
@@ -340,14 +340,14 @@ fun PlayerScreen(
         }
     }
 
-    // Track list bottom sheet
+    // Chapter list bottom sheet
     if (showTrackSheet) {
         ModalBottomSheet(
             onDismissRequest = { showTrackSheet = false },
             sheetState = sheetState,
         ) {
             Text(
-                text = "Tracks",
+                text = "Chapters",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
@@ -358,7 +358,7 @@ fun PlayerScreen(
                     ListItem(
                         headlineContent = {
                             Text(
-                                track.title.ifBlank { "Part ${index + 1}" },
+                                track.title.ifBlank { "Chapter ${index + 1}" },
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isCurrentTrack)

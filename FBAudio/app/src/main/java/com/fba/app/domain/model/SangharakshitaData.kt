@@ -365,4 +365,41 @@ object SangharakshitaData {
             year = e.year,
         )
     }
+
+    data class Series(val id: String, val title: String)
+
+    val series: List<Series> = listOf(
+        Series("X01", "Introducing the Three Jewels of Buddhism"),
+        Series("X02", "The Meaning of Conversion in Buddhism"),
+        Series("X03", "The Essence of Zen"),
+        Series("X04", "Introducing Buddhism"),
+        Series("X05", "Ritual and Devotion in Buddhism"),
+        Series("X06", "Aspects of Buddhist Psychology"),
+        Series("X07", "The Buddha's Noble Eightfold Path"),
+        Series("X08", "An Introduction to Tibetan Buddhism"),
+        Series("X09", "Aspects of the Bodhisattva Ideal"),
+        Series("X10", "The Higher Evolution"),
+        Series("X11", "Aspects of the Higher Evolution of the Individual"),
+        Series("X12", "Parables, Myths and Symbols of Mahayana in the White Lotus Sutra"),
+        Series("X13", "Creative Symbols of the Tantric Path to Enlightenment"),
+        Series("X14", "Human Enlightenment"),
+        Series("X15", "Transformation of Life and World in the Sutra of Golden Light"),
+        Series("X16", "Buddhism for Today and Tomorrow"),
+        Series("X17", "A New Buddhist Movement"),
+        Series("X18", "Incidents from the Pali Canon"),
+        Series("X19", "The Inconceivable Emancipation: Themes from the Vimalakirti Nirdesha"),
+        Series("X20", "Reality, Consciousness and Order"),
+        Series("X21", "The Nature of Reality: Buddhism as Transformation"),
+        Series("X22", "Three Lectures to the Friends of the Western Buddhist Order"),
+        Series("X238", "Lectures on the World of Images"),
+    )
+
+    fun seriesAsBrowseCategories(): List<BrowseCategory> = series.map { s ->
+        BrowseCategory(
+            id = "sang_series_${s.id}",
+            name = s.title,
+            type = CategoryType.SERIES,
+            browseUrl = "https://www.freebuddhistaudio.com/series/details?num=${s.id}",
+        )
+    }
 }

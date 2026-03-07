@@ -9,6 +9,7 @@ import com.fba.app.domain.model.CategoryType
 import com.fba.app.domain.model.MitraStudyData
 import com.fba.app.domain.model.SangharakshitaData
 import com.fba.app.domain.model.SearchResult
+import com.fba.app.ui.friendlyError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -123,7 +124,7 @@ class BrowseViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoadingCategories = false,
-                    error = e.message ?: "Failed to load categories",
+                    error = friendlyError(e),
                 )
             }
         }
@@ -276,7 +277,7 @@ class BrowseViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoadingTalks = false,
-                    error = e.message ?: "Failed to load talks",
+                    error = friendlyError(e),
                 )
             }
         }
@@ -401,9 +402,61 @@ class BrowseViewModel @Inject constructor(
         return years.map { (it / 10) * 10 }.distinct().sorted()
     }
 
+    /** Pre-select Sangharakshita talks with decade/year filters. */
+    fun selectSangharakshitaByYear() {
+        if (_uiState.value.selectedCategory?.type == CategoryType.SANGHARAKSHITA) return
+        selectCategory(
+            BrowseCategory(
+                id = "Sangharakshita",
+                name = "Sangharakshita",
+                type = CategoryType.SANGHARAKSHITA,
+                browseUrl = "sang://root",
+            )
+        )
+    }
+
+    /** Show Sangharakshita series as a sub-category list. */
+    fun selectSangharakshitaSeries() {
+        val seriesCategories = SangharakshitaData.seriesAsBrowseCategories()
+        _uiState.value = _uiState.value.copy(
+            selectedCategory = BrowseCategory(
+                id = "sang_series",
+                name = "Sangharakshita Series",
+                type = CategoryType.SANGHARAKSHITA,
+                browseUrl = "sang://series",
+            ),
+            categories = seriesCategories,
+            isLoadingTalks = false,
+            isLoadingCategories = false,
+            talks = emptyList(),
+            totalTalkCount = 0,
+            showingSubCategories = true,
+        )
+    }
+
+    /** Pre-select Mitra Study. */
+    fun selectMitraStudy() {
+        if (_uiState.value.selectedCategory?.type == CategoryType.MITRA_STUDY) return
+        selectCategory(
+            BrowseCategory(
+                id = "mitra_study",
+                name = "Mitra Study",
+                type = CategoryType.MITRA_STUDY,
+                browseUrl = "mitra://study",
+            )
+        )
+    }
+
     fun clearSelection() {
         // Don't cancel autoLoadJob — let background loading continue so cache gets populated
         allItems = emptyList()
+
+        // Sangharakshita series sub-nav: if showing a series talk list, go back to series list
+        val current = _uiState.value.selectedCategory
+        if (current != null && current.id.startsWith("sang_series_")) {
+            selectSangharakshitaSeries()
+            return
+        }
 
         // Mitra nested back: pop stack and go back one level
         if (mitraCategoryStack.isNotEmpty()) {

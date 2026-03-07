@@ -36,9 +36,13 @@ class TalkRepository @Inject constructor(
         if (cached != null) return cached.toDomain()
 
         // Fetch from web and cache
-        val talk = scraper.fetchTalkDetail(catNum) ?: return null
-        talkDao.insertTalk(TalkEntity.fromDomain(talk))
-        return talk
+        return try {
+            val talk = scraper.fetchTalkDetail(catNum) ?: return null
+            talkDao.insertTalk(TalkEntity.fromDomain(talk))
+            talk
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /** General audio search via FBA API. */

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -251,6 +252,50 @@ fun DetailScreen(
                         if (description.isNotBlank()) {
                             Spacer(Modifier.height(16.dp))
                             Text(description, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+
+                    // Chapters — clickable to play, styled like player chapter list
+                    if (talk.tracks.size > 1) {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "Chapters (${talk.tracks.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        talk.tracks.forEachIndexed { index, track ->
+                            val isCurrentChapter = isThisTalkActive && playerState.currentTrackIndex == index
+                            androidx.compose.material3.Divider()
+                            androidx.compose.material3.ListItem(
+                                headlineContent = {
+                                    Text(
+                                        track.title.ifBlank { "Chapter ${index + 1}" },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isCurrentChapter) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
+                                        color = if (isCurrentChapter)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.onSurface,
+                                    )
+                                },
+                                trailingContent = {
+                                    if (track.durationSeconds > 0) {
+                                        Text(
+                                            formatDuration(track.durationSeconds),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.clickable {
+                                    if (isThisTalkActive) {
+                                        playerViewModel.playTrackByIndex(index)
+                                    } else {
+                                        onPlay(catNum)
+                                        playerViewModel.playTrackByIndex(index)
+                                    }
+                                },
+                            )
                         }
                     }
                 }

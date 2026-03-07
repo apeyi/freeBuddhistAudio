@@ -42,8 +42,21 @@ import com.fba.app.ui.components.TalkCard
 fun BrowseScreen(
     onTalkClick: (String) -> Unit,
     onBack: () -> Unit,
+    initialSangharakshitaByYear: Boolean = false,
+    initialSangharakshitaSeries: Boolean = false,
+    initialMitraStudy: Boolean = false,
+    alwaysPopOnBack: Boolean = false,
     viewModel: BrowseViewModel = hiltViewModel(),
 ) {
+    val hasInitialSelection = initialSangharakshitaByYear || initialSangharakshitaSeries || initialMitraStudy
+    // Apply initial navigation if requested
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        when {
+            initialSangharakshitaByYear -> viewModel.selectSangharakshitaByYear()
+            initialSangharakshitaSeries -> viewModel.selectSangharakshitaSeries()
+            initialMitraStudy -> viewModel.selectMitraStudy()
+        }
+    }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -62,8 +75,23 @@ fun BrowseScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (state.selectedCategory != null || state.showingSubCategories) viewModel.clearSelection()
-                        else onBack()
+                        if (alwaysPopOnBack) {
+                            onBack()
+                        } else if (hasInitialSelection) {
+                            // If showing sub-content within the initial selection, go back within it
+                            // Otherwise pop back to the previous screen entirely
+                            val canGoBack = when {
+                                initialSangharakshitaSeries && state.selectedCategory?.id?.startsWith("sang_series_") == true -> true
+                                initialMitraStudy && state.showingSubCategories -> true
+                                else -> false
+                            }
+                            if (canGoBack) viewModel.clearSelection()
+                            else onBack()
+                        } else if (state.selectedCategory != null || state.showingSubCategories) {
+                            viewModel.clearSelection()
+                        } else {
+                            onBack()
+                        }
                     }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }

@@ -12,6 +12,8 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.fba.app.data.local.DownloadStatus
+import com.fba.app.data.local.RecentlyListenedDao
+import com.fba.app.data.local.RecentlyListenedEntity
 import com.fba.app.data.repository.DownloadRepository
 import com.fba.app.data.repository.TalkRepository
 import com.fba.app.domain.model.Talk
@@ -44,6 +46,7 @@ class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val talkRepository: TalkRepository,
     private val downloadRepository: DownloadRepository,
+    private val recentlyListenedDao: RecentlyListenedDao,
 ) : ViewModel() {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("player_prefs", Context.MODE_PRIVATE)
@@ -160,7 +163,8 @@ class PlayerViewModel @Inject constructor(
     /** Save current playback state immediately (uses commit for reliability). */
     private fun savePlaybackState() {
         val state = _uiState.value
-        val catNum = state.currentTalk?.catNum ?: return
+        val talk = state.currentTalk ?: return
+        val catNum = talk.catNum
         val controller = mediaController
         val pos = controller?.currentPosition?.coerceAtLeast(0) ?: state.currentPosition
         val dur = controller?.duration?.coerceAtLeast(0) ?: state.duration
@@ -171,6 +175,37 @@ class PlayerViewModel @Inject constructor(
             .putInt("last_track_index_$catNum", state.currentTrackIndex)
             .putLong("last_duration_$catNum", dur)
             .commit() // sync write — survives process death
+
+        // Update recently listened — compute cumulative position across all chapters
+        viewModelScope.launch {
+            val trackIndex = state.currentTrackIndex
+            val tracks = talk.tracks
+            val cumulativePos = if (tracks.size > 1) {
+                val priorDuration = tracks.take(trackIndex).sumOf { it.durationSeconds.toLong() * 1000 }
+                priorDuration + pos
+            } else pos
+            // Use talk.durationSeconds if valid, otherwise derive from player duration
+            val totalDur = if (talk.durationSeconds > 0) {
+                talk.durationSeconds
+            } else if (tracks.size > 1) {
+                tracks.sumOf { it.durationSeconds }
+            } else {
+                (dur / 1000).toInt()
+            }
+
+            recentlyListenedDao.upsert(
+                RecentlyListenedEntity(
+                    catNum = catNum,
+                    title = talk.title,
+                    speaker = talk.speaker,
+                    imageUrl = talk.imageUrl,
+                    positionMs = cumulativePos,
+                    durationMs = dur,
+                    trackIndex = trackIndex,
+                    totalDurationSeconds = totalDur,
+                )
+            )
+        }
     }
 
     private fun connectToService() {
@@ -219,35 +254,42 @@ class PlayerViewModel @Inject constructor(
             val talk = talkRepository.getTalkDetail(catNum)
             val download = downloadRepository.getDownload(catNum)
 
-            // Determine audio source: prefer downloaded file, fall back to stream
-            val trackFile = DownloadWorker.trackFilePath(context, catNum, 0)
-            val audioUri = when {
-                download?.status == DownloadStatus.COMPLETE && java.io.File(trackFile).exists() ->
-                    Uri.parse("file://$trackFile")
-                download?.status == DownloadStatus.COMPLETE && download.filePath.isNotBlank() ->
-                    Uri.parse("file://${download.filePath}")
-                talk != null -> Uri.parse(talk.audioUrl)
-                else -> return@launch // no talk info and no download
-            }
-
-            val title = talk?.title ?: download?.title ?: ""
-            val speaker = talk?.speaker ?: download?.speaker ?: ""
-            val imageUrl = talk?.imageUrl ?: download?.imageUrl ?: ""
-
-            setMediaAndPlay(audioUri, title, speaker, imageUrl)
-
-            // Resume from saved position (10s earlier for context)
             val savedTrackIndex = prefs.getInt("last_track_index_$catNum", 0)
             val savedPos = prefs.getLong("last_position_$catNum", 0)
-            if (savedPos > 10_000 && savedTrackIndex == 0) {
+            val tracks = talk?.tracks ?: emptyList()
+            val resumeTrackIndex = if (savedTrackIndex < tracks.size) savedTrackIndex else 0
+
+            // Determine audio source for the correct track
+            val trackFile = java.io.File(DownloadWorker.trackFilePath(context, catNum, resumeTrackIndex))
+            val mainDownloadFile = download?.filePath?.let { java.io.File(it) }
+            val track = tracks.getOrNull(resumeTrackIndex)
+            val audioUri = when {
+                trackFile.exists() -> Uri.parse("file://${trackFile.absolutePath}")
+                download?.status == DownloadStatus.COMPLETE && mainDownloadFile?.exists() == true ->
+                    Uri.parse("file://${mainDownloadFile.absolutePath}")
+                track != null -> Uri.parse(track.audioUrl)
+                talk != null -> Uri.parse(talk.audioUrl)
+                download?.status == DownloadStatus.COMPLETE && download.filePath.isNotBlank() ->
+                    Uri.parse("file://${download.filePath}")
+                else -> return@launch
+            }
+
+            val titleText = talk?.title ?: download?.title ?: ""
+            val speakerText = talk?.speaker ?: download?.speaker ?: ""
+            val imageUrlText = talk?.imageUrl ?: download?.imageUrl ?: ""
+
+            setMediaAndPlay(audioUri, track?.title?.ifBlank { titleText } ?: titleText, speakerText, imageUrlText)
+
+            // Resume from saved position (10s earlier for context)
+            if (savedPos > 10_000) {
                 mediaController?.seekTo((savedPos - 10_000).coerceAtLeast(0))
             }
 
             // Build a Talk for the UI even if network fetch failed (offline)
             val displayTalk = talk ?: Talk(
-                catNum = catNum, title = title, speaker = speaker,
+                catNum = catNum, title = titleText, speaker = speakerText,
                 year = 0, genre = "", durationSeconds = 0,
-                imageUrl = imageUrl, audioUrl = download?.filePath ?: "",
+                imageUrl = imageUrlText, audioUrl = download?.filePath ?: "",
                 description = "",
             )
 
@@ -255,6 +297,7 @@ class PlayerViewModel @Inject constructor(
                 currentTalk = displayTalk,
                 isVisible = true,
                 downloadStatus = download?.status,
+                currentTrackIndex = resumeTrackIndex,
             )
 
             observeDownloadStatus(catNum)
@@ -301,6 +344,7 @@ class PlayerViewModel @Inject constructor(
                 imageUrl = talk.imageUrl,
                 audioUrl = talk.audioUrl,
                 trackUrls = talk.tracks.map { it.audioUrl },
+                transcriptUrl = talk.transcriptUrl,
             )
             observeDownloadStatus(talk.catNum)
         }

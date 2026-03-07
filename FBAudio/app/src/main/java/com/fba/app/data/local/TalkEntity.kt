@@ -30,7 +30,10 @@ data class TalkEntity(
         val tracks: List<Track> = if (tracksJson.isNotBlank()) {
             try {
                 val raw: List<Track> = Gson().fromJson(tracksJson, trackType)
-                raw.map { it.copy(title = Parser.unescapeEntities(it.title, false)) }
+                raw.map { it.copy(
+                    title = Parser.unescapeEntities(it.title, false),
+                    durationSeconds = it.durationSeconds.coerceAtLeast(0),
+                ) }
             } catch (_: Exception) { emptyList() }
         } else emptyList()
         return Talk(
@@ -39,7 +42,7 @@ data class TalkEntity(
             speaker = Parser.unescapeEntities(speaker, false),
             year = year,
             genre = genre,
-            durationSeconds = durationSeconds,
+            durationSeconds = durationSeconds.coerceAtLeast(0),
             imageUrl = imageUrl,
             audioUrl = audioUrl,
             description = Parser.unescapeEntities(description, false),

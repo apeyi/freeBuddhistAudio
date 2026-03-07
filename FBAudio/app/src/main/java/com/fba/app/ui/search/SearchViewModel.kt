@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fba.app.data.repository.TalkRepository
 import com.fba.app.domain.model.SangharakshitaData
 import com.fba.app.domain.model.SearchResult
+import com.fba.app.ui.friendlyError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -125,7 +126,7 @@ class SearchViewModel @Inject constructor(
                 } catch (e: Exception) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false, hasSearched = true,
-                        error = e.message ?: "Failed to load series",
+                        error = friendlyError(e),
                     )
                 }
                 return
@@ -177,7 +178,7 @@ class SearchViewModel @Inject constructor(
         catch (e: Exception) {
             _uiState.value = _uiState.value.copy(
                 isLoading = false, hasSearched = true,
-                error = e.message ?: "Search failed",
+                error = friendlyError(e),
             )
         }
     }
@@ -219,7 +220,7 @@ class SearchViewModel @Inject constructor(
         catch (e: Exception) {
             _uiState.value = _uiState.value.copy(
                 isLoading = false, hasSearched = true,
-                error = e.message ?: "Search failed",
+                error = friendlyError(e),
             )
         }
     }

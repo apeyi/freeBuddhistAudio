@@ -7,6 +7,7 @@ import com.fba.app.data.local.DownloadEntity
 import com.fba.app.data.repository.DownloadRepository
 import com.fba.app.data.repository.TalkRepository
 import com.fba.app.domain.model.Talk
+import com.fba.app.ui.friendlyError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +48,7 @@ class DetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Failed to load talk",
+                    error = friendlyError(e),
                 )
             }
         }
@@ -71,6 +72,7 @@ class DetailViewModel @Inject constructor(
                 imageUrl = talk.imageUrl,
                 audioUrl = talk.audioUrl,
                 trackUrls = talk.tracks.map { it.audioUrl },
+                transcriptUrl = talk.transcriptUrl,
             )
         }
     }

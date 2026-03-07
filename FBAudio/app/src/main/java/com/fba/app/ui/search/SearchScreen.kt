@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,6 +46,14 @@ fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
+
+    // Dismiss keyboard when search results arrive
+    LaunchedEffect(state.hasSearched, state.isLoading) {
+        if (state.hasSearched && !state.isLoading) {
+            focusManager.clearFocus()
+        }
+    }
 
     LaunchedEffect(state.navigateToCatNum) {
         state.navigateToCatNum?.let {
@@ -90,7 +99,10 @@ fun SearchScreen(
                     },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { viewModel.search() }),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        viewModel.search()
+                        focusManager.clearFocus()
+                    }),
                 )
             }
 

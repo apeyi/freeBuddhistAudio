@@ -147,7 +147,7 @@ class FBAScraper @Inject constructor(
         )
         val year = json.getInt("year") ?: 0
         val genre = json.getStr("genre") ?: json.getStr("genre1") ?: ""
-        val duration = json.getInt("durationSeconds") ?: json.getInt("duration") ?: 0
+        val duration = (json.getInt("durationSeconds") ?: json.getInt("duration") ?: 0).coerceAtLeast(0)
         val imageUrl = json.getStr("image") ?: json.getStr("imageUrl") ?: json.getStr("image_url") ?: ""
         val rawDesc = json.getStr("blurb") ?: json.getStr("description") ?: ""
         val description = if (rawDesc.contains('<')) {
@@ -217,7 +217,7 @@ class FBAScraper @Inject constructor(
             result.add(
                 Track(
                     title = unescape(t.getStr("title") ?: ""),
-                    durationSeconds = t.getInt("durationSeconds") ?: 0,
+                    durationSeconds = (t.getInt("durationSeconds") ?: 0).coerceAtLeast(0),
                     audioUrl = resolveUrl(mp3),
                 )
             )
@@ -324,26 +324,26 @@ class FBAScraper @Inject constructor(
      * Search audio talks via the FBA API: /api/v1/search?q=TERM&type=audio
      * Returns results matching across titles, speakers, and descriptions.
      */
-    suspend fun searchAudio(query: String): List<SearchResult> {
+    suspend fun searchAudio(query: String): List<SearchResult> = withContext(Dispatchers.IO) {
         val url = "$BASE_URL/api/v1/search".toHttpUrl().newBuilder()
             .addQueryParameter("q", query)
             .addQueryParameter("type", "audio")
             .build().toString()
-        val body = withContext(Dispatchers.IO) {
-            val request = Request.Builder().url(url).build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
-                response.body?.string() ?: throw Exception("Empty response")
-            }
+        val request = Request.Builder().url(url).build()
+        val body = client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+            response.body?.string() ?: throw Exception("Empty response")
         }
         val json = JsonParser.parseString(body).asJsonObject
-        val searchObj = json.getAsJsonObject("search") ?: return emptyList()
-        val items = searchObj.getAsJsonArray("results") ?: return emptyList()
+        val searchObj = json.getAsJsonObject("search") ?: return@withContext emptyList()
+        val items = searchObj.getAsJsonArray("results") ?: return@withContext emptyList()
         val results = mutableListOf<SearchResult>()
+        val seen = mutableSetOf<String>()
         for (item in items) {
+            if (results.size >= 200) break
             val obj = item.asJsonObject
             val catNum = obj.getStr("cat_num") ?: obj.getStr("catNum") ?: continue
-            if (catNum.isBlank()) continue
+            if (catNum.isBlank() || !seen.add(catNum)) continue
             val link = obj.getStr("link") ?: "/audio/details?num=$catNum"
             results.add(
                 SearchResult(
@@ -356,7 +356,7 @@ class FBAScraper @Inject constructor(
                 )
             )
         }
-        return results
+        results
     }
 
     /**

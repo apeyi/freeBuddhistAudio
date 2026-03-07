@@ -32,6 +32,7 @@ class DownloadRepository @Inject constructor(
         imageUrl: String,
         audioUrl: String,
         trackUrls: List<String> = emptyList(),
+        transcriptUrl: String = "",
     ) {
         val entity = DownloadEntity(
             catNum = catNum,
@@ -50,6 +51,7 @@ class DownloadRepository @Inject constructor(
             .putString(DownloadWorker.KEY_AUDIO_URL, audioUrl)
             .putString(DownloadWorker.KEY_TITLE, title)
             .putStringArray(DownloadWorker.KEY_TRACK_URLS, urls.toTypedArray())
+            .putString(DownloadWorker.KEY_TRANSCRIPT_URL, transcriptUrl)
             .build()
 
         val request = OneTimeWorkRequestBuilder<DownloadWorker>()
@@ -72,10 +74,10 @@ class DownloadRepository @Inject constructor(
             val file = java.io.File(download.filePath)
             if (file.exists()) file.delete()
         }
-        // Delete all track files (new naming convention)
+        // Delete all track files and transcript
         val downloadsDir = java.io.File(context.filesDir, "downloads")
         if (downloadsDir.exists()) {
-            downloadsDir.listFiles()?.filter { it.name.startsWith("${catNum}_track") }?.forEach { it.delete() }
+            downloadsDir.listFiles()?.filter { it.name.startsWith("${catNum}_") }?.forEach { it.delete() }
         }
         downloadDao.delete(catNum)
         WorkManager.getInstance(context).cancelAllWorkByTag("download_$catNum")

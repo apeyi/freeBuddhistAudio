@@ -26,11 +26,16 @@ class DownloadWorker @AssistedInject constructor(
         const val KEY_AUDIO_URL = "audio_url"
         const val KEY_TITLE = "title"
         const val KEY_TRACK_URLS = "track_urls"
+        const val KEY_TRANSCRIPT_URL = "transcript_url"
 
-        /** Get the file path for a specific track of a downloaded talk. */
         fun trackFilePath(context: Context, catNum: String, trackIndex: Int): String {
             val downloadsDir = File(context.filesDir, "downloads")
             return File(downloadsDir, "${catNum}_track${trackIndex}.mp3").absolutePath
+        }
+
+        fun transcriptFilePath(context: Context, catNum: String): String {
+            val downloadsDir = File(context.filesDir, "downloads")
+            return File(downloadsDir, "${catNum}_transcript.txt").absolutePath
         }
     }
 
@@ -83,6 +88,59 @@ class DownloadWorker @AssistedInject constructor(
                 downloadDao.updateProgress(catNum, DownloadStatus.DOWNLOADING, progress)
             }
 
+            // Download transcript if available (best-effort, don't fail the download)
+            val transcriptUrl = inputData.getString(KEY_TRANSCRIPT_URL)
+            if (!transcriptUrl.isNullOrBlank()) {
+                try {
+                    val transcriptRequest = Request.Builder().url(transcriptUrl).build()
+                    val transcriptResponse = client.newCall(transcriptRequest).execute()
+                    if (transcriptResponse.isSuccessful) {
+                        val html = transcriptResponse.body?.string() ?: ""
+                        if (html.isNotBlank()) {
+                            // Parse transcript HTML to plain text
+                            val doc = org.jsoup.Jsoup.parse(html)
+                            // Try document.__FBA__.text.content first
+                            var text = ""
+                            for (script in doc.select("script")) {
+                                val data = script.data()
+                                val marker = "document.__FBA__.text"
+                                val idx = data.indexOf(marker)
+                                if (idx >= 0) {
+                                    val braceIdx = data.indexOf('{', idx)
+                                    if (braceIdx >= 0) {
+                                        val jsonStr = extractBalancedBraces(data, braceIdx)
+                                        if (jsonStr != null) {
+                                            val json = com.google.gson.JsonParser.parseString(jsonStr).asJsonObject
+                                            val content = json.get("content")?.asString ?: ""
+                                            if (content.isNotBlank()) {
+                                                val contentDoc = org.jsoup.Jsoup.parse(content)
+                                                val sb = StringBuilder()
+                                                for (el in contentDoc.select("p, br, h1, h2, h3, h4, h5, h6, blockquote, li")) {
+                                                    val t = el.text().trim()
+                                                    if (t.isNotBlank()) sb.append(t).append("\n\n")
+                                                }
+                                                text = sb.toString().trim().ifBlank { contentDoc.wholeText().trim() }
+                                            }
+                                        }
+                                    }
+                                    break
+                                }
+                            }
+                            if (text.isBlank()) {
+                                text = doc.select(".text-content, .content, article, main").text()
+                                    .ifBlank { doc.body()?.text() ?: "" }
+                            }
+                            if (text.isNotBlank()) {
+                                val transcriptFile = File(downloadsDir, "${catNum}_transcript.txt")
+                                transcriptFile.writeText(text)
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Transcript download failure is non-fatal
+                }
+            }
+
             // Mark complete — filePath points to first track for backward compatibility
             val firstTrackFile = File(downloadsDir, "${catNum}_track0.mp3")
             downloadDao.markComplete(
@@ -96,5 +154,22 @@ class DownloadWorker @AssistedInject constructor(
             downloadDao.updateProgress(catNum, DownloadStatus.FAILED, 0)
             return Result.failure()
         }
+    }
+
+    private fun extractBalancedBraces(data: String, start: Int): String? {
+        var depth = 0
+        var inString = false
+        var escape = false
+        for (i in start until data.length) {
+            val c = data[i]
+            if (escape) { escape = false; continue }
+            if (c == '\\' && inString) { escape = true; continue }
+            if (c == '"') { inString = !inString; continue }
+            if (!inString) {
+                if (c == '{') depth++
+                else if (c == '}') { depth--; if (depth == 0) return data.substring(start, i + 1) }
+            }
+        }
+        return null
     }
 }

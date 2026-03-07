@@ -4,6 +4,7 @@ import android.content.Context
 import com.fba.app.data.local.FBADatabase
 import com.fba.app.data.local.TalkDao
 import com.fba.app.data.local.DownloadDao
+import com.fba.app.data.local.RecentlyListenedDao
 import com.fba.app.data.remote.FBAScraper
 import com.fba.app.data.repository.TalkRepository
 import com.fba.app.data.repository.DownloadRepository
@@ -58,6 +59,9 @@ object AppModule {
 
     @Provides
     fun provideDownloadDao(db: FBADatabase): DownloadDao = db.downloadDao()
+
+    @Provides
+    fun provideRecentlyListenedDao(db: FBADatabase): RecentlyListenedDao = db.recentlyListenedDao()
 
     @Provides
     @Singleton
