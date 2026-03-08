@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.4.1
+
+- Replaced Sangharakshita home screen image with the FBA default portrait
+
 ## v0.4.0
 
 **Improvements**
