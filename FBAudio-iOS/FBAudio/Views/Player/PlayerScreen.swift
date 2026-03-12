@@ -59,7 +59,7 @@ struct PlayerScreen: View {
                 }) {
                     Text(talk?.speaker ?? "")
                         .font(.subheadline)
-                        .foregroundStyle(.saffronOrange)
+                        .foregroundStyle(Color.saffronOrange)
                 }
                 if hasMultipleTracks {
                     Text("Chapter \(player.currentTrackIndex + 1) of \(tracks.count)")
@@ -194,7 +194,7 @@ struct PlayerScreen: View {
         switch status {
         case .complete:
             Image(systemName: "arrow.down.circle.fill")
-                .foregroundStyle(.saffronOrange)
+                .foregroundStyle(Color.saffronOrange)
         case .downloading, .pending:
             ProgressView().controlSize(.small)
         default:

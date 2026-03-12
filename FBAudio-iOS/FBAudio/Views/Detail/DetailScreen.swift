@@ -61,14 +61,14 @@ struct DetailScreen: View {
 
                 // Speaker
                 Button(action: { onSpeakerClick(talk.speaker) }) {
-                    Text(talk.speaker).foregroundStyle(.saffronOrange)
+                    Text(talk.speaker).foregroundStyle(Color.saffronOrange)
                 }
 
                 // Series
                 if !talk.series.isEmpty {
                     Button(action: { onSeriesClick(talk.seriesHref.isEmpty ? talk.series : talk.seriesHref) }) {
                         Text("Series: \(talk.series)")
-                            .font(.caption).foregroundStyle(.deepSaffron)
+                            .font(.caption).foregroundStyle(Color.deepSaffron)
                     }
                 }
 
@@ -173,7 +173,7 @@ struct DetailScreen: View {
                 .font(.headline)
                 .padding(.top, 8)
 
-            ForEach(Array(talk.tracks.enumerated()), id: \.offset) { index, track in
+            ForEach(Array(zip(talk.tracks.indices, talk.tracks)), id: \.0) { index, track in
                 let isActive = player.currentTalk?.catNum == catNum
                 let isCurrent = isActive && player.currentTrackIndex == index
 

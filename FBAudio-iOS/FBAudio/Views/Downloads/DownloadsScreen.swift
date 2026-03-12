@@ -42,14 +42,14 @@ struct DownloadsScreen: View {
             }
         }
         .navigationTitle("Downloads")
-        .toolbar {
-            if totalBytes > 0 {
-                ToolbarItem(placement: .navigationBarTrailing) {
+        .toolbar(content: {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if totalBytes > 0 {
                     Text("Total: \(formatFileSize(totalBytes))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
-        }
+        })
     }
 
     private func trailingView(_ download: DownloadManager.DownloadState) -> AnyView {
@@ -76,7 +76,7 @@ struct DownloadsScreen: View {
                             }
                         }
                     }) {
-                        Image(systemName: "arrow.clockwise").foregroundStyle(.saffronOrange)
+                        Image(systemName: "arrow.clockwise").foregroundStyle(Color.saffronOrange)
                     }
                     Button(action: { downloadManager.deleteDownload(catNum: download.catNum) }) {
                         Image(systemName: "trash").foregroundStyle(.red)

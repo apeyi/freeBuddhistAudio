@@ -87,7 +87,7 @@ actor FBAScraper {
         return (try? doc.text()) ?? str
     }
 
-    private func resolveUrl(_ url: String) -> String {
+    nonisolated private func resolveUrl(_ url: String) -> String {
         if url.isEmpty { return "" }
         return url.hasPrefix("http") ? url : Self.baseUrl + url
     }

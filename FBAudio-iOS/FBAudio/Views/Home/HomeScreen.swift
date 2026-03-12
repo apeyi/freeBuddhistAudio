@@ -184,12 +184,12 @@ struct HomeScreen: View {
             HStack(spacing: 4) {
                 if isCompleted {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.saffronOrange)
+                        .foregroundStyle(Color.saffronOrange)
                         .font(.caption)
                 }
                 if isDownloaded {
                     Image(systemName: "arrow.down.circle.fill")
-                        .foregroundStyle(.saffronOrange)
+                        .foregroundStyle(Color.saffronOrange)
                         .font(.caption)
                 }
             }
