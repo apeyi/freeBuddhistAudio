@@ -1,0 +1,533 @@
+{
+  "modules": [
+    {
+      "id": "y1_refuge",
+      "name": "Going for Refuge",
+      "year": 1,
+      "seriesCodes": [
+        "X04"
+      ],
+      "talks": [
+        {
+          "catNum": "09",
+          "title": "Going for Refuge",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "137",
+          "title": "Levels of Going for Refuge",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "154",
+          "title": "Dimensions of Going for Refuge",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "171",
+          "title": "The History of My Going for Refuge",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "08",
+          "title": "Introducing Buddhism",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "19",
+          "title": "The Approach to Buddhism",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y1_ethics",
+      "name": "Ethics",
+      "year": 1,
+      "seriesCodes": [],
+      "talks": [
+        {
+          "catNum": "161",
+          "title": "The Ten Pillars of Buddhism",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y1_meditation",
+      "name": "Meditation",
+      "year": 1,
+      "seriesCodes": [],
+      "talks": []
+    },
+    {
+      "id": "y1_wisdom",
+      "name": "Wisdom",
+      "year": 1,
+      "seriesCodes": [],
+      "talks": [
+        {
+          "catNum": "24",
+          "title": "The Dynamics of Being",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "31",
+          "title": "Mind: Reactive and Creative",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y1_triratna",
+      "name": "Buddhism and Triratna",
+      "year": 1,
+      "seriesCodes": [],
+      "talks": [
+        {
+          "catNum": "LOC517",
+          "title": "Triratna Buddhism",
+          "speaker": "Vadanya",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vadanya.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y2_eightfold",
+      "name": "Noble Eightfold Path",
+      "year": 2,
+      "seriesCodes": [
+        "X07"
+      ],
+      "talks": [
+        {
+          "catNum": "47",
+          "title": "The Nature of Existence: Right Understanding",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "48",
+          "title": "Reason and Emotion in the Spiritual Life: Right Resolve",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "49",
+          "title": "The Ideal of Human Communication: Right Speech",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "50",
+          "title": "The Principles of Ethics: Right Action",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "51",
+          "title": "The Ideal Society: Right Livelihood",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "52",
+          "title": "The Conscious Evolution of Man: Right Effort",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "53",
+          "title": "Levels of Awareness: Right Mindfulness",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "54",
+          "title": "Samadhi, the Higher Consciousness: Right Meditation",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y2_conditionality",
+      "name": "Pratitya-Samutpada",
+      "year": 2,
+      "seriesCodes": [],
+      "talks": [
+        {
+          "catNum": "24",
+          "title": "The Dynamics of Being",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "LOC432",
+          "title": "Revering and Relying Upon the Dharma",
+          "speaker": "Subhuti",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/OKSt7sgcGxBe.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y2_five_aspects",
+      "name": "Five Aspects of Dharma Life",
+      "year": 2,
+      "seriesCodes": [
+        "X74"
+      ],
+      "talks": [
+        {
+          "catNum": "LOC1691",
+          "title": "The Five Aspects of Dharma Life - Integration",
+          "speaker": "Subhuti",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/OKSt7sgcGxBe.jpg"
+        },
+        {
+          "catNum": "LOC1698",
+          "title": "The Five Aspects of Dharma Life - Positive Emotion",
+          "speaker": "Subhuti",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/OKSt7sgcGxBe.jpg"
+        },
+        {
+          "catNum": "LOC1699",
+          "title": "The Five Aspects of Dharma Life - Questions and Answers",
+          "speaker": "Subhuti",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/OKSt7sgcGxBe.jpg"
+        },
+        {
+          "catNum": "LOC1701",
+          "title": "The Five Aspects of Dharma Life - Spiritual Receptivity",
+          "speaker": "Subhuti",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/OKSt7sgcGxBe.jpg"
+        },
+        {
+          "catNum": "LOC1714",
+          "title": "The Five Aspects of Dharma Life - Spiritual Rebirth",
+          "speaker": "Subhuti",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/OKSt7sgcGxBe.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y2_mind_turning",
+      "name": "Turning the Mind",
+      "year": 2,
+      "seriesCodes": [
+        "X25"
+      ],
+      "talks": [
+        {
+          "catNum": "OM739",
+          "title": "The Four Mind-Turning Reflections",
+          "speaker": "Dhammadinna",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/EjVD2wfyd4Af.jpg"
+        },
+        {
+          "catNum": "OM743",
+          "title": "The Defects and Dangers of Samsara",
+          "speaker": "Maitreyi",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/maitreyi.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y2_mindfulness",
+      "name": "Way of Mindfulness",
+      "year": 2,
+      "seriesCodes": [
+        "X93"
+      ],
+      "talks": [
+        {
+          "catNum": "OM838",
+          "title": "The Way of Mindfulness - Introduction to the Satipatthana Sutta",
+          "speaker": "Vidyamala",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vidyamala.jpg"
+        },
+        {
+          "catNum": "M14",
+          "title": "The Way of Mindfulness Week 1 - Awareness Meditation",
+          "speaker": "Vidyamala",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vidyamala.jpg"
+        },
+        {
+          "catNum": "M15",
+          "title": "The Way of Mindfulness Week 2 - Body Scan (Breath-Based)",
+          "speaker": "Vidyamala",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vidyamala.jpg"
+        },
+        {
+          "catNum": "M16",
+          "title": "The Way of Mindfulness Week 3 - Vedana Meditation",
+          "speaker": "Vidyamala",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vidyamala.jpg"
+        },
+        {
+          "catNum": "M17",
+          "title": "The Way of Mindfulness Week 4 - Unworldly Vedana Meditation",
+          "speaker": "Vidyamala",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vidyamala.jpg"
+        },
+        {
+          "catNum": "M18",
+          "title": "The Way of Mindfulness Week 5 - Citta Meditation",
+          "speaker": "Vidyamala",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vidyamala.jpg"
+        },
+        {
+          "catNum": "M19",
+          "title": "The Way of Mindfulness Week 6 - Working with Thoughts and Emotions",
+          "speaker": "Vidyamala",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vidyamala.jpg"
+        },
+        {
+          "catNum": "M20",
+          "title": "The Way of Mindfulness Week 7 - Hindrances and Awakening Factors",
+          "speaker": "Vidyamala",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/vidyamala.jpg"
+        },
+        {
+          "catNum": "LOC1016",
+          "title": "Living with Awareness (A Guide to the Satipatthana Sutta) - Part 1",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "LOC1017",
+          "title": "Living with Awareness (A Guide to the Satipatthana Sutta) - Part 2",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y2_sangha",
+      "name": "What is the Sangha?",
+      "year": 2,
+      "seriesCodes": [],
+      "talks": [
+        {
+          "catNum": "142",
+          "title": "Commitment and Spiritual Community",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y2_tradition",
+      "name": "A Living Tradition",
+      "year": 2,
+      "seriesCodes": [
+        "X100"
+      ],
+      "talks": []
+    },
+    {
+      "id": "y3_pali",
+      "name": "Selected Suttas (Pali Canon)",
+      "year": 3,
+      "seriesCodes": [],
+      "talks": [
+        {
+          "catNum": "S01",
+          "title": "Readings from the Pali Canon",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y3_dhammapada",
+      "name": "The Dhammapada",
+      "year": 3,
+      "seriesCodes": [
+        "X37"
+      ],
+      "talks": [
+        {
+          "catNum": "OM790",
+          "title": "The Essential Revolution - Dhammapada Verses 1 & 2",
+          "speaker": "Padmavajra",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/74F3308hMMvn.jpg"
+        },
+        {
+          "catNum": "OM791",
+          "title": "Changing Hatred into Love - Dhammapada Verses 3 to 6",
+          "speaker": "Padmavajra",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/74F3308hMMvn.jpg"
+        },
+        {
+          "catNum": "OM792",
+          "title": "Mindfulness is the Way to the Deathless - Dhammapada Verses 7, 8, 21 & 23",
+          "speaker": "Padmavajra",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/74F3308hMMvn.jpg"
+        },
+        {
+          "catNum": "OM793",
+          "title": "Seeing with Insight - Dhammapada Verses 277 to 279",
+          "speaker": "Padmavajra",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/74F3308hMMvn.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y3_insight",
+      "name": "Towards Insight",
+      "year": 3,
+      "seriesCodes": [],
+      "talks": [
+        {
+          "catNum": "LOC100",
+          "title": "Towards Insight - Contemplations of the Buddha",
+          "speaker": "Dayanandi and Ratnaguna",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/talks/LOC100.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y3_mahayana",
+      "name": "Mahayana Perspectives",
+      "year": 3,
+      "seriesCodes": [],
+      "talks": []
+    },
+    {
+      "id": "y4_bodhisattva",
+      "name": "The Bodhisattva Ideal",
+      "year": 4,
+      "seriesCodes": [
+        "X09"
+      ],
+      "talks": [
+        {
+          "catNum": "65",
+          "title": "The Origin and Development of the Bodhisattva Ideal",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "67",
+          "title": "The Bodhisattva Vow",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "71",
+          "title": "The Bodhisattva Hierarchy",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "LOC1020",
+          "title": "The Bodhisattva Ideal: Wisdom and Compassion in Buddhism - Part 1",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y4_sangha",
+      "name": "Nature of the Sangha",
+      "year": 4,
+      "seriesCodes": [],
+      "talks": []
+    },
+    {
+      "id": "y4_symbols",
+      "name": "Faith, Symbols, and Imagination",
+      "year": 4,
+      "seriesCodes": [
+        "X13"
+      ],
+      "talks": [
+        {
+          "catNum": "103",
+          "title": "The Symbolism of the Tibetan Wheel of Life",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "104",
+          "title": "The Tantric Symbolism of the Stupa",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y4_ethics_env",
+      "name": "Ethics and Environment",
+      "year": 4,
+      "seriesCodes": [
+        "X141"
+      ],
+      "talks": [
+        {
+          "catNum": "LOC3566",
+          "title": "Introducing Ethics: Resonating with Reality",
+          "speaker": "Maitrisiddhi",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/t3k3UrtQ0pxL.jpg"
+        },
+        {
+          "catNum": "LOC3565",
+          "title": "Metta Versus Pema: Love and Attachment",
+          "speaker": "Dharmakarunya",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/dharmakarunya.jpg"
+        },
+        {
+          "catNum": "LOC3563",
+          "title": "Love and Sex - The Third Precept",
+          "speaker": "Sahajatara",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/sahajatara.jpg"
+        },
+        {
+          "catNum": "LOC3564",
+          "title": "The Speech Precepts",
+          "speaker": "Sahajatara",
+          "imageUrl": "https://www.freebuddhistaudio.com/images/people/sahajatara.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y4_psychology",
+      "name": "Buddhist Psychology",
+      "year": 4,
+      "seriesCodes": [],
+      "talks": [
+        {
+          "catNum": "40",
+          "title": "The Analytical Psychology of the Abhidharma",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        },
+        {
+          "catNum": "41",
+          "title": "The Psychology of Spiritual Development",
+          "speaker": "Sangharakshita",
+          "imageUrl": "https://www.freebuddhistaudio.com/m/uKp8bNgbigXw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "y4_history",
+      "name": "History of Triratna",
+      "year": 4,
+      "seriesCodes": [
+        "X100"
+      ],
+      "talks": []
+    }
+  ]
+}
