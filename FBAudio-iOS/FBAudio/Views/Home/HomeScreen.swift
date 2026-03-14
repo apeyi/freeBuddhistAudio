@@ -38,9 +38,8 @@ struct HomeScreen: View {
 
     private var sangharakshitaSection: some View {
         VStack(spacing: 0) {
-            Image("sangharakshita")
-                .resizable()
-                .aspectRatio(16/9, contentMode: .fill)
+            BundleImage(name: "sangharakshita")
+                .aspectRatio(16.0/9.0, contentMode: .fill)
                 .clipped()
 
             VStack(alignment: .leading, spacing: 4) {
@@ -115,8 +114,7 @@ struct HomeScreen: View {
     private var donateCard: some View {
         Button(action: onDonateClick) {
             HStack(spacing: 12) {
-                Image("fba_logo")
-                    .resizable()
+                BundleImage(name: "fba_logo")
                     .aspectRatio(contentMode: .fit)
                     .frame(height: 28)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
