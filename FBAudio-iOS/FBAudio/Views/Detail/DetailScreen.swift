@@ -190,7 +190,7 @@ struct DetailScreen: View {
                     HStack {
                         Text(track.title.isEmpty ? "Chapter \(index + 1)" : track.title)
                             .fontWeight(isCurrent ? .bold : .regular)
-                            .foregroundStyle(isCurrent ? .saffronOrange : .primary)
+                            .foregroundStyle(isCurrent ? Color.saffronOrange : .primary)
                         Spacer()
                         if track.durationSeconds > 0 {
                             Text(formatDuration(track.durationSeconds))
