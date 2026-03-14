@@ -57,7 +57,7 @@ class SharedDataLoader {
     }
 
     private static func loadSangharakshita() {
-        guard let url = Bundle.main.url(forResource: "sangharakshita", withExtension: "json", subdirectory: "SharedData") else {
+        guard let url = Bundle.main.url(forResource: "sangharakshita", withExtension: "json", subdirectory: "fbaudio-shared") else {
             print("sangharakshita.json not found in bundle")
             return
         }
@@ -120,7 +120,7 @@ class SharedDataLoader {
     private static var _mitraModules: [MitraModule]?
 
     private static func loadMitraStudy() {
-        guard let url = Bundle.main.url(forResource: "mitra_study", withExtension: "json", subdirectory: "SharedData") else {
+        guard let url = Bundle.main.url(forResource: "mitra_study", withExtension: "json", subdirectory: "fbaudio-shared") else {
             print("mitra_study.json not found in bundle")
             return
         }
