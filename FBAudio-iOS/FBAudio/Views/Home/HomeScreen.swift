@@ -39,7 +39,9 @@ struct HomeScreen: View {
     private var sangharakshitaSection: some View {
         VStack(spacing: 0) {
             BundleImage(name: "sangharakshita")
-                .aspectRatio(16.0/9.0, contentMode: .fill)
+                .aspectRatio(contentMode: .fill)
+                .frame(maxWidth: .infinity)
+                .aspectRatio(16.0/9.0, contentMode: .fit)
                 .clipped()
 
             VStack(alignment: .leading, spacing: 4) {

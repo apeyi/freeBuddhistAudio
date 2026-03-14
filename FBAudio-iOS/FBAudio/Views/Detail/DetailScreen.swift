@@ -50,10 +50,13 @@ struct DetailScreen: View {
                 // Image
                 if !talk.imageUrl.isEmpty {
                     AsyncImage(url: URL(string: talk.imageUrl)) { image in
-                        image.resizable().aspectRatio(16.0/9.0, contentMode: .fill)
+                        image.resizable().aspectRatio(contentMode: .fill)
                     } placeholder: {
-                        Color.gray.opacity(0.2).aspectRatio(16.0/9.0, contentMode: .fill)
+                        Color.gray.opacity(0.2)
                     }
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(16.0/9.0, contentMode: .fit)
+                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 

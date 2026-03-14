@@ -77,11 +77,22 @@ class DownloadManager: ObservableObject {
         downloads[catNum]?.status = .downloading
         downloads[catNum]?.progress = 0
 
+        // Ensure downloads directory exists
+        try? FileManager.default.createDirectory(at: downloadsDir, withIntermediateDirectories: true)
+
         let urls = talk.tracks.isEmpty ? [talk.audioUrl] : talk.tracks.map(\.audioUrl)
+        let validUrls = urls.filter { !$0.isEmpty }
+        guard !validUrls.isEmpty else {
+            print("DownloadManager: No audio URLs for \(catNum)")
+            downloads[catNum]?.status = .failed
+            saveDownloads()
+            return
+        }
         var totalBytes: Int64 = 0
 
-        for (index, urlString) in urls.enumerated() {
+        for (index, urlString) in validUrls.enumerated() {
             guard let url = URL(string: urlString) else {
+                print("DownloadManager: Invalid URL: \(urlString)")
                 downloads[catNum]?.status = .failed
                 saveDownloads()
                 return
@@ -90,6 +101,8 @@ class DownloadManager: ObservableObject {
             do {
                 let (data, response) = try await URLSession.shared.data(from: url)
                 guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                    let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    print("DownloadManager: HTTP \(code) for \(urlString)")
                     downloads[catNum]?.status = .failed
                     saveDownloads()
                     return
@@ -99,9 +112,10 @@ class DownloadManager: ObservableObject {
                 try data.write(to: filePath)
                 totalBytes += Int64(data.count)
 
-                let progress = ((index + 1) * 100) / urls.count
+                let progress = ((index + 1) * 100) / validUrls.count
                 downloads[catNum]?.progress = progress
             } catch {
+                print("DownloadManager: Download error for \(urlString): \(error)")
                 downloads[catNum]?.status = .failed
                 saveDownloads()
                 return
