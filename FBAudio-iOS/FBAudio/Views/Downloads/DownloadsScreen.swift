@@ -18,7 +18,14 @@ struct DownloadsScreen: View {
     var body: some View {
         Group {
             if downloads.isEmpty {
-                ContentUnavailableView("No downloads yet", systemImage: "arrow.down.circle")
+                VStack(spacing: 12) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                    Text("No downloads yet")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(downloads) { download in
                     let subtitle: String? = {
