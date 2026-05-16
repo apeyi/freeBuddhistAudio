@@ -6,7 +6,7 @@ A mobile app for the [Free Buddhist Audio](https://www.freebuddhistaudio.com/) a
 
 ```
 /workspace/
-├── FBAudio/           — Android app (Kotlin/Jetpack Compose)
+├── FBAudio-Android/   — Android app (Kotlin/Jetpack Compose)
 ├── FBAudio-iOS/       — iOS app (SwiftUI, uses XcodeGen)
 ├── fbaudio-shared/    — Shared JSON data + images (both platforms read from here)
 ├── codemagic.yaml     — Codemagic CI config for iOS builds
@@ -27,7 +27,7 @@ iOS bundles the `fbaudio-shared/` folder as a resource directory and parses JSON
 
 ```bash
 # Build debug
-cd FBAudio && ./gradlew assembleDebug
+cd FBAudio-Android && ./gradlew assembleDebug
 
 # Run tests
 ./gradlew testDebugUnitTest
