@@ -42,6 +42,7 @@ import com.fba.app.ui.components.TalkCard
 @Composable
 fun SearchScreen(
     onTalkClick: (String) -> Unit,
+    onSeriesClick: (String) -> Unit = {},
     onBack: () -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
@@ -180,12 +181,16 @@ fun SearchScreen(
                 }
                 else -> {
                     items(state.filteredResults, key = { it.catNum }) { result ->
+                        val isSeries = result.path.contains("/series/")
                         TalkCard(
                             title = result.title,
-                            speaker = result.speaker,
+                            speaker = if (isSeries) "Series · ${result.speaker}" else result.speaker,
                             imageUrl = result.imageUrl,
                             subtitle = if (result.year > 0) result.year.toString() else null,
-                            onClick = { onTalkClick(result.catNum) },
+                            onClick = {
+                                if (isSeries) onSeriesClick(result.path)
+                                else onTalkClick(result.catNum)
+                            },
                         )
                     }
                 }

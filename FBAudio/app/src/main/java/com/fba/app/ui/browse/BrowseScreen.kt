@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,6 +63,32 @@ fun BrowseScreen(
     }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val handleBack = {
+        if (alwaysPopOnBack) {
+            onBack()
+        } else if (hasInitialSelection) {
+            val canGoBack = when {
+                initialSangharakshitaSeries && state.selectedCategory?.id?.startsWith("sang_series_") == true -> true
+                initialMitraStudy && (state.showingSubCategories || state.selectedCategory?.type == CategoryType.MITRA_MODULE) -> true
+                else -> false
+            }
+            if (canGoBack) {
+                viewModel.clearSelection()
+                val newState = viewModel.uiState.value
+                if (!newState.showingSubCategories && newState.selectedCategory == null) {
+                    onBack()
+                }
+            } else onBack()
+        } else if (state.selectedCategory != null || state.showingSubCategories) {
+            viewModel.clearSelection()
+        } else {
+            onBack()
+        }
+    }
+
+    // Make system back gesture match toolbar back button
+    BackHandler { handleBack() }
+
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -77,31 +104,7 @@ fun BrowseScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (alwaysPopOnBack) {
-                            onBack()
-                        } else if (hasInitialSelection) {
-                            // If showing sub-content within the initial selection, go back within it
-                            // Otherwise pop back to the previous screen entirely
-                            val canGoBack = when {
-                                initialSangharakshitaSeries && state.selectedCategory?.id?.startsWith("sang_series_") == true -> true
-                                initialMitraStudy && (state.showingSubCategories || state.selectedCategory?.type == CategoryType.MITRA_MODULE) -> true
-                                else -> false
-                            }
-                            if (canGoBack) {
-                                viewModel.clearSelection()
-                                // If clearSelection brought us back to root categories, pop nav instead
-                                val newState = viewModel.uiState.value
-                                if (!newState.showingSubCategories && newState.selectedCategory == null) {
-                                    onBack()
-                                }
-                            } else onBack()
-                        } else if (state.selectedCategory != null || state.showingSubCategories) {
-                            viewModel.clearSelection()
-                        } else {
-                            onBack()
-                        }
-                    }) {
+                    IconButton(onClick = { handleBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },

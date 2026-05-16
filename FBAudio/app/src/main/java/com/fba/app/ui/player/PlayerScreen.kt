@@ -70,6 +70,7 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onNavigateToDetail: (String) -> Unit = {},
     onSpeakerClick: (String) -> Unit = {},
+    onSeriesClick: (String) -> Unit = {},
     playerViewModel: PlayerViewModel,
 ) {
     val state by playerViewModel.uiState.collectAsStateWithLifecycle()
@@ -173,6 +174,17 @@ fun PlayerScreen(
                     if (!sp.isNullOrBlank()) onSpeakerClick(sp)
                 },
             )
+            // Series link
+            if (talk?.series?.isNotBlank() == true) {
+                Text(
+                    text = talk.series,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.clickable {
+                        onSeriesClick(talk.seriesHref.ifBlank { talk.series })
+                    },
+                )
+            }
             // Chapter info
             if (hasMultipleTracks) {
                 Text(
@@ -344,6 +356,15 @@ fun PlayerScreen(
                         playerViewModel.setPlaybackSpeed(snapped)
                     },
                     modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    thumb = {},
+                    track = { sliderState ->
+                        SliderDefaults.Track(
+                            sliderState = sliderState,
+                            modifier = Modifier.height(4.dp),
+                            thumbTrackGapSize = 0.dp,
+                            drawStopIndicator = null,
+                        )
+                    },
                 )
                 Text("2.0x", style = MaterialTheme.typography.labelSmall)
             }

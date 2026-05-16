@@ -31,7 +31,6 @@ fun NavGraph(
                 onTalkClick = { navController.navigate(Routes.detail(it)) },
                 onSangharakshitaByYearClick = { navController.navigate(Routes.SANGHARAKSHITA_BY_YEAR) },
                 onSangharakshitaSeriesClick = { navController.navigate(Routes.SANGHARAKSHITA_SERIES) },
-                onMitraStudyClick = { navController.navigate(Routes.MITRA_STUDY) },
                 onDonateClick = {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.freebuddhistaudio.com/donate/")))
                 },
@@ -40,6 +39,7 @@ fun NavGraph(
         composable(Routes.SEARCH) {
             SearchScreen(
                 onTalkClick = { navController.navigate(Routes.detail(it)) },
+                onSeriesClick = { navController.navigate(Routes.browseForSeries(it)) },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -78,6 +78,9 @@ fun NavGraph(
                 },
                 onSpeakerClick = { speakerName ->
                     navController.navigate(Routes.browseForSpeaker(speakerName))
+                },
+                onSeriesClick = { seriesName ->
+                    navController.navigate(Routes.browseForSeries(seriesName))
                 },
                 playerViewModel = playerViewModel,
             )

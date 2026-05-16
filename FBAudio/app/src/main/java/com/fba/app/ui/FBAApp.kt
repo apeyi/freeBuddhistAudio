@@ -16,6 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -26,15 +27,38 @@ import com.fba.app.ui.navigation.NavGraph
 import com.fba.app.ui.navigation.Routes
 import com.fba.app.ui.player.MiniPlayer
 import com.fba.app.ui.player.PlayerViewModel
+import com.fba.app.domain.model.SangharakshitaData
 import com.fba.app.ui.theme.FBATheme
 
+sealed class DeepLink {
+    data class Talk(val catNum: String) : DeepLink()
+    data class Series(val seriesId: String) : DeepLink()
+    data class Speaker(val name: String) : DeepLink()
+}
+
 @Composable
-fun FBAApp() {
+fun FBAApp(deepLink: DeepLink? = null) {
     FBATheme {
         val navController = rememberNavController()
         val playerViewModel: PlayerViewModel = hiltViewModel()
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
+
+        // Handle deep link navigation
+        LaunchedEffect(deepLink) {
+            when (deepLink) {
+                is DeepLink.Talk -> navController.navigate(Routes.detail(deepLink.catNum))
+                is DeepLink.Series -> {
+                    val seriesTitle = SangharakshitaData.series
+                        .firstOrNull { it.id == deepLink.seriesId }?.title
+                    if (seriesTitle != null) {
+                        navController.navigate(Routes.browseForSeries(seriesTitle))
+                    }
+                }
+                is DeepLink.Speaker -> navController.navigate(Routes.browseForSpeaker(deepLink.name))
+                null -> {}
+            }
+        }
 
         val hideBottomBar = currentRoute == Routes.PLAYER
         val playerState by playerViewModel.uiState.collectAsStateWithLifecycle()

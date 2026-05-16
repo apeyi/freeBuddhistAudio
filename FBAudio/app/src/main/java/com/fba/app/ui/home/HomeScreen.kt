@@ -19,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DownloadDone
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -48,7 +47,6 @@ fun HomeScreen(
     onTalkClick: (String) -> Unit,
     onSangharakshitaByYearClick: () -> Unit = {},
     onSangharakshitaSeriesClick: (String) -> Unit = {},
-    onMitraStudyClick: () -> Unit = {},
     onDonateClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -69,17 +67,6 @@ fun HomeScreen(
                     seriesCount = state.sangharakshitaSeriesCount,
                     onByYearClick = onSangharakshitaByYearClick,
                     onSeriesClick = onSangharakshitaSeriesClick,
-                )
-            }
-
-            // --- Mitra Study section ---
-            item {
-                Spacer(Modifier.height(8.dp))
-                SectionCard(
-                    title = "Mitra Study",
-                    subtitle = "Structured study courses",
-                    icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(32.dp)) },
-                    onClick = onMitraStudyClick,
                 )
             }
 

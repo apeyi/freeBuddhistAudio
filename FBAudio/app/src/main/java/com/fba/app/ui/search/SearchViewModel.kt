@@ -9,6 +9,7 @@ import com.fba.app.ui.friendlyError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -168,7 +169,15 @@ class SearchViewModel @Inject constructor(
                 return
             }
 
-            val results = repository.searchAudio(query)
+            val audioDeferred = viewModelScope.async { repository.searchAudio(query) }
+            val seriesDeferred = viewModelScope.async {
+                try { repository.searchSeries(query) } catch (_: Exception) { emptyList() }
+            }
+            val audioResults = audioDeferred.await()
+            val seriesResults = seriesDeferred.await()
+            // Series first, then audio talks; deduplicate by catNum
+            val seen = mutableSetOf<String>()
+            val results = (seriesResults + audioResults).filter { seen.add(it.catNum) }
             if (results.isNotEmpty()) searchCache[cacheKey] = results
             _uiState.value = _uiState.value.copy(
                 results = results, filteredResults = results,

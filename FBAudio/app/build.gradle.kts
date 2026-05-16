@@ -16,6 +16,7 @@ val generateSharedData by tasks.registering(GenerateSharedData::class) {
 android {
     namespace = "com.fba.app"
     compileSdk = 36
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "com.fba.app"

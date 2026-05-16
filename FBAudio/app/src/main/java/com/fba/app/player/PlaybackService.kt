@@ -28,6 +28,17 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
 
+        // Dismiss notification when playback ends (prevents stale notification)
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
+                    if (!player.playWhenReady) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    }
+                }
+            }
+        })
+
         mediaSession = MediaSession.Builder(this, player).build()
     }
 
@@ -36,10 +47,13 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Stop playback when user swipes app away from recents
-        mediaSession?.player?.let {
-            it.pause()
-            it.stop()
+        // Stop playback and dismiss notification when user swipes app away
+        mediaSession?.player?.let { player ->
+            if (!player.playWhenReady || player.mediaItemCount == 0) {
+                // Not actively playing — clean up completely
+                player.stop()
+                player.clearMediaItems()
+            }
         }
         stopSelf()
     }

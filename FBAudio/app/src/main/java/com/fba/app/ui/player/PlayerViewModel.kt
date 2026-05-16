@@ -108,18 +108,23 @@ class PlayerViewModel @Inject constructor(
         val lastDuration = prefs.getLong("last_duration_$lastCatNum", 0)
         pendingRestore = RestoreState(lastCatNum, lastPos, lastTrackIndex)
         viewModelScope.launch {
-            val talk = talkRepository.getTalkDetail(lastCatNum) ?: return@launch
-            val trackDuration = talk.tracks.getOrNull(lastTrackIndex)?.durationSeconds?.let { it * 1000L }
-                ?: lastDuration.takeIf { it > 0 }
-                ?: (talk.durationSeconds * 1000L)
-            _uiState.value = _uiState.value.copy(
-                currentTalk = talk,
-                isVisible = true,
-                currentPosition = lastPos.coerceAtMost(trackDuration),
-                duration = trackDuration,
-                currentTrackIndex = lastTrackIndex,
-                isPlaying = false,
-            )
+            try {
+                val talk = talkRepository.getTalkDetail(lastCatNum) ?: return@launch
+                val trackDuration = talk.tracks.getOrNull(lastTrackIndex)?.durationSeconds?.let { it * 1000L }
+                    ?: lastDuration.takeIf { it > 0 }
+                    ?: (talk.durationSeconds * 1000L)
+                _uiState.value = _uiState.value.copy(
+                    currentTalk = talk,
+                    isVisible = true,
+                    currentPosition = lastPos.coerceAtMost(trackDuration),
+                    duration = trackDuration,
+                    currentTrackIndex = lastTrackIndex,
+                    isPlaying = false,
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("PlayerViewModel", "Failed to restore last playback", e)
+                pendingRestore = null
+            }
         }
     }
 
@@ -231,16 +236,24 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun connectToService() {
-        val sessionToken = SessionToken(context, ComponentName(context, PlaybackService::class.java))
-        val controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
-        controllerFuture.addListener({
-            mediaController = controllerFuture.get()
-            mediaController?.addListener(playerListener)
-            mediaController?.setPlaybackSpeed(savedSpeed)
-            // Start polling only if already playing (e.g. after config change)
-            if (mediaController?.isPlaying == true) startPositionUpdates()
-            applyPendingRestore()
-        }, MoreExecutors.directExecutor())
+        try {
+            val sessionToken = SessionToken(context, ComponentName(context, PlaybackService::class.java))
+            val controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
+            controllerFuture.addListener({
+                try {
+                    mediaController = controllerFuture.get()
+                    mediaController?.addListener(playerListener)
+                    mediaController?.setPlaybackSpeed(savedSpeed)
+                    // Start polling only if already playing (e.g. after config change)
+                    if (mediaController?.isPlaying == true) startPositionUpdates()
+                    applyPendingRestore()
+                } catch (e: Exception) {
+                    android.util.Log.e("PlayerViewModel", "Failed to connect to PlaybackService", e)
+                }
+            }, MoreExecutors.directExecutor())
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerViewModel", "Failed to create session token", e)
+        }
     }
 
     private fun startPositionUpdates() {

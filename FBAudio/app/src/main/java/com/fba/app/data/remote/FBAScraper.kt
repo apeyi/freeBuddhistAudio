@@ -325,9 +325,17 @@ class FBAScraper @Inject constructor(
      * Returns results matching across titles, speakers, and descriptions.
      */
     suspend fun searchAudio(query: String): List<SearchResult> = withContext(Dispatchers.IO) {
+        searchByType(query, "audio")
+    }
+
+    suspend fun searchSeries(query: String): List<SearchResult> = withContext(Dispatchers.IO) {
+        searchByType(query, "series")
+    }
+
+    private fun searchByType(query: String, type: String): List<SearchResult> {
         val url = "$BASE_URL/api/v1/search".toHttpUrl().newBuilder()
             .addQueryParameter("q", query)
-            .addQueryParameter("type", "audio")
+            .addQueryParameter("type", type)
             .build().toString()
         val request = Request.Builder().url(url).build()
         val body = client.newCall(request).execute().use { response ->
@@ -335,8 +343,8 @@ class FBAScraper @Inject constructor(
             response.body?.string() ?: throw Exception("Empty response")
         }
         val json = JsonParser.parseString(body).asJsonObject
-        val searchObj = json.getAsJsonObject("search") ?: return@withContext emptyList()
-        val items = searchObj.getAsJsonArray("results") ?: return@withContext emptyList()
+        val searchObj = json.getAsJsonObject("search") ?: return emptyList()
+        val items = searchObj.getAsJsonArray("results") ?: return emptyList()
         val results = mutableListOf<SearchResult>()
         val seen = mutableSetOf<String>()
         for (item in items) {
@@ -356,7 +364,7 @@ class FBAScraper @Inject constructor(
                 )
             )
         }
-        results
+        return results
     }
 
     /**

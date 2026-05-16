@@ -25,6 +25,48 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="www.freebuddhistaudio.com"
+                    android:pathPrefix="/audio/details" />
+                <data
+                    android:scheme="https"
+                    android:host="www.freebuddhistaudio.com"
+                    android:pathPrefix="/series/details" />
+                <data
+                    android:scheme="https"
+                    android:host="www.freebuddhistaudio.com"
+                    android:pathPrefix="/browse" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="freebuddhistaudio.com"
+                    android:pathPrefix="/audio/details" />
+                <data
+                    android:scheme="https"
+                    android:host="freebuddhistaudio.com"
+                    android:pathPrefix="/series/details" />
+                <data
+                    android:scheme="https"
+                    android:host="freebuddhistaudio.com"
+                    android:pathPrefix="/browse" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="fbaudio" android:host="talk" />
+                <data android:scheme="fbaudio" android:host="series" />
+                <data android:scheme="fbaudio" android:host="speaker" />
+            </intent-filter>
         </activity>
 
         <service

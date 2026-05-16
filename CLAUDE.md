@@ -198,6 +198,45 @@ curl -s -X DELETE "https://console.vast.ai/api/v0/instances/INSTANCE_ID/" \
 - Instance boot + docker pull takes 1-2 min
 - Container logs (from onstart) may take a minute to appear; daemon logs are available sooner
 
+## GitHub Releases
+
+Release descriptions must use collapsible `<details>` tags:
+
+```markdown
+<details>
+<summary>What's new</summary>
+
+- Feature 1
+- Bug fix 1
+</details>
+```
+
+## Telegram Bridge
+
+Env vars: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_USER_ID`
+
+Scripts in `scripts/`:
+- `telegram_poll.py` — long-polls Telegram, prints message and exits when one arrives
+- `telegram_send.py` — sends a message to the user: `python3 scripts/telegram_send.py "text"`
+
+### How it works (background poll in active session)
+
+1. Run `python3 scripts/telegram_poll.py` as a background bash command
+2. When a message arrives, the command completes and wakes Claude
+3. Read the message from the task output, do the work, reply via `telegram_send.py`
+4. Display both the user's message and the reply as normal text in the terminal
+5. Start polling again (goto 1)
+
+### After session restart
+
+Run `claude --resume SESSION_ID` then say "start listening on Telegram".
+
+Session ID is saved in `/workspace/.claude_session_id`.
+
+### Standalone bot (auto-start, survives session crashes)
+
+A standalone Python bot runs as a daemon and invokes `claude --print --resume SESSION_ID --dangerously-skip-permissions` for each incoming message. This provides Telegram access even when no interactive session is running. Set up via cron `@reboot`.
+
 ## Key Architecture Notes
 
 - Android theme: hardcoded FBA brand color `#A85D21`, no dynamic/Material You colors

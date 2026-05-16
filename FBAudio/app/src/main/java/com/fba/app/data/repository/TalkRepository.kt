@@ -59,6 +59,11 @@ class TalkRepository @Inject constructor(
         return scraper.searchAudio(query)
     }
 
+    /** Series search via FBA API. */
+    suspend fun searchSeries(query: String): List<SearchResult> {
+        return scraper.searchSeries(query)
+    }
+
     /** Browse all talks by a speaker. Returns BrowsePage with pagination. */
     suspend fun browseBySpeaker(speakerName: String): com.fba.app.data.remote.BrowsePage {
         return scraper.browseBySpeaker(speakerName)
