@@ -23,3 +23,19 @@ local.properties
 
 # Claude
 .claude/
+CLAUDE.local.md
+
+# Local-only state
+.claude_session_id
+.telegram_offset
+.last_*
+
+# Python
+__pycache__/
+*.pyc
+
+# Local-only working data — transcription pipeline, search indexes
+/transcripts/
+/scripts/
+/bot.py
+/FBAudio-simulator.zip
