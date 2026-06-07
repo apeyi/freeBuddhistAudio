@@ -1,5 +1,6 @@
 package com.fba.app.player
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -39,7 +40,21 @@ class PlaybackService : MediaSessionService() {
             }
         })
 
-        mediaSession = MediaSession.Builder(this, player).build()
+        // PendingIntent so tapping the notification (re)launches the app — without
+        // this the notification body does nothing, including after the OS kills us.
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val sessionActivity = launchIntent?.let {
+            PendingIntent.getActivity(
+                this, 0, it,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+        }
+
+        mediaSession = MediaSession.Builder(this, player)
+            .apply { if (sessionActivity != null) setSessionActivity(sessionActivity) }
+            .build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
