@@ -23,6 +23,28 @@ Android reads these at **build time** via a Gradle codegen task (`buildSrc/Gener
 
 iOS bundles the `fbaudio-shared/` folder as a resource directory and parses JSON at runtime via `SharedDataLoader.swift`.
 
+## Development conventions
+
+**Apply every change to both platforms.** This is a dual-platform app — Android
+(`FBAudio-Android/`) and iOS (`FBAudio-iOS/`) are meant to stay at feature
+parity. Any fix, feature, or behaviour change to one platform should be made to
+the other in the same change, unless it's genuinely platform-specific (and then
+say why). Recent examples done on both: the NaN slider/progress guard
+(`safeFraction`), playback-error auto-retry, and the `PlaybackMath` extraction.
+
+**Write tests as part of the work, not after.** When fixing a bug or adding
+logic, ask "is there a pure function at the core?" — if so, add a unit test for
+it. Pure logic lives in testable units on purpose:
+- Android: JVM unit tests in `FBAudio-Android/app/src/test/java/com/fba/app/`,
+  run with `./gradlew testDebugUnitTest`. See `HelpersTest`, `PlaybackMathTest`.
+- iOS: XCTest in `FBAudio-iOS/FBAudioTests/`, run via `xcodebuild test` (CI).
+  See `HelpersTests`, `PlaybackMathTests`.
+
+Both test suites run in CI (GitHub Actions / Codemagic), no device needed.
+Prefer extracting fiddly logic (progress math, parsing, formatting) into pure
+functions over testing framework-coupled code (Media3/AVFoundation lifecycle,
+Compose/SwiftUI) which needs instrumented/device tests and isn't worth the cost.
+
 ## Android Builds
 
 ```bash

@@ -318,15 +318,10 @@ class AudioPlayer: ObservableObject {
 
         // Update recently listened
         let tracks = talk.tracks
-        let cumulativePos: Int64
-        if tracks.count > 1 {
-            let priorDuration = tracks.prefix(currentTrackIndex).reduce(0) { $0 + Int64($1.durationSeconds) * 1000 }
-            cumulativePos = priorDuration + posMs
-        } else {
-            cumulativePos = posMs
-        }
-        let totalDur = talk.durationSeconds > 0 ? talk.durationSeconds :
-            (tracks.count > 1 ? tracks.reduce(0) { $0 + $1.durationSeconds } : Int(duration))
+        let cumulativePos = PlaybackMath.cumulativePositionMs(
+            tracks: tracks, trackIndex: currentTrackIndex, positionInTrackMs: posMs)
+        let totalDur = PlaybackMath.totalDurationSeconds(
+            talkDurationSeconds: talk.durationSeconds, tracks: tracks, playerDurationMs: durMs)
 
         persistence.updateRecentlyListened(PersistenceManager.RecentlyListened(
             catNum: talk.catNum, title: talk.title, speaker: talk.speaker,

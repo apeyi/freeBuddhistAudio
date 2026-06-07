@@ -236,15 +236,8 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val trackIndex = state.currentTrackIndex
             val tracks = talk.tracks
-            val priorTrackMs = tracks.take(trackIndex).sumOf { it.durationSeconds.toLong() * 1000 }
-            val cumulativePos = priorTrackMs + pos
-
-            // Prefer talk.durationSeconds, fall back to summed track durations, then to player duration
-            val totalDur = when {
-                talk.durationSeconds > 0 -> talk.durationSeconds
-                tracks.isNotEmpty() -> tracks.sumOf { it.durationSeconds }
-                else -> (dur / 1000).toInt()
-            }
+            val cumulativePos = PlaybackMath.cumulativePositionMs(tracks, trackIndex, pos)
+            val totalDur = PlaybackMath.totalDurationSeconds(talk.durationSeconds, tracks, dur)
 
             recentlyListenedDao.upsert(
                 RecentlyListenedEntity(
