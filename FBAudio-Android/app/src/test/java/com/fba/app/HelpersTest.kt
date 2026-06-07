@@ -2,10 +2,35 @@ package com.fba.app
 
 import com.fba.app.ui.components.formatDuration
 import com.fba.app.ui.components.formatFileSize
+import com.fba.app.ui.components.safeFraction
 import org.junit.Assert.*
 import org.junit.Test
 
 class HelpersTest {
+
+    @Test
+    fun `safeFraction passes through valid fractions`() {
+        assertEquals(0f, 0f.safeFraction())
+        assertEquals(0.5f, 0.5f.safeFraction())
+        assertEquals(1f, 1f.safeFraction())
+    }
+
+    @Test
+    fun `safeFraction coerces out-of-range into 0_1`() {
+        assertEquals(0f, (-0.3f).safeFraction())
+        assertEquals(1f, 1.7f.safeFraction())
+    }
+
+    @Test
+    fun `safeFraction maps NaN and infinity to 0 (the crash guard)`() {
+        // These are the values that crash a Slider / progress bar with
+        // "current must not be NaN" if they reach it unguarded.
+        assertEquals(0f, Float.NaN.safeFraction())
+        assertEquals(0f, (0f / 0f).safeFraction())          // 0/0 -> NaN
+        assertEquals(0f, (1f / 0f).safeFraction())          // +Inf
+        assertEquals(0f, Float.POSITIVE_INFINITY.safeFraction())
+        assertEquals(0f, Float.NEGATIVE_INFINITY.safeFraction())
+    }
 
     @Test
     fun `formatDuration minutes and seconds`() {

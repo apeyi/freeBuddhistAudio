@@ -3,6 +3,28 @@ import XCTest
 
 final class HelpersTests: XCTestCase {
 
+    func testSafeFractionPassesThroughValid() {
+        XCTAssertEqual(Float(0).safeFraction(), 0)
+        XCTAssertEqual(Float(0.5).safeFraction(), 0.5)
+        XCTAssertEqual(Float(1).safeFraction(), 1)
+    }
+
+    func testSafeFractionCoercesOutOfRange() {
+        XCTAssertEqual(Float(-0.3).safeFraction(), 0)
+        XCTAssertEqual(Float(1.7).safeFraction(), 1)
+    }
+
+    func testSafeFractionMapsNaNAndInfinityToZero() {
+        // Values that produce CoreGraphics NaN errors / broken layout if they
+        // reach a Slider or ProgressView unguarded.
+        XCTAssertEqual(Float.nan.safeFraction(), 0)
+        XCTAssertEqual((Float(0) / Float(0)).safeFraction(), 0)
+        XCTAssertEqual(Float.infinity.safeFraction(), 0)
+        XCTAssertEqual((-Float.infinity).safeFraction(), 0)
+        // Double too, since the seek slider uses Double
+        XCTAssertEqual(Double.nan.safeFraction(), 0)
+    }
+
     func testFormatDurationMinutesSeconds() {
         XCTAssertEqual(formatDuration(0), "0:00")
         XCTAssertEqual(formatDuration(65), "1:05")
