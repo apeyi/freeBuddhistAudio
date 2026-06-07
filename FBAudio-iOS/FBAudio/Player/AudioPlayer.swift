@@ -16,6 +16,7 @@ class AudioPlayer: ObservableObject {
     @Published var playbackSpeed: Float = 1.0
     @Published var isVisible = false
     @Published var showDeleteDownloadPrompt = false
+    @Published var playbackError: String?
 
     private var player: AVPlayer?
     private var timeObserver: Any?
@@ -25,6 +26,7 @@ class AudioPlayer: ObservableObject {
     private let persistence = PersistenceManager.shared
     private let downloadManager = DownloadManager.shared
     private var lastSaveTime: Date = .distantPast
+    private var autoRetryCount = 0
 
     // Cached Lock Screen / Control Center artwork, keyed by the image URL it was loaded from
     private var nowPlayingArtwork: MPMediaItemArtwork?
@@ -133,8 +135,16 @@ class AudioPlayer: ObservableObject {
         // Status observer
         statusObserver = item.observe(\.status) { [weak self] item, _ in
             Task { @MainActor in
-                if item.status == .readyToPlay {
-                    self?.duration = item.duration.seconds.isFinite ? item.duration.seconds : 0
+                guard let self else { return }
+                switch item.status {
+                case .readyToPlay:
+                    self.duration = item.duration.seconds.isFinite ? item.duration.seconds : 0
+                    self.autoRetryCount = 0
+                    self.playbackError = nil
+                case .failed:
+                    self.handlePlaybackError(item.error)
+                default:
+                    break
                 }
             }
         }
@@ -178,6 +188,53 @@ class AudioPlayer: ObservableObject {
                 showDeleteDownloadPrompt = true
             }
         }
+    }
+
+    private func handlePlaybackError(_ error: Error?) {
+        let ns = error as NSError?
+        let isNetwork = ns?.domain == NSURLErrorDomain || {
+            switch ns?.code {
+            case NSURLErrorNotConnectedToInternet, NSURLErrorTimedOut,
+                 NSURLErrorCannotFindHost, NSURLErrorNetworkConnectionLost:
+                return true
+            default:
+                return false
+            }
+        }()
+        print("Playback error: \(error?.localizedDescription ?? "unknown")")
+
+        // Transient network errors: auto-retry a few times (network may be flapping).
+        if isNetwork && autoRetryCount < 3 {
+            autoRetryCount += 1
+            let delay = Double(autoRetryCount) * 2.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.rebuildAndPlay()
+            }
+        } else {
+            playbackError = isNetwork
+                ? "Couldn't load audio — check your connection."
+                : "Couldn't play this talk."
+        }
+    }
+
+    /// Manual retry after an error — resets the auto-retry budget then reloads.
+    func retry() {
+        autoRetryCount = 0
+        rebuildAndPlay()
+    }
+
+    /// Rebuild the player for the current track at the current position and play.
+    private func rebuildAndPlay() {
+        guard let talk = currentTalk, let url = audioUrl(for: talk, trackIndex: currentTrackIndex) else { return }
+        playbackError = nil
+        let resumeAt = currentPosition
+        setupPlayer(url: url)
+        if resumeAt > 1 {
+            player?.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600))
+        }
+        player?.play()
+        player?.rate = playbackSpeed
+        updateNowPlayingInfo()
     }
 
     func dismissDeletePrompt() {

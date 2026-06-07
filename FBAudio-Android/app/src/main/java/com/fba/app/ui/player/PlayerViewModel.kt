@@ -40,6 +40,7 @@ data class PlayerUiState(
     val playbackSpeed: Float = 1.0f,
     val currentTrackIndex: Int = 0,
     val showDeleteDownloadPrompt: Boolean = false,
+    val playbackError: String? = null,
 )
 
 @HiltViewModel
@@ -61,6 +62,7 @@ class PlayerViewModel @Inject constructor(
     private var positionUpdateJob: Job? = null
     private var lastSaveTime: Long = 0
     private var pendingRestore: RestoreState? = null
+    private var autoRetryCount: Int = 0
 
     private data class RestoreState(val catNum: String, val position: Long, val trackIndex: Int)
 
@@ -68,11 +70,38 @@ class PlayerViewModel @Inject constructor(
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
             if (isPlaying) {
+                // Successful playback — clear any prior error and reset retry budget
+                autoRetryCount = 0
+                if (_uiState.value.playbackError != null) {
+                    _uiState.value = _uiState.value.copy(playbackError = null)
+                }
                 startPositionUpdates()
             } else {
                 stopPositionUpdates()
                 updatePosition() // one final update
                 savePlaybackState()
+            }
+        }
+
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            android.util.Log.e("PlayerViewModel", "Playback error: ${error.errorCodeName}", error)
+            // Transient network errors: auto-retry a few times (network may be flapping).
+            val isNetwork = error.errorCode in intArrayOf(
+                androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+                androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            )
+            if (isNetwork && autoRetryCount < 3) {
+                autoRetryCount++
+                viewModelScope.launch {
+                    delay(2000L * autoRetryCount)
+                    mediaController?.run { prepare(); play() }
+                }
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    playbackError = if (isNetwork) "Couldn't load audio — check your connection."
+                    else "Couldn't play this talk.",
+                )
             }
         }
 
@@ -392,6 +421,16 @@ class PlayerViewModel @Inject constructor(
         mediaController?.let { controller ->
             if (controller.isPlaying) controller.pause()
             else controller.play()
+        }
+    }
+
+    /** Manual retry after a playback error (re-prepares the current media item). */
+    fun retry() {
+        autoRetryCount = 0
+        _uiState.value = _uiState.value.copy(playbackError = null)
+        mediaController?.run {
+            prepare()
+            play()
         }
     }
 

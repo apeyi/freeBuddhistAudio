@@ -194,6 +194,19 @@ fun PlayerScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            // Playback error + retry
+            state.playbackError?.let { err ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                )
+                TextButton(onClick = { playerViewModel.retry() }) {
+                    Text("Retry")
+                }
+            }
         }
 
         // Seek bar

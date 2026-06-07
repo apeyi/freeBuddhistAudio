@@ -66,6 +66,16 @@ struct PlayerScreen: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if let err = player.playbackError {
+                    Text(err)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 8)
+                    Button("Retry") { player.retry() }
+                        .font(.caption)
+                        .tint(.saffronOrange)
+                }
             }
             .padding(.top, 16)
 
