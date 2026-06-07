@@ -75,7 +75,7 @@ struct PlayerScreen: View {
             VStack(spacing: 4) {
                 Slider(
                     value: Binding(
-                        get: { player.duration > 0 ? player.currentPosition / player.duration : 0 },
+                        get: { (player.duration > 0 ? player.currentPosition / player.duration : 0).safeFraction() },
                         set: { player.seekTo($0 * player.duration) }
                     ),
                     in: 0...1
@@ -168,7 +168,7 @@ struct PlayerScreen: View {
                     HStack {
                         Text("0.5x").font(.caption2)
                         Slider(value: Binding(
-                            get: { (player.playbackSpeed - 0.5) / 1.5 },
+                            get: { ((player.playbackSpeed - 0.5) / 1.5).safeFraction() },
                             set: {
                                 let speed = 0.5 + $0 * 1.5
                                 let snapped = (speed * 20).rounded() / 20

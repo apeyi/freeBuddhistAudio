@@ -102,7 +102,7 @@ struct DownloadsScreen: View {
             )
         case .downloading, .pending:
             return AnyView(
-                ProgressView(value: Float(download.progress) / 100)
+                ProgressView(value: (Float(download.progress) / 100).safeFraction())
                     .progressViewStyle(.circular)
                     .controlSize(.small)
             )

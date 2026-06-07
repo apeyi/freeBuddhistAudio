@@ -142,7 +142,7 @@ struct HomeScreen: View {
                     )
 
                     if progress > 0 && !isCompleted {
-                        ProgressView(value: progress)
+                        ProgressView(value: progress.safeFraction())
                             .tint(.saffronOrange)
                             .padding(.horizontal, 12)
                             .padding(.top, 2)

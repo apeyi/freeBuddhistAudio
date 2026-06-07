@@ -1,5 +1,16 @@
 import Foundation
 
+extension BinaryFloatingPoint {
+    /// Coerce into a valid 0...1 progress/slider fraction. NaN or infinite
+    /// inputs become 0 — passing NaN to a SwiftUI Slider or ProgressView
+    /// produces CoreGraphics errors and broken layout, so all such values
+    /// funnel through here.
+    func safeFraction() -> Self {
+        if isNaN || isInfinite { return 0 }
+        return Swift.min(Swift.max(self, 0), 1)
+    }
+}
+
 func formatDuration(_ seconds: Int) -> String {
     let h = seconds / 3600
     let m = (seconds % 3600) / 60
