@@ -39,6 +39,7 @@ import com.fba.app.data.local.DownloadStatus
 import com.fba.app.ui.components.EmptyState
 import com.fba.app.ui.components.TalkCard
 import com.fba.app.ui.components.formatFileSize
+import com.fba.app.ui.components.safeFraction
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,7 +135,7 @@ fun DownloadsScreen(
                                 }
                                 DownloadStatus.DOWNLOADING, DownloadStatus.PENDING -> {
                                     CircularProgressIndicator(
-                                        progress = { download.progress / 100f },
+                                        progress = { (download.progress / 100f).safeFraction() },
                                         modifier = Modifier.size(24.dp),
                                         strokeWidth = 2.dp,
                                     )

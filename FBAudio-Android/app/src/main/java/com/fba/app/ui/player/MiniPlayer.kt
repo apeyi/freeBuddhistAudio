@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.fba.app.ui.components.safeFraction
 
 @Composable
 fun MiniPlayer(
@@ -54,7 +55,7 @@ fun MiniPlayer(
             Column {
                 if (state.duration > 0) {
                     LinearProgressIndicator(
-                        progress = { (state.currentPosition.toFloat() / state.duration).coerceIn(0f, 1f) },
+                        progress = { (state.currentPosition.toFloat() / state.duration).safeFraction() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(2.dp),

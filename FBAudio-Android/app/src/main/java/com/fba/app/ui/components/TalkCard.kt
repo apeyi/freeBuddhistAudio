@@ -85,6 +85,14 @@ fun TalkCard(
     }
 }
 
+/**
+ * Coerce a value into a valid 0..1 progress/slider fraction. NaN or infinite
+ * inputs become 0f — passing NaN to a Slider or progress indicator throws
+ * "current must not be NaN" and crashes the app, so all such values funnel
+ * through here.
+ */
+fun Float.safeFraction(): Float = if (isNaN() || isInfinite()) 0f else coerceIn(0f, 1f)
+
 fun formatDuration(seconds: Int): String {
     val h = seconds / 3600
     val m = (seconds % 3600) / 60

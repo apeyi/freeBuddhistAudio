@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.fba.app.ui.components.formatDuration
+import com.fba.app.ui.components.safeFraction
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -203,13 +204,13 @@ fun PlayerScreen(
         ) {
             var sliderPosition by remember(state.currentPosition) {
                 mutableFloatStateOf(
-                    if (state.duration > 0) state.currentPosition.toFloat() / state.duration
-                    else 0f
+                    (if (state.duration > 0) state.currentPosition.toFloat() / state.duration
+                    else 0f).safeFraction()
                 )
             }
 
             Slider(
-                value = sliderPosition,
+                value = sliderPosition.safeFraction(),
                 onValueChange = { sliderPosition = it },
                 onValueChangeFinished = {
                     playerViewModel.seekTo((sliderPosition * state.duration).toLong())
@@ -327,7 +328,7 @@ fun PlayerScreen(
         // Speed slider — shown inline when tapped
         if (showSpeedSlider) {
             var speedSliderPos by remember(state.playbackSpeed) {
-                mutableFloatStateOf((state.playbackSpeed - 0.5f) / 1.5f) // 0.5-2.0 → 0-1
+                mutableFloatStateOf(((state.playbackSpeed - 0.5f) / 1.5f).safeFraction()) // 0.5-2.0 → 0-1
             }
             val liveSpeed = 0.5f + speedSliderPos * 1.5f
             val displaySpeed = (Math.round(liveSpeed * 20.0) / 20.0).toFloat()
@@ -347,7 +348,7 @@ fun PlayerScreen(
             ) {
                 Text("0.5x", style = MaterialTheme.typography.labelSmall)
                 Slider(
-                    value = speedSliderPos,
+                    value = speedSliderPos.safeFraction(),
                     onValueChange = {
                         speedSliderPos = it
                         // Apply speed live while sliding

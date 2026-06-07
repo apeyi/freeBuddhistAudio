@@ -41,6 +41,7 @@ import androidx.compose.ui.res.painterResource
 import com.fba.app.R
 import com.fba.app.ui.components.TalkCard
 import com.fba.app.ui.components.formatDuration
+import com.fba.app.ui.components.safeFraction
 
 @Composable
 fun HomeScreen(
@@ -134,7 +135,7 @@ fun HomeScreen(
                         )
                         if (progress > 0f && !isCompleted) {
                             LinearProgressIndicator(
-                                progress = { progress },
+                                progress = { progress.safeFraction() },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 2.dp)

@@ -155,7 +155,8 @@ class PlayerViewModel @Inject constructor(
                 .setUri(uri)
                 .setMediaMetadata(
                     MediaMetadata.Builder()
-                        .setTitle(track?.title?.ifBlank { talk.title } ?: talk.title)
+                        .setTitle(talk.title)
+                        .setSubtitle(track?.title?.takeIf { it.isNotBlank() } ?: "")
                         .setArtist(talk.speaker)
                         .setArtworkUri(if (talk.imageUrl.isNotBlank()) Uri.parse(talk.imageUrl) else null)
                         .build()
@@ -317,7 +318,7 @@ class PlayerViewModel @Inject constructor(
             val speakerText = talk?.speaker ?: download?.speaker ?: ""
             val imageUrlText = talk?.imageUrl ?: download?.imageUrl ?: ""
 
-            setMediaAndPlay(audioUri, track?.title?.ifBlank { titleText } ?: titleText, speakerText, imageUrlText)
+            setMediaAndPlay(audioUri, titleText, track?.title.orEmpty(), speakerText, imageUrlText)
 
             // Resume from saved position (10s earlier for context)
             if (savedPos > 10_000) {
@@ -343,12 +344,13 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun setMediaAndPlay(uri: Uri, title: String, speaker: String, imageUrl: String) {
+    private fun setMediaAndPlay(uri: Uri, title: String, chapterTitle: String, speaker: String, imageUrl: String) {
         val mediaItem = MediaItem.Builder()
             .setUri(uri)
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(title)
+                    .setSubtitle(chapterTitle)
                     .setArtist(speaker)
                     .setArtworkUri(if (imageUrl.isNotBlank()) Uri.parse(imageUrl) else null)
                     .build()
@@ -449,7 +451,8 @@ class PlayerViewModel @Inject constructor(
             }
             setMediaAndPlay(
                 uri,
-                track.title.ifBlank { currentTalk.title },
+                currentTalk.title,
+                track.title,
                 currentTalk.speaker,
                 currentTalk.imageUrl,
             )
