@@ -5,10 +5,13 @@ No dependencies beyond Python stdlib (sqlite3 has FTS5 built-in).
 
 Usage: python3 search_lite.py "your query" [--limit N]
 """
+import os
 import sqlite3
 import sys
 
-DB_PATH = "/workspace/scripts/search_lite.db"
+# Resolve next to this script so the tool is portable (zip, clone, anywhere).
+_HERE = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("FBA_SEARCH_LITE_DB", os.path.join(_HERE, "search_lite.db"))
 
 
 def make_fts_queries(query):

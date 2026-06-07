@@ -15,8 +15,10 @@ import numpy as np
 import sqlite_vec
 from sentence_transformers import SentenceTransformer
 
-DB_PATH = "/workspace/scripts/search.db"
-METADATA_PATH = "/workspace/scripts/talk_metadata.json"
+# Resolve next to this script so the tool is portable (zip, clone, anywhere).
+_HERE = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("FBA_SEARCH_DB", os.path.join(_HERE, "search.db"))
+METADATA_PATH = os.environ.get("FBA_TALK_METADATA", os.path.join(_HERE, "talk_metadata.json"))
 RRF_K = 60  # RRF constant (standard value)
 SPEAKER_BOOST = 0.03  # bonus score when speaker name matches query terms
 
