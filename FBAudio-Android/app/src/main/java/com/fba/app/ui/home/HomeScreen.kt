@@ -247,11 +247,9 @@ private fun DonateCard(onDonateClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(R.drawable.fba_logo),
+                painter = painterResource(R.drawable.fba_wordmark),
                 contentDescription = "FBA logo",
-                modifier = Modifier
-                    .height(28.dp)
-                    .clip(RoundedCornerShape(4.dp)),
+                modifier = Modifier.height(28.dp),
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {

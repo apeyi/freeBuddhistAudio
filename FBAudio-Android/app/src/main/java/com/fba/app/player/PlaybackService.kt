@@ -59,6 +59,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        // Ensure the foreground notification is removed when the service goes away.
+        // Force-stop kills the process and skips this, but normal shutdowns will clean up.
+        stopForeground(STOP_FOREGROUND_REMOVE)
         mediaSession?.run {
             player.release()
             release()
