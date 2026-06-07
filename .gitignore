@@ -34,8 +34,22 @@ CLAUDE.local.md
 __pycache__/
 *.pyc
 
-# Local-only working data — transcription pipeline, search indexes
+# Local-only working data
 /transcripts/
-/scripts/
 /bot.py
 /FBAudio-simulator.zip
+
+# Personal infra scripts (kept local, not part of the public pipeline)
+/scripts/bot.py
+/scripts/telegram_poll.py
+/scripts/telegram_send.py
+
+# Search/transcription: track the code & small config, ignore generated data
+/scripts/*.db
+/scripts/*.npy
+/scripts/chunks/
+/scripts/summaries/
+/scripts/summary_texts.json
+/scripts/talk_metadata.json
+/scripts/talk_summaries.json
+/scripts/last_launch.json
