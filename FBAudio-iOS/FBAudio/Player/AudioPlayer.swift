@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import MediaPlayer
 import Combine
+import UIKit
 
 @MainActor
 class AudioPlayer: ObservableObject {
@@ -24,6 +25,10 @@ class AudioPlayer: ObservableObject {
     private let persistence = PersistenceManager.shared
     private let downloadManager = DownloadManager.shared
     private var lastSaveTime: Date = .distantPast
+
+    // Cached Lock Screen / Control Center artwork, keyed by the image URL it was loaded from
+    private var nowPlayingArtwork: MPMediaItemArtwork?
+    private var nowPlayingArtworkUrl: String?
 
     init() {
         playbackSpeed = persistence.playbackSpeed
@@ -188,18 +193,28 @@ class AudioPlayer: ObservableObject {
     // MARK: - Controls
 
     func togglePlayPause() {
-        guard let player else { return }
+        guard let player else {
+            // No AVPlayer yet — e.g. playback state was restored at launch but
+            // never started. Begin the restored talk at its saved position.
+            if let talk = currentTalk { playTalk(talk) }
+            return
+        }
         if player.rate > 0 {
             player.pause()
+            isPlaying = false
             savePlaybackState()
         } else {
             player.play()
             player.rate = playbackSpeed
+            isPlaying = true
         }
+        updateNowPlayingInfo()
     }
 
     func seekTo(_ seconds: TimeInterval) {
         player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+        currentPosition = seconds
+        updateNowPlayingInfo()
     }
 
     func seekForward() {
@@ -228,6 +243,7 @@ class AudioPlayer: ObservableObject {
         if let player, player.rate > 0 {
             player.rate = speed
         }
+        updateNowPlayingInfo()
     }
 
     // MARK: - State Persistence
@@ -299,7 +315,33 @@ class AudioPlayer: ObservableObject {
             info[MPNowPlayingInfoPropertyChapterNumber] = currentTrackIndex
             info[MPNowPlayingInfoPropertyChapterCount] = talk.tracks.count
         }
+        if let nowPlayingArtwork, nowPlayingArtworkUrl == talk.imageUrl {
+            info[MPMediaItemPropertyArtwork] = nowPlayingArtwork
+        }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+
+        // Fetch artwork lazily the first time we see a new talk's image, then refresh
+        if nowPlayingArtworkUrl != talk.imageUrl, !talk.imageUrl.isEmpty {
+            loadNowPlayingArtwork(urlString: talk.imageUrl)
+        }
+    }
+
+    private func loadNowPlayingArtwork(urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        Task { [weak self] in
+            guard let (data, _) = try? await URLSession.shared.data(from: url),
+                  let image = UIImage(data: data) else { return }
+            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            await MainActor.run {
+                guard let self else { return }
+                self.nowPlayingArtwork = artwork
+                self.nowPlayingArtworkUrl = urlString
+                // Re-apply now that artwork is ready, but only if it's still the current talk
+                if self.currentTalk?.imageUrl == urlString {
+                    self.updateNowPlayingInfo()
+                }
+            }
+        }
     }
 
     private func setupRemoteCommands() {

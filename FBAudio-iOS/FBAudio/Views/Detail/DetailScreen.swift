@@ -12,6 +12,7 @@ struct DetailScreen: View {
     @State private var talk: Talk?
     @State private var isLoading = true
     @State private var error: String?
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         Group {
@@ -29,6 +30,14 @@ struct DetailScreen: View {
         .navigationTitle(talk?.title ?? "Talk")
         .navigationBarTitleDisplayMode(.inline)
         .task { loadTalk() }
+        .alert("Delete download?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                downloadManager.deleteDownload(catNum: catNum)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will remove the offline files.")
+        }
     }
 
     private func loadTalk() {
@@ -131,6 +140,7 @@ struct DetailScreen: View {
             }
             .padding(16)
         }
+        .miniPlayerClearance()
     }
 
     @ViewBuilder
@@ -146,7 +156,7 @@ struct DetailScreen: View {
                 .buttonStyle(.bordered)
                 .disabled(true)
 
-                Button(action: { downloadManager.deleteDownload(catNum: talk.catNum) }) {
+                Button(action: { showDeleteConfirm = true }) {
                     Image(systemName: "trash")
                         .foregroundStyle(.red)
                 }

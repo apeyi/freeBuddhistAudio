@@ -14,39 +14,41 @@ struct BundleImage: View {
     }
 
     private func loadImage() -> UIImage? {
-        // Try nested subdirectory
-        if let url = Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "fbaudio-shared/images"),
-           let data = try? Data(contentsOf: url),
-           let image = UIImage(data: data) {
-            return image
+        // Try PNG first (transparent assets), then JPG, across the known locations
+        for ext in ["png", "jpg"] {
+            if let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: "fbaudio-shared/images"),
+               let data = try? Data(contentsOf: url),
+               let image = UIImage(data: data) {
+                return image
+            }
+            if let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: "fbaudio-shared"),
+               let data = try? Data(contentsOf: url),
+               let image = UIImage(data: data) {
+                return image
+            }
+            if let url = Bundle.main.url(forResource: name, withExtension: ext),
+               let data = try? Data(contentsOf: url),
+               let image = UIImage(data: data) {
+                return image
+            }
         }
-        // Try flat subdirectory (in case bundled differently)
-        if let url = Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "fbaudio-shared"),
-           let data = try? Data(contentsOf: url),
-           let image = UIImage(data: data) {
-            return image
-        }
-        // Try searching the whole bundle
-        if let url = Bundle.main.url(forResource: name, withExtension: "jpg"),
-           let data = try? Data(contentsOf: url),
-           let image = UIImage(data: data) {
-            return image
-        }
-        // Try direct path in bundle
+        // Try direct paths in the bundle
         if let bundlePath = Bundle.main.resourcePath {
-            let paths = [
-                "\(bundlePath)/fbaudio-shared/images/\(name).jpg",
-                "\(bundlePath)/SharedData/images/\(name).jpg",
-                "\(bundlePath)/images/\(name).jpg",
-                "\(bundlePath)/\(name).jpg",
-            ]
-            for path in paths {
-                if let image = UIImage(contentsOfFile: path) {
-                    return image
+            for ext in ["png", "jpg"] {
+                let paths = [
+                    "\(bundlePath)/fbaudio-shared/images/\(name).\(ext)",
+                    "\(bundlePath)/SharedData/images/\(name).\(ext)",
+                    "\(bundlePath)/images/\(name).\(ext)",
+                    "\(bundlePath)/\(name).\(ext)",
+                ]
+                for path in paths {
+                    if let image = UIImage(contentsOfFile: path) {
+                        return image
+                    }
                 }
             }
         }
-        print("BundleImage: Could not find \(name).jpg in bundle")
+        print("BundleImage: Could not find \(name).(png|jpg) in bundle")
         return nil
     }
 }

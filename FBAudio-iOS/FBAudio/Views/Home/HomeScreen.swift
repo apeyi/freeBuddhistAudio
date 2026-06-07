@@ -26,6 +26,7 @@ struct HomeScreen: View {
             }
             .padding(.bottom, 16)
         }
+        .miniPlayerClearance()
         .onAppear { recentlyListened = PersistenceManager.shared.getRecentlyListened() }
     }
 
@@ -58,6 +59,7 @@ struct HomeScreen: View {
                         Spacer()
                         Image(systemName: "chevron.right").foregroundStyle(.secondary)
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
@@ -73,6 +75,7 @@ struct HomeScreen: View {
                         Spacer()
                         Image(systemName: "chevron.right").foregroundStyle(.secondary)
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -89,10 +92,9 @@ struct HomeScreen: View {
     private var donateCard: some View {
         Button(action: onDonateClick) {
             HStack(spacing: 12) {
-                BundleImage(name: "fba_logo")
+                BundleImage(name: "fba_wordmark")
                     .aspectRatio(contentMode: .fit)
                     .frame(height: 28)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
                 VStack(alignment: .leading) {
                     Text("Support Free Buddhist Audio").font(.subheadline)
                     Text("Donate to help keep FBA free for everyone")

@@ -26,6 +26,7 @@ struct TranscriptScreen: View {
                 }
             }
         }
+        .miniPlayerClearance()
         .navigationTitle("Transcript")
         .navigationBarTitleDisplayMode(.inline)
         .task { loadTranscript() }

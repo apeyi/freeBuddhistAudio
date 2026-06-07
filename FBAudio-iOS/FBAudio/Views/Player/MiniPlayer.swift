@@ -54,3 +54,28 @@ struct MiniPlayer: View {
         }
     }
 }
+
+extension View {
+    /// Reserves bottom space matching the floating mini player's height (when a
+    /// talk is loaded) so a scroll view's content isn't hidden behind it. The
+    /// space is sized by an invisible copy of the real player — no hardcoded
+    /// height — and the visible player itself is drawn once by ContentView.
+    /// Apply this to each screen's own scroll container: a `safeAreaInset` on the
+    /// surrounding NavigationStack does not reach its scroll views.
+    func miniPlayerClearance() -> some View {
+        modifier(MiniPlayerClearance())
+    }
+}
+
+private struct MiniPlayerClearance: ViewModifier {
+    @ObservedObject private var player = AudioPlayer.shared
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            if player.isVisible {
+                MiniPlayer(player: player, onExpand: {})
+                    .hidden()
+            }
+        }
+    }
+}

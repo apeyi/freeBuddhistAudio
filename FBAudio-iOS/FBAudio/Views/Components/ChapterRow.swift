@@ -20,6 +20,8 @@ struct ChapterRow: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            // Make the whole row (including the spacer gap) tappable, not just the text
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

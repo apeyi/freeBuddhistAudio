@@ -82,6 +82,7 @@ struct SearchScreen: View {
             }
         }
         .listStyle(.plain)
+        .miniPlayerClearance()
         .navigationTitle("Search")
     }
 

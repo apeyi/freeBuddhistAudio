@@ -33,6 +33,7 @@ struct BrowseScreen: View {
                 categoriesView
             }
         }
+        .miniPlayerClearance()
         .navigationTitle(selectedCategory?.name ?? "Browse")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(canGoBackInternally)

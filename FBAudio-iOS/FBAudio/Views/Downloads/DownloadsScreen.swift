@@ -51,6 +51,7 @@ struct DownloadsScreen: View {
                 .listStyle(.plain)
             }
         }
+        .miniPlayerClearance()
         .navigationTitle("Downloads")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

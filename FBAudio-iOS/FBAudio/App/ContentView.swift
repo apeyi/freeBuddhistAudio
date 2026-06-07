@@ -7,57 +7,52 @@ struct ContentView: View {
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TabView(selection: tabSelection) {
-                NavigationStack(path: $navigationPath) {
-                    HomeScreen(
-                        onTalkClick: { navigateToDetail($0) },
-                        onSangharakshitaByYearClick: { navigateToBrowse(.sangharakshitaByYear) },
-                        onSangharakshitaSeriesClick: { navigateToBrowse(.sangharakshitaSeries) },
-                        onDonateClick: { openDonateUrl() }
-                    )
-                    .navigationTitle("Free Buddhist Audio")
-                    .navigationDestination(for: Route.self) { route in
-                        routeView(route)
+        TabView(selection: tabSelection) {
+            NavigationStack(path: $navigationPath) {
+                HomeScreen(
+                    onTalkClick: { navigateToDetail($0) },
+                    onSangharakshitaByYearClick: { navigateToBrowse(.sangharakshitaByYear) },
+                    onSangharakshitaSeriesClick: { navigateToBrowse(.sangharakshitaSeries) },
+                    onDonateClick: { openDonateUrl() }
+                )
+                .navigationTitle("Free Buddhist Audio")
+                .navigationDestination(for: Route.self) { route in
+                    routeView(route)
+                }
+            }
+            .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
+            .tabItem {
+                Label("Home", systemImage: "house")
+            }
+            .tag(0)
+
+            NavigationStack {
+                SearchScreen(onTalkClick: { catNum in
+                    selectedTab = 0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        navigateToDetail(catNum)
                     }
-                }
-                .tabItem {
-                    Label("Home", systemImage: "house")
-                }
-                .tag(0)
-
-                NavigationStack {
-                    SearchScreen(onTalkClick: { catNum in
-                        selectedTab = 0
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            navigateToDetail(catNum)
-                        }
-                    })
-                }
-                .tabItem {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
-                .tag(1)
-
-                NavigationStack {
-                    DownloadsScreen(onTalkClick: { catNum in
-                        selectedTab = 0
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            navigateToDetail(catNum)
-                        }
-                    })
-                }
-                .tabItem {
-                    Label("Downloads", systemImage: "arrow.down.circle")
-                }
-                .tag(2)
+                })
             }
-
-            // Mini player
-            if !showPlayer {
-                MiniPlayer(player: player, onExpand: { showPlayer = true })
-                    .padding(.bottom, 49) // TabView height
+            .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
+            .tabItem {
+                Label("Search", systemImage: "magnifyingglass")
             }
+            .tag(1)
+
+            NavigationStack {
+                DownloadsScreen(onTalkClick: { catNum in
+                    selectedTab = 0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        navigateToDetail(catNum)
+                    }
+                })
+            }
+            .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
+            .tabItem {
+                Label("Downloads", systemImage: "arrow.down.circle")
+            }
+            .tag(2)
         }
         .fullScreenCover(isPresented: $showPlayer) {
             PlayerScreen(
@@ -157,6 +152,20 @@ struct ContentView: View {
     private func openDonateUrl() {
         if let url = URL(string: "https://www.freebuddhistaudio.com/donate/") {
             UIApplication.shared.open(url)
+        }
+    }
+}
+
+private extension View {
+    /// Places the mini player in a reserved strip at the bottom of a tab's
+    /// content — above the tab bar, not floating over it — so SwiftUI insets the
+    /// tab's scroll views by the player's real height. Content (e.g. talk
+    /// chapters) is never hidden behind it, with no hardcoded height guess.
+    func miniPlayerInset(player: AudioPlayer, isHidden: Bool, onExpand: @escaping () -> Void) -> some View {
+        safeAreaInset(edge: .bottom, spacing: 0) {
+            if !isHidden {
+                MiniPlayer(player: player, onExpand: onExpand)
+            }
         }
     }
 }
