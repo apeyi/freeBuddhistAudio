@@ -31,12 +31,20 @@ class TranscriptViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(TranscriptUiState())
     val uiState: StateFlow<TranscriptUiState> = _uiState
 
+    // Nav args arrive already decoded by Navigation Compose — no second decode.
+    private val transcriptUrl: String? = savedStateHandle["transcriptUrl"]
+    private val catNum: String? = savedStateHandle["catNum"]
+
     init {
-        val url: String? = savedStateHandle["transcriptUrl"]
-        val catNum: String? = savedStateHandle["catNum"]
-        if (!url.isNullOrBlank()) {
-            val decodedUrl = java.net.URLDecoder.decode(url, "UTF-8")
-            loadTranscript(decodedUrl, catNum)
+        load()
+    }
+
+    fun retry() = load()
+
+    private fun load() {
+        if (!transcriptUrl.isNullOrBlank()) {
+            _uiState.value = TranscriptUiState(isLoading = true)
+            loadTranscript(transcriptUrl, catNum)
         } else {
             _uiState.value = TranscriptUiState(isLoading = false, error = "No transcript URL")
         }

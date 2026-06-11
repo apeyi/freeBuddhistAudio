@@ -24,6 +24,10 @@ class TalkRepository: ObservableObject {
         try await scraper.searchAudio(query)
     }
 
+    func searchSeries(_ query: String) async throws -> [SearchResult] {
+        try await scraper.searchSeries(query)
+    }
+
     func browseBySpeaker(_ name: String) async throws -> BrowsePage {
         try await scraper.browseBySpeaker(name)
     }

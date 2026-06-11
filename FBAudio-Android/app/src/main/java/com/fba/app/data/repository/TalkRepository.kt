@@ -81,8 +81,13 @@ class TalkRepository @Inject constructor(
         return scraper.fetchMoreItems(apiBaseUrl, browseQueryString, startIndex, count)
     }
 
-    fun getCachedBrowse(key: String): List<SearchResult>? = browseCache[key]
-    fun setCachedBrowse(key: String, items: List<SearchResult>) {
+    // Access-ordered LinkedHashMap mutates internal links even on get() — this is a
+    // singleton hit from multiple coroutines, so every access must be synchronized.
+    fun getCachedBrowse(key: String): List<SearchResult>? = synchronized(browseCache) {
+        browseCache[key]
+    }
+
+    fun setCachedBrowse(key: String, items: List<SearchResult>) = synchronized(browseCache) {
         if (browseCache.size >= 50) {
             val oldest = browseCache.keys.first()
             browseCache.remove(oldest)

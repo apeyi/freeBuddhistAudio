@@ -23,10 +23,14 @@ class AudioPlayer: ObservableObject {
     private var statusObserver: NSKeyValueObservation?
     private var rateObserver: NSKeyValueObservation?
     private var itemEndObserver: NSObjectProtocol?
+    private var itemFailedObserver: NSObjectProtocol?
     private let persistence = PersistenceManager.shared
     private let downloadManager = DownloadManager.shared
     private var lastSaveTime: Date = .distantPast
     private var autoRetryCount = 0
+    // Pending delayed auto-retry — must be cancellable, or a stale retry fires
+    // into a different (healthy) playback started in the meantime.
+    private var retryWorkItem: DispatchWorkItem?
 
     // Cached Lock Screen / Control Center artwork, keyed by the image URL it was loaded from
     private var nowPlayingArtwork: MPMediaItemArtwork?
@@ -35,16 +39,63 @@ class AudioPlayer: ObservableObject {
     init() {
         playbackSpeed = persistence.playbackSpeed
         setupAudioSession()
+        setupInterruptionHandling()
         setupRemoteCommands()
         restoreLastPlayback()
     }
 
     private func setupAudioSession() {
         do {
+            // Category only — do NOT activate here. Activating at app launch
+            // silences other apps' audio before the user has pressed play.
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
-            try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             print("Audio session setup failed: \(error)")
+        }
+    }
+
+    /// Activate the session right before playback starts.
+    private func activateSession() {
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    /// Pause on interruptions (phone call, Siri, alarm) and resume when the
+    /// system says we should; pause when headphones are unplugged.
+    private func setupInterruptionHandling() {
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(), queue: .main
+        ) { [weak self] notification in
+            guard let info = notification.userInfo,
+                  let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+            Task { @MainActor in
+                guard let self else { return }
+                switch type {
+                case .began:
+                    self.pause()
+                case .ended:
+                    let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+                    if AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume) {
+                        self.play()
+                    }
+                @unknown default:
+                    break
+                }
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(), queue: .main
+        ) { [weak self] notification in
+            guard let info = notification.userInfo,
+                  let reasonValue = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue),
+                  reason == .oldDeviceUnavailable else { return }
+            Task { @MainActor in
+                self?.pause() // headphones unplugged — don't blast the speaker
+            }
         }
     }
 
@@ -58,6 +109,8 @@ class AudioPlayer: ObservableObject {
         currentTalk = talk
         currentTrackIndex = trackIndex
         isVisible = true
+        playbackError = nil
+        autoRetryCount = 0
 
         // Set duration from metadata immediately (player will update when ready)
         let metaDuration = talk.tracks[safe: trackIndex]?.durationSeconds ?? talk.durationSeconds
@@ -70,11 +123,19 @@ class AudioPlayer: ObservableObject {
 
         setupPlayer(url: url)
 
+        let startPos: TimeInterval
         if fromTrackIndex == nil && savedPos > 10_000 {
-            let seekTime = CMTime(milliseconds: max(savedPos - 10_000, 0))
-            player?.seek(to: seekTime)
+            startPos = TimeInterval(max(savedPos - 10_000, 0)) / 1000
+            player?.seek(to: CMTime(seconds: startPos, preferredTimescale: 600))
+        } else {
+            startPos = 0
         }
+        // Track the intended position immediately — if the item fails before the
+        // first time-observer tick, a retry must resume HERE, not at whatever
+        // stale position the previous track left behind.
+        currentPosition = startPos
 
+        activateSession()
         player?.play()
         player?.rate = playbackSpeed
         updateNowPlayingInfo()
@@ -98,11 +159,16 @@ class AudioPlayer: ObservableObject {
 
         setupPlayer(url: url)
 
+        let startPos: TimeInterval
         if savedTrackIndex == index && savedPos > 10_000 {
-            let seekTime = CMTime(milliseconds: max(savedPos - 10_000, 0))
-            player?.seek(to: seekTime)
+            startPos = TimeInterval(max(savedPos - 10_000, 0)) / 1000
+            player?.seek(to: CMTime(seconds: startPos, preferredTimescale: 600))
+        } else {
+            startPos = 0
         }
+        currentPosition = startPos
 
+        activateSession()
         player?.play()
         player?.rate = playbackSpeed
         updateNowPlayingInfo()
@@ -164,6 +230,18 @@ class AudioPlayer: ObservableObject {
                 self?.handleTrackEnded()
             }
         }
+
+        // Mid-stream failure (network drop after the item was already playing).
+        // item.status often STAYS .readyToPlay in this case, so without this
+        // observer playback just silently stops and the retry path never runs.
+        itemFailedObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main
+        ) { [weak self] notification in
+            let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+            Task { @MainActor in
+                self?.handlePlaybackError(error)
+            }
+        }
     }
 
     private func handleTimeUpdate(_ time: CMTime) {
@@ -183,33 +261,48 @@ class AudioPlayer: ObservableObject {
             playTrackByIndex(nextIndex)
         } else {
             isPlaying = false
-            savePlaybackState()
+            savePlaybackState() // records "completed" in recently listened
+            // Clear the resume point so replaying starts from the beginning
+            // instead of "resuming" the final 10 seconds.
+            persistence.savePlaybackState(
+                catNum: talk.catNum, position: 0,
+                trackIndex: 0, duration: Int64(duration * 1000)
+            )
+            updateNowPlayingInfo() // stop the lock screen advancing past the end
             if downloadManager.isDownloaded(talk.catNum) {
                 showDeleteDownloadPrompt = true
             }
         }
     }
 
+    /// AVFoundation wraps the real URL error (e.g. AVFoundationErrorDomain -11800
+    /// with the NSURLErrorDomain error nested in NSUnderlyingErrorKey) — walk the
+    /// underlying-error chain to classify network failures correctly.
+    private func isNetworkError(_ error: Error?) -> Bool {
+        var current = error as NSError?
+        var depth = 0
+        while let ns = current, depth < 5 {
+            if ns.domain == NSURLErrorDomain { return true }
+            current = ns.userInfo[NSUnderlyingErrorKey] as? NSError
+            depth += 1
+        }
+        return false
+    }
+
     private func handlePlaybackError(_ error: Error?) {
-        let ns = error as NSError?
-        let isNetwork = ns?.domain == NSURLErrorDomain || {
-            switch ns?.code {
-            case NSURLErrorNotConnectedToInternet, NSURLErrorTimedOut,
-                 NSURLErrorCannotFindHost, NSURLErrorNetworkConnectionLost:
-                return true
-            default:
-                return false
-            }
-        }()
+        let isNetwork = isNetworkError(error)
         print("Playback error: \(error?.localizedDescription ?? "unknown")")
 
         // Transient network errors: auto-retry a few times (network may be flapping).
         if isNetwork && autoRetryCount < 3 {
             autoRetryCount += 1
             let delay = Double(autoRetryCount) * 2.0
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                self?.rebuildAndPlay()
+            retryWorkItem?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                Task { @MainActor in self?.rebuildAndPlay() }
             }
+            retryWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
         } else {
             playbackError = isNetwork
                 ? "Couldn't load audio — check your connection."
@@ -249,23 +342,37 @@ class AudioPlayer: ObservableObject {
 
     // MARK: - Controls
 
-    func togglePlayPause() {
+    /// Explicit play — lock-screen/CarPlay "play" must never pause (a toggle
+    /// desyncs whenever the system's notion of state diverges from ours).
+    func play() {
         guard let player else {
             // No AVPlayer yet — e.g. playback state was restored at launch but
             // never started. Begin the restored talk at its saved position.
             if let talk = currentTalk { playTalk(talk) }
             return
         }
-        if player.rate > 0 {
-            player.pause()
-            isPlaying = false
-            savePlaybackState()
-        } else {
-            player.play()
-            player.rate = playbackSpeed
-            isPlaying = true
-        }
+        activateSession()
+        player.play()
+        player.rate = playbackSpeed
+        isPlaying = true
         updateNowPlayingInfo()
+    }
+
+    /// Explicit pause — see play().
+    func pause() {
+        guard let player else { return }
+        player.pause()
+        isPlaying = false
+        savePlaybackState()
+        updateNowPlayingInfo()
+    }
+
+    func togglePlayPause() {
+        if player?.rate ?? 0 > 0 {
+            pause()
+        } else {
+            play()
+        }
     }
 
     func seekTo(_ seconds: TimeInterval) {
@@ -276,7 +383,8 @@ class AudioPlayer: ObservableObject {
 
     func seekForward() {
         let newPos = currentPosition + 10
-        seekTo(min(newPos, duration))
+        // With unknown duration (0), don't clamp — min(newPos, 0) would jump to the start.
+        seekTo(duration > 0 ? min(newPos, duration) : newPos)
     }
 
     func seekBack() {
@@ -339,6 +447,11 @@ class AudioPlayer: ObservableObject {
 
         Task {
             guard let talk = await TalkRepository.shared.getTalkDetail(catNum) else { return }
+            // The fetch can be slow (network). If the user started their own
+            // playback meanwhile, applying the restore now would flip the UI to
+            // the restored talk while the player keeps playing the other one —
+            // and then auto-save would corrupt both talks' saved positions.
+            guard player == nil, currentTalk == nil else { return }
             let trackDuration = talk.tracks[safe: lastTrackIndex]
                 .map { TimeInterval($0.durationSeconds) }
                 ?? (lastDuration > 0 ? TimeInterval(lastDuration) / 1000 : TimeInterval(talk.durationSeconds))
@@ -399,10 +512,14 @@ class AudioPlayer: ObservableObject {
     private func setupRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()
         center.playCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.togglePlayPause() }
+            Task { @MainActor in self?.play() }
             return .success
         }
         center.pauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor in self?.pause() }
+            return .success
+        }
+        center.togglePlayPauseCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.togglePlayPause() }
             return .success
         }
@@ -434,12 +551,16 @@ class AudioPlayer: ObservableObject {
     // MARK: - Cleanup
 
     private func cleanupPlayer() {
+        retryWorkItem?.cancel()
+        retryWorkItem = nil
         if let timeObserver { player?.removeTimeObserver(timeObserver) }
         if let itemEndObserver { NotificationCenter.default.removeObserver(itemEndObserver) }
+        if let itemFailedObserver { NotificationCenter.default.removeObserver(itemFailedObserver) }
         statusObserver?.invalidate()
         rateObserver?.invalidate()
         timeObserver = nil
         itemEndObserver = nil
+        itemFailedObserver = nil
         statusObserver = nil
         rateObserver = nil
     }

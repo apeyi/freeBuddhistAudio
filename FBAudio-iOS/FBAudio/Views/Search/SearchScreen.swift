@@ -14,6 +14,7 @@ struct SearchScreen: View {
     @State private var searchMode: SearchMode = .all
 
     let onTalkClick: (String) -> Void
+    var onSeriesClick: (String) -> Void = { _ in }
 
     private var filteredResults: [SearchResult] {
         if searchMode == .bySpeaker && !keywordFilter.isEmpty {
@@ -34,8 +35,8 @@ struct SearchScreen: View {
             // Mode toggle
             Section {
                 HStack(spacing: 8) {
-                    modeChip("All", selected: searchMode == .all) { searchMode = .all; search() }
-                    modeChip("By speaker", selected: searchMode == .bySpeaker) { searchMode = .bySpeaker; search() }
+                    modeChip("All", selected: searchMode == .all) { setMode(.all) }
+                    modeChip("By speaker", selected: searchMode == .bySpeaker) { setMode(.bySpeaker) }
                 }
             }
 
@@ -69,12 +70,16 @@ struct SearchScreen: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(filteredResults) { result in
+                    let isSeries = result.path.contains("/series/")
                     TalkCard(
                         title: result.title,
-                        speaker: result.speaker,
+                        speaker: isSeries ? "Series · \(result.speaker)" : result.speaker,
                         imageUrl: result.imageUrl,
                         subtitle: result.year > 0 ? "\(result.year)" : nil,
-                        onClick: { onTalkClick(result.catNum) }
+                        onClick: {
+                            if isSeries { onSeriesClick(result.path) }
+                            else { onTalkClick(result.catNum) }
+                        }
                     )
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
@@ -99,18 +104,71 @@ struct SearchScreen: View {
         .buttonStyle(.plain)
     }
 
+    private func setMode(_ mode: SearchMode) {
+        guard mode != searchMode else { return }
+        searchMode = mode
+        // Old-mode results don't fit the new mode's UI (counts, keyword filter) —
+        // clear rather than presenting them mislabelled.
+        results = []
+        hasSearched = false
+        keywordFilter = ""
+        error = nil
+        search()
+    }
+
+    /// Detect a pasted FBA URL ("…details?num=X"). Returns (catNum, isSeries).
+    private func extractCatNumFromUrl(_ text: String) -> (String, Bool)? {
+        guard text.contains("num=") else { return nil }
+        let after = text.components(separatedBy: "num=").last ?? ""
+        let catNum = after.components(separatedBy: "&").first?
+            .components(separatedBy: " ").first?
+            .trimmingCharacters(in: .whitespaces) ?? ""
+        guard !catNum.isEmpty else { return nil }
+        return (catNum, text.contains("/series/"))
+    }
+
     private func search() {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+
+        // URL paste: navigate straight to the talk or series
+        if let (catNum, isSeries) = extractCatNumFromUrl(trimmed) {
+            if isSeries {
+                onSeriesClick("https://www.freebuddhistaudio.com/series/details?num=\(catNum)")
+            } else {
+                onTalkClick(catNum)
+            }
+            return
+        }
+
         isLoading = true
         error = nil
         keywordFilter = ""
         Task {
             do {
                 if searchMode == .bySpeaker {
-                    let page = try await TalkRepository.shared.browseBySpeaker(query)
-                    results = page.items
+                    if trimmed.lowercased() == "sangharakshita" {
+                        // Offline-capable: the bundled catalogue
+                        results = SharedDataLoader.sangharakshitaTalks
+                    } else {
+                        let page = try await TalkRepository.shared.browseBySpeaker(trimmed)
+                        results = page.items
+                    }
+                } else if trimmed.lowercased().hasPrefix("sangharakshita") {
+                    // "sangharakshita <words>" answers from the bundled catalogue (works offline)
+                    let words = trimmed.split(separator: " ").dropFirst().map(String.init)
+                    let all = SharedDataLoader.sangharakshitaTalks
+                    results = words.isEmpty ? all : all.filter { r in
+                        words.allSatisfy { r.title.localizedCaseInsensitiveContains($0) }
+                    }
                 } else {
-                    results = try await TalkRepository.shared.searchAudio(query)
+                    // Series first, then audio, deduped (parity with Android)
+                    async let seriesTask = (try? TalkRepository.shared.searchSeries(trimmed)) ?? []
+                    async let audioTask = TalkRepository.shared.searchAudio(trimmed)
+                    let series = await seriesTask
+                    let audio = try await audioTask
+                    var seen = Set<String>()
+                    results = (series + audio).filter { seen.insert($0.catNum).inserted }
                 }
                 hasSearched = true
             } catch {

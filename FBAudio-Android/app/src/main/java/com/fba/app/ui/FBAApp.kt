@@ -37,27 +37,38 @@ sealed class DeepLink {
 }
 
 @Composable
-fun FBAApp(deepLink: DeepLink? = null) {
+fun FBAApp(
+    deepLink: DeepLink? = null,
+    onDeepLinkConsumed: () -> Unit = {},
+) {
     FBATheme {
         val navController = rememberNavController()
         val playerViewModel: PlayerViewModel = hiltViewModel()
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
 
-        // Handle deep link navigation
+        // Handle deep link navigation — consumed exactly once, then cleared by
+        // the activity so rotation/recreation doesn't re-navigate.
         LaunchedEffect(deepLink) {
+            if (deepLink == null) return@LaunchedEffect
             when (deepLink) {
-                is DeepLink.Talk -> navController.navigate(Routes.detail(deepLink.catNum))
+                is DeepLink.Talk -> navController.navigate(Routes.detail(deepLink.catNum)) {
+                    launchSingleTop = true
+                }
                 is DeepLink.Series -> {
                     val seriesTitle = SangharakshitaData.series
                         .firstOrNull { it.id == deepLink.seriesId }?.title
                     if (seriesTitle != null) {
-                        navController.navigate(Routes.browseForSeries(seriesTitle))
+                        navController.navigate(Routes.browseForSeries(seriesTitle)) {
+                            launchSingleTop = true
+                        }
                     }
                 }
-                is DeepLink.Speaker -> navController.navigate(Routes.browseForSpeaker(deepLink.name))
-                null -> {}
+                is DeepLink.Speaker -> navController.navigate(Routes.browseForSpeaker(deepLink.name)) {
+                    launchSingleTop = true
+                }
             }
+            onDeepLinkConsumed()
         }
 
         val hideBottomBar = currentRoute == Routes.PLAYER
@@ -88,38 +99,38 @@ fun FBAApp(deepLink: DeepLink? = null) {
                     Column {
                         MiniPlayer(
                             viewModel = playerViewModel,
-                            onExpand = { navController.navigate(Routes.PLAYER) },
+                            onExpand = {
+                                navController.navigate(Routes.PLAYER) { launchSingleTop = true }
+                            },
                         )
                         NavigationBar {
+                        // Standard bottom-bar pattern: single-top + save/restore state so
+                        // re-tapping a tab doesn't recreate its ViewModel (wiping e.g.
+                        // search results), and switching tabs preserves each tab's state.
+                        fun navigateToTab(route: String) {
+                            navController.navigate(route) {
+                                popUpTo(Routes.HOME) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                         NavigationBarItem(
                             icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                             label = { Text("Home") },
                             selected = currentRoute == Routes.HOME,
-                            onClick = {
-                                navController.navigate(Routes.HOME) {
-                                    popUpTo(Routes.HOME) { inclusive = true }
-                                }
-                            }
+                            onClick = { navigateToTab(Routes.HOME) }
                         )
                         NavigationBarItem(
                             icon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                             label = { Text("Search") },
                             selected = currentRoute == Routes.SEARCH,
-                            onClick = {
-                                navController.navigate(Routes.SEARCH) {
-                                    popUpTo(Routes.HOME)
-                                }
-                            }
+                            onClick = { navigateToTab(Routes.SEARCH) }
                         )
                         NavigationBarItem(
                             icon = { Icon(Icons.Default.Download, contentDescription = "Downloads") },
                             label = { Text("Downloads") },
                             selected = currentRoute == Routes.DOWNLOADS,
-                            onClick = {
-                                navController.navigate(Routes.DOWNLOADS) {
-                                    popUpTo(Routes.HOME)
-                                }
-                            }
+                            onClick = { navigateToTab(Routes.DOWNLOADS) }
                         )
                     }
                     }
@@ -135,7 +146,11 @@ fun FBAApp(deepLink: DeepLink? = null) {
                     navController = navController,
                     onPlayTalk = { catNum ->
                         playerViewModel.playTalk(catNum)
-                        navController.navigate(Routes.PLAYER)
+                        navController.navigate(Routes.PLAYER) { launchSingleTop = true }
+                    },
+                    onPlayChapter = { catNum, trackIndex ->
+                        playerViewModel.playTalk(catNum, trackIndex)
+                        navController.navigate(Routes.PLAYER) { launchSingleTop = true }
                     },
                     playerViewModel = playerViewModel,
                 )

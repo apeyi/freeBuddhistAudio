@@ -19,6 +19,13 @@ struct BrowseScreen: View {
     @State private var isLoadingTalks = false
     @State private var error: String?
 
+    // Pagination (the collection API serves one item per page index)
+    @State private var totalItems = 0
+    @State private var apiBaseUrl = ""
+    @State private var browseQueryString = ""
+    @State private var nextFetchIndex = 1
+    @State private var isLoadingMore = false
+
     // Decade/year filtering
     @State private var selectedDecade: Int?
     @State private var selectedYear: Int?
@@ -27,6 +34,17 @@ struct BrowseScreen: View {
         Group {
             if isLoadingCategories {
                 ProgressView()
+            } else if let error {
+                // A failed load must say so — silently showing an empty list looks
+                // like the category has no talks.
+                VStack(spacing: 8) {
+                    Text(error).foregroundStyle(.secondary)
+                    Button("Retry") {
+                        self.error = nil
+                        Task { await loadInitial() }
+                    }
+                    .tint(.saffronOrange)
+                }
             } else if selectedCategory != nil {
                 talksView
             } else {
@@ -139,9 +157,46 @@ struct BrowseScreen: View {
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
                 }
+
+                // Pagination: large speakers/collections only return the first page
+                if hasMore {
+                    HStack {
+                        Spacer()
+                        if isLoadingMore {
+                            ProgressView()
+                        } else {
+                            Button("Load more (\(talks.count) of \(totalItems))") {
+                                Task { await loadMore() }
+                            }
+                            .tint(.saffronOrange)
+                        }
+                        Spacer()
+                    }
+                    .listRowSeparator(.hidden)
+                }
             }
         }
         .listStyle(.plain)
+    }
+
+    private var hasMore: Bool {
+        !apiBaseUrl.isEmpty && nextFetchIndex <= totalItems
+    }
+
+    private func loadMore() async {
+        guard hasMore, !isLoadingMore else { return }
+        isLoadingMore = true
+        let batch = min(24, totalItems - nextFetchIndex + 1)
+        let newItems = await TalkRepository.shared.fetchMoreItems(
+            apiBaseUrl: apiBaseUrl, browseQueryString: browseQueryString,
+            startIndex: nextFetchIndex, count: batch
+        )
+        // Advance by the REQUESTED batch size (skipped non-audio pages would
+        // otherwise drift the index and duplicate items); dedup on append.
+        nextFetchIndex += batch
+        var seen = Set(talks.map(\.catNum))
+        talks.append(contentsOf: newItems.filter { seen.insert($0.catNum).inserted })
+        isLoadingMore = false
     }
 
     private var availableDecades: [Int] {
@@ -217,6 +272,7 @@ struct BrowseScreen: View {
         do {
             let page = try await TalkRepository.shared.getTalksByBrowseUrl(url)
             talks = page.items
+            applyPagination(page)
             if !page.title.isEmpty {
                 selectedCategory = BrowseCategory(id: selectedCategory?.id ?? "browse", name: page.title,
                                                    type: selectedCategory?.type ?? .series, browseUrl: url)
@@ -233,9 +289,17 @@ struct BrowseScreen: View {
         do {
             let page = try await TalkRepository.shared.browseBySpeaker(name)
             talks = page.items
+            applyPagination(page)
         } catch {
             self.error = friendlyError(error)
         }
         isLoadingTalks = false
+    }
+
+    private func applyPagination(_ page: BrowsePage) {
+        totalItems = page.totalItems
+        apiBaseUrl = page.apiBaseUrl
+        browseQueryString = page.browseQueryString
+        nextFetchIndex = page.items.count + 1
     }
 }

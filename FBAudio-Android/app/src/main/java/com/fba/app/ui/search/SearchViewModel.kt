@@ -47,6 +47,7 @@ class SearchViewModel @Inject constructor(
     // Pagination state for speaker browse
     private var paginationApiUrl = ""
     private var paginationQueryString = ""
+    private var nextFetchIndex = 1
     private var allSpeakerItems = mutableListOf<SearchResult>()
 
     fun onQueryChanged(query: String) {
@@ -214,6 +215,7 @@ class SearchViewModel @Inject constructor(
             allSpeakerItems = page.items.toMutableList()
             paginationApiUrl = page.apiBaseUrl
             paginationQueryString = page.browseQueryString
+            nextFetchIndex = page.items.size + 1
             _uiState.value = _uiState.value.copy(
                 results = page.items,
                 filteredResults = page.items,
@@ -236,19 +238,27 @@ class SearchViewModel @Inject constructor(
 
     private fun autoLoadRemaining(total: Int) {
         autoLoadJob = viewModelScope.launch {
-            while (allSpeakerItems.size < total) {
-                val batchSize = minOf(24, total - allSpeakerItems.size)
-                val newItems = repository.fetchMoreItems(
-                    paginationApiUrl, paginationQueryString,
-                    allSpeakerItems.size + 1, batchSize,
-                )
-                if (newItems.isEmpty()) break
-                allSpeakerItems.addAll(newItems)
-                _uiState.value = _uiState.value.copy(
-                    results = allSpeakerItems.toList(),
-                    isLoadingMore = allSpeakerItems.size < total,
-                )
-                applyKeywordFilter()
+            try {
+                // Advance by the requested batch size, not the received count — the
+                // API skips non-audio pages and deriving the index from list size
+                // drifts, duplicating items (LazyColumn duplicate-key crash).
+                while (nextFetchIndex <= total) {
+                    val batchSize = minOf(24, total - nextFetchIndex + 1)
+                    val newItems = repository.fetchMoreItems(
+                        paginationApiUrl, paginationQueryString,
+                        nextFetchIndex, batchSize,
+                    )
+                    nextFetchIndex += batchSize
+                    val seen = allSpeakerItems.mapTo(HashSet()) { it.catNum }
+                    allSpeakerItems.addAll(newItems.filter { seen.add(it.catNum) })
+                    _uiState.value = _uiState.value.copy(
+                        results = allSpeakerItems.toList(),
+                        isLoadingMore = nextFetchIndex <= total,
+                    )
+                    applyKeywordFilter()
+                }
+            } catch (_: Exception) {
+                // Network failure mid-load — keep partial results, stop quietly.
             }
             _uiState.value = _uiState.value.copy(isLoadingMore = false)
         }

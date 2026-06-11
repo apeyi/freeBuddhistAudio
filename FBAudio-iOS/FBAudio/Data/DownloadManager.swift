@@ -30,6 +30,27 @@ class DownloadManager: ObservableObject {
     init() {
         try? FileManager.default.createDirectory(at: downloadsDir, withIntermediateDirectories: true)
         loadSavedDownloads()
+        cleanupOrphanedFiles()
+    }
+
+    /// Remove track/transcript files whose download never completed (e.g. the app
+    /// was suspended mid-download). Orphans otherwise pass the bare file-exists
+    /// check in trackFileUrl, so a half-downloaded series would play tracks 0..k
+    /// offline and then silently stream the rest.
+    private func cleanupOrphanedFiles() {
+        let completePrefixes = Set(
+            downloads.values
+                .filter { $0.status == .complete }
+                .map { sanitize($0.catNum) + "_" }
+        )
+        guard let files = try? FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: nil) else { return }
+        for file in files {
+            let name = file.lastPathComponent
+            let belongsToComplete = completePrefixes.contains { name.hasPrefix($0) }
+            if !belongsToComplete {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
     }
 
     // MARK: - File Paths
@@ -99,18 +120,24 @@ class DownloadManager: ObservableObject {
             }
 
             do {
-                let (data, response) = try await URLSession.shared.data(from: url)
+                // download(from:) streams to a temp file — never buffers the whole
+                // MP3 in memory (multi-track talks are easily 100+ MB, which used
+                // to spike RAM and freeze the main thread on the write).
+                let (tempUrl, response) = try await URLSession.shared.download(from: url)
                 guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                     let code = (response as? HTTPURLResponse)?.statusCode ?? 0
                     print("DownloadManager: HTTP \(code) for \(urlString)")
+                    try? FileManager.default.removeItem(at: tempUrl)
                     downloads[catNum]?.status = .failed
                     saveDownloads()
                     return
                 }
 
                 let filePath = trackFilePath(catNum: catNum, trackIndex: index)
-                try data.write(to: filePath)
-                totalBytes += Int64(data.count)
+                try? FileManager.default.removeItem(at: filePath)
+                try FileManager.default.moveItem(at: tempUrl, to: filePath)
+                let attrs = try? FileManager.default.attributesOfItem(atPath: filePath.path)
+                totalBytes += (attrs?[.size] as? Int64) ?? 0
 
                 let progress = ((index + 1) * 100) / validUrls.count
                 downloads[catNum]?.progress = progress

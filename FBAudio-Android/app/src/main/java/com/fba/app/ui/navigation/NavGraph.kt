@@ -22,6 +22,7 @@ import com.fba.app.ui.transcript.TranscriptScreen
 fun NavGraph(
     navController: NavHostController,
     onPlayTalk: (String) -> Unit,
+    onPlayChapter: (String, Int) -> Unit = { catNum, _ -> onPlayTalk(catNum) },
     playerViewModel: PlayerViewModel,
 ) {
     val context = LocalContext.current
@@ -51,6 +52,7 @@ fun NavGraph(
             DetailScreen(
                 catNum = catNum,
                 onPlay = onPlayTalk,
+                onPlayChapter = onPlayChapter,
                 onBack = { navController.popBackStack() },
                 onSpeakerClick = { speakerName ->
                     navController.navigate(Routes.browseForSpeaker(speakerName))

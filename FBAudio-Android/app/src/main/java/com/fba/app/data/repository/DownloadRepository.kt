@@ -1,8 +1,10 @@
 package com.fba.app.data.repository
 
 import android.content.Context
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -10,7 +12,10 @@ import com.fba.app.data.local.DownloadDao
 import com.fba.app.data.local.DownloadEntity
 import com.fba.app.data.local.DownloadStatus
 import com.fba.app.download.DownloadWorker
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 class DownloadRepository @Inject constructor(
@@ -61,10 +66,17 @@ class DownloadRepository @Inject constructor(
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build()
             )
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
             .addTag("download_$catNum")
             .build()
 
-        WorkManager.getInstance(context).enqueue(request)
+        // Unique work keyed by catNum: a double-tap (or retry racing a cancel) must
+        // never run two workers writing the same files concurrently.
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "download_$catNum",
+            ExistingWorkPolicy.KEEP,
+            request,
+        )
     }
 
     suspend fun deleteAllDownloads() {
@@ -75,18 +87,24 @@ class DownloadRepository @Inject constructor(
     }
 
     suspend fun deleteDownload(catNum: String) {
-        val download = downloadDao.getDownload(catNum)
-        // Delete old-style single file
-        if (download != null && download.filePath.isNotBlank()) {
-            val file = java.io.File(download.filePath)
-            if (file.exists()) file.delete()
-        }
-        // Delete all track files and transcript
-        val downloadsDir = java.io.File(context.filesDir, "downloads")
-        if (downloadsDir.exists()) {
-            downloadsDir.listFiles()?.filter { it.name.startsWith("${catNum}_") }?.forEach { it.delete() }
-        }
-        downloadDao.delete(catNum)
+        // Cancel any in-flight worker FIRST so it stops writing files we're about
+        // to delete (its own cancellation cleanup removes partial files).
+        WorkManager.getInstance(context).cancelUniqueWork("download_$catNum")
         WorkManager.getInstance(context).cancelAllWorkByTag("download_$catNum")
+
+        withContext(Dispatchers.IO) {
+            val download = downloadDao.getDownload(catNum)
+            // Delete old-style single file
+            if (download != null && download.filePath.isNotBlank()) {
+                val file = java.io.File(download.filePath)
+                if (file.exists()) file.delete()
+            }
+            // Delete all track files and transcript
+            val downloadsDir = java.io.File(context.filesDir, "downloads")
+            if (downloadsDir.exists()) {
+                downloadsDir.listFiles()?.filter { it.name.startsWith("${catNum}_") }?.forEach { it.delete() }
+            }
+            downloadDao.delete(catNum)
+        }
     }
 }

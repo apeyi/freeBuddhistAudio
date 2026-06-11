@@ -49,6 +49,10 @@ class BrowseViewModel @Inject constructor(
     // Pagination state — kept separate so loadMore can reference it
     private var paginationApiUrl: String = ""
     private var paginationQueryString: String = ""
+    // Next absolute 1-based page index to fetch. Advanced by the REQUESTED batch
+    // size, not the received count — the API skips non-audio pages, so deriving
+    // the index from list size drifts and re-fetches items (duplicate-key crash).
+    private var nextFetchIndex: Int = 1
     private var autoLoadJob: Job? = null
     // Full unfiltered list when all items are loaded (for year/decade filtering)
     private var allItems: List<SearchResult> = emptyList()
@@ -71,9 +75,10 @@ class BrowseViewModel @Inject constructor(
                 )
                 // If a speaker name was passed via SavedStateHandle (from BROWSE_SPEAKER route),
                 // immediately select that speaker as the category.
+                // Nav args arrive already decoded by Navigation Compose — no second decode.
                 val speakerName: String? = savedStateHandle["speakerName"]
                 if (!speakerName.isNullOrBlank()) {
-                    val decodedName = java.net.URLDecoder.decode(speakerName, "UTF-8")
+                    val decodedName = speakerName
                     // Sangharakshita uses hardcoded data
                     if (decodedName.equals("Sangharakshita", ignoreCase = true)) {
                         selectCategory(
@@ -100,7 +105,7 @@ class BrowseViewModel @Inject constructor(
                 // immediately select that series as the category.
                 val seriesName: String? = savedStateHandle["seriesName"]
                 if (!seriesName.isNullOrBlank()) {
-                    val decodedSeries = java.net.URLDecoder.decode(seriesName, "UTF-8")
+                    val decodedSeries = seriesName
                     // decodedSeries may be a /series/details href or a series title
                     val isHref = decodedSeries.startsWith("/series/") || decodedSeries.startsWith("http")
                     val seriesBrowseUrl = if (isHref) {
@@ -198,6 +203,7 @@ class BrowseViewModel @Inject constructor(
                 }
                 paginationApiUrl = page.apiBaseUrl
                 paginationQueryString = page.browseQueryString
+                nextFetchIndex = page.items.size + 1
                 allItems = page.items
                 val earlyDecades = computeDecades(page.items)
                 // Update category name if page returned a title (e.g. series title)
@@ -225,40 +231,51 @@ class BrowseViewModel @Inject constructor(
         }
     }
 
+    /** Append a batch to allItems, de-duplicated by catNum. */
+    private fun appendDeduped(newItems: List<SearchResult>) {
+        val seen = allItems.mapTo(HashSet()) { it.catNum }
+        allItems = allItems + newItems.filter { seen.add(it.catNum) }
+    }
+
     /** Background-load all remaining items in batches of 24, updating UI after each batch. */
     private fun autoLoadAllRemaining(cacheKey: String, firstPage: com.fba.app.data.remote.BrowsePage) {
         autoLoadJob = viewModelScope.launch {
-            var loaded = allItems.toMutableList()
             val total = firstPage.totalItems
-            while (loaded.size < total) {
-                val batchSize = minOf(24, total - loaded.size)
-                val newItems = repository.fetchMoreItems(
-                    paginationApiUrl, paginationQueryString,
-                    loaded.size + 1, batchSize,
-                )
-                if (newItems.isEmpty()) break
-                loaded.addAll(newItems)
-                allItems = loaded.toList()
-                val partialDecades = computeDecades(allItems)
-                // Save cache incrementally so it persists even if user navigates away
-                repository.setCachedBrowse(cacheKey, allItems)
+            try {
+                while (nextFetchIndex <= total) {
+                    val batchSize = minOf(24, total - nextFetchIndex + 1)
+                    val newItems = repository.fetchMoreItems(
+                        paginationApiUrl, paginationQueryString,
+                        nextFetchIndex, batchSize,
+                    )
+                    nextFetchIndex += batchSize
+                    appendDeduped(newItems)
+                    _uiState.value = _uiState.value.copy(
+                        talks = applyFilters(allItems, _uiState.value.selectedDecade, _uiState.value.selectedYear),
+                        hasMore = nextFetchIndex <= total,
+                        isLoadingMore = nextFetchIndex <= total,
+                        availableDecades = computeDecades(allItems),
+                    )
+                }
+                // All loaded — only now is the cache a complete result set
+                // (getCachedBrowse treats a hit as fully loaded).
                 _uiState.value = _uiState.value.copy(
-                    talks = applyFilters(allItems, _uiState.value.selectedDecade, _uiState.value.selectedYear),
-                    hasMore = loaded.size < total,
-                    isLoadingMore = loaded.size < total,
-                    availableDecades = partialDecades,
+                    allItemsLoaded = true,
+                    hasMore = false,
+                    isLoadingMore = false,
+                    availableDecades = computeDecades(allItems),
+                    totalTalkCount = allItems.size,
+                )
+                repository.setCachedBrowse(cacheKey, allItems)
+            } catch (e: Exception) {
+                // Network failure mid-load: keep what we have, leave hasMore=true so
+                // the user can Load More to retry. Do NOT cache the truncated list.
+                _uiState.value = _uiState.value.copy(
+                    hasMore = true,
+                    isLoadingMore = false,
+                    availableDecades = computeDecades(allItems),
                 )
             }
-            // All loaded — compute decades and cache
-            val decades = computeDecades(allItems)
-            _uiState.value = _uiState.value.copy(
-                allItemsLoaded = true,
-                hasMore = false,
-                isLoadingMore = false,
-                availableDecades = decades,
-                totalTalkCount = allItems.size,
-            )
-            repository.setCachedBrowse(cacheKey, allItems)
         }
     }
 
@@ -268,18 +285,19 @@ class BrowseViewModel @Inject constructor(
         _uiState.value = state.copy(isLoadingMore = true)
         viewModelScope.launch {
             try {
-                val startIndex = state.talks.size + 1 // API is 1-indexed
                 val newItems = repository.fetchMoreItems(
                     apiBaseUrl = paginationApiUrl,
                     browseQueryString = paginationQueryString,
-                    startIndex = startIndex,
+                    startIndex = nextFetchIndex,
                     count = 24,
                 )
-                val allTalks = state.talks + newItems
-                _uiState.value = _uiState.value.copy(
-                    talks = allTalks,
+                nextFetchIndex += 24
+                appendDeduped(newItems)
+                val s = _uiState.value
+                _uiState.value = s.copy(
+                    talks = applyFilters(allItems, s.selectedDecade, s.selectedYear),
                     isLoadingMore = false,
-                    hasMore = allTalks.size < state.totalTalkCount,
+                    hasMore = nextFetchIndex <= s.totalTalkCount,
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoadingMore = false)

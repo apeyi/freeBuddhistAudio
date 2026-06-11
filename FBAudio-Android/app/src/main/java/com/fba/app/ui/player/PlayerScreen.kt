@@ -215,18 +215,24 @@ fun PlayerScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
         ) {
-            var sliderPosition by remember(state.currentPosition) {
-                mutableFloatStateOf(
-                    (if (state.duration > 0) state.currentPosition.toFloat() / state.duration
-                    else 0f).safeFraction()
-                )
-            }
+            // While the user drags, the slider follows the finger only — re-deriving
+            // it from state.currentPosition (which ticks every 500ms during playback)
+            // would yank the thumb back mid-drag and discard the drag target.
+            var isDragging by remember { mutableStateOf(false) }
+            var dragPosition by remember { mutableFloatStateOf(0f) }
+            val livePosition = (if (state.duration > 0)
+                state.currentPosition.toFloat() / state.duration else 0f).safeFraction()
+            val sliderPosition = if (isDragging) dragPosition else livePosition
 
             Slider(
                 value = sliderPosition.safeFraction(),
-                onValueChange = { sliderPosition = it },
+                onValueChange = {
+                    isDragging = true
+                    dragPosition = it
+                },
                 onValueChangeFinished = {
-                    playerViewModel.seekTo((sliderPosition * state.duration).toLong())
+                    playerViewModel.seekTo((dragPosition * state.duration).toLong())
+                    isDragging = false
                 },
                 modifier = Modifier.fillMaxWidth(),
                 thumb = {},

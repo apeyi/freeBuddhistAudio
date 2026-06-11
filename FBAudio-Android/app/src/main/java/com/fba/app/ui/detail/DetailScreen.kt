@@ -59,6 +59,7 @@ import com.fba.app.ui.player.PlayerViewModel
 fun DetailScreen(
     catNum: String,
     onPlay: (String) -> Unit,
+    onPlayChapter: (String, Int) -> Unit = { c, _ -> onPlay(c) },
     onBack: () -> Unit,
     onSpeakerClick: (String) -> Unit = {},
     onSeriesClick: (String) -> Unit = {},
@@ -298,8 +299,10 @@ fun DetailScreen(
                                     if (isThisTalkActive) {
                                         playerViewModel.playTrackByIndex(index)
                                     } else {
-                                        onPlay(catNum)
-                                        playerViewModel.playTrackByIndex(index)
+                                        // Load the talk starting at the tapped chapter — calling
+                                        // playTrackByIndex here would race against the async load
+                                        // and play the wrong talk/chapter.
+                                        onPlayChapter(catNum, index)
                                     }
                                 },
                             )

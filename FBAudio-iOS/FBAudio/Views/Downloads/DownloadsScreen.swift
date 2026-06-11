@@ -68,18 +68,18 @@ struct DownloadsScreen: View {
                 }
             }
         }
+        // presenting: hands the catNum to the action directly — reading the
+        // @State var inside the action raced with the binding's set(false),
+        // which could nil it first and silently skip the delete.
         .alert("Delete download?", isPresented: Binding(
             get: { deleteConfirmCatNum != nil },
             set: { if !$0 { deleteConfirmCatNum = nil } }
-        )) {
+        ), presenting: deleteConfirmCatNum) { catNum in
             Button("Delete", role: .destructive) {
-                if let catNum = deleteConfirmCatNum {
-                    downloadManager.deleteDownload(catNum: catNum)
-                }
-                deleteConfirmCatNum = nil
+                downloadManager.deleteDownload(catNum: catNum)
             }
-            Button("Cancel", role: .cancel) { deleteConfirmCatNum = nil }
-        } message: {
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
             Text("This will remove the offline files.")
         }
         .alert("Delete all downloads?", isPresented: $showDeleteAllConfirm) {

@@ -5,6 +5,11 @@ struct PlayerScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showSpeedSlider = false
     @State private var showChapterSheet = false
+    // Local scrub state: while dragging, the slider follows the finger only —
+    // binding it to the live position would yank the thumb back on every
+    // 0.5s position tick and fire a seek per drag tick.
+    @State private var isScrubbing = false
+    @State private var scrubPosition: Double = 0
 
     let onNavigateToDetail: (String) -> Void
     let onSpeakerClick: (String) -> Void
@@ -85,10 +90,21 @@ struct PlayerScreen: View {
             VStack(spacing: 4) {
                 Slider(
                     value: Binding(
-                        get: { (player.duration > 0 ? player.currentPosition / player.duration : 0).safeFraction() },
-                        set: { player.seekTo($0 * player.duration) }
+                        get: {
+                            if isScrubbing { return scrubPosition }
+                            return (player.duration > 0 ? player.currentPosition / player.duration : 0).safeFraction()
+                        },
+                        set: { scrubPosition = $0 }
                     ),
-                    in: 0...1
+                    in: 0...1,
+                    onEditingChanged: { editing in
+                        if editing {
+                            isScrubbing = true
+                        } else {
+                            player.seekTo(scrubPosition * player.duration)
+                            isScrubbing = false
+                        }
+                    }
                 )
                 .tint(.saffronOrange)
 

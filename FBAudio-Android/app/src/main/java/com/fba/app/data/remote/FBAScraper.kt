@@ -269,29 +269,43 @@ class FBAScraper @Inject constructor(
      * Fetch a batch of items by their 1-based indices using the collection API.
      * The site returns one item per API call; this fetches [count] items in parallel
      * starting at [startIndex] (1-based).
+     *
+     * Non-audio or unparseable pages are skipped (callers must advance their fetch
+     * index by [count], NOT by the number of items returned, or indices drift and
+     * duplicates appear). Throws IOException if every page in the batch errored —
+     * that's a network failure, not end-of-data.
      */
     suspend fun fetchMoreItems(apiBaseUrl: String, browseQueryString: String, startIndex: Int, count: Int): List<SearchResult> =
         withContext(Dispatchers.IO) {
+            // Pair<result, wasError> per index: a null result with wasError=false is a
+            // legitimately skipped page (non-audio); wasError=true is a fetch failure.
             val jobs = (startIndex until startIndex + count).map { idx ->
                 async {
                     try {
                         val url = "$apiBaseUrl?$browseQueryString&page=$idx"
                         val request = Request.Builder().url(url).build()
-                        val body = client.newCall(request).execute().use { it.body?.string() } ?: return@async null
+                        val body = client.newCall(request).execute().use { resp ->
+                            if (!resp.isSuccessful) return@async null to true
+                            resp.body?.string()
+                        } ?: return@async null to true
                         val data = JsonParser.parseString(body).asJsonObject
-                        val coll = data.getAsJsonObject("collection") ?: return@async null
-                        val items = coll.getAsJsonArray("items") ?: return@async null
-                        val obj = items.firstOrNull()?.asJsonObject ?: return@async null
-                        val path = obj.getStr("url") ?: return@async null
-                        if (!path.contains("/audio/")) return@async null
+                        val coll = data.getAsJsonObject("collection") ?: return@async null to false
+                        val items = coll.getAsJsonArray("items") ?: return@async null to false
+                        val obj = items.firstOrNull()?.asJsonObject ?: return@async null to false
+                        val path = obj.getStr("url") ?: return@async null to false
+                        if (!path.contains("/audio/")) return@async null to false
                         val catNum = obj.getStr("cat_num") ?: obj.getStr("catNum")
                             ?: path.substringAfter("num=", "").substringBefore("&")
-                        if (catNum.isBlank()) return@async null
-                        obj.toSearchResult(catNum, path)
-                    } catch (_: Exception) { null }
+                        if (catNum.isBlank()) return@async null to false
+                        obj.toSearchResult(catNum, path) to false
+                    } catch (_: Exception) { null to true }
                 }
             }
-            jobs.awaitAll().filterNotNull()
+            val outcomes = jobs.awaitAll()
+            if (outcomes.isNotEmpty() && outcomes.all { it.second }) {
+                throw java.io.IOException("All $count page fetches failed (network error)")
+            }
+            outcomes.mapNotNull { it.first }
         }
 
     /** Browse all talks by a speaker. Returns a BrowsePage with pagination info. */
@@ -300,7 +314,8 @@ class FBAScraper @Inject constructor(
             .addQueryParameter("s", speakerName)
             .addQueryParameter("t", "audio")
             .build().toString()
-        return parseBrowseCollectionPage(fetchHtml(browseUrl), "s=$speakerName&t=audio")
+        val encodedName = java.net.URLEncoder.encode(speakerName, "UTF-8")
+        return parseBrowseCollectionPage(fetchHtml(browseUrl), "s=$encodedName&t=audio")
     }
 
     /**

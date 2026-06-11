@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.fba.app.ui.DeepLink
@@ -16,25 +17,33 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    // Pending deep link, consumed exactly once by FBAApp. Held as state (rather
+    // than re-calling setContent from onNewIntent, which would rebuild the whole
+    // composition and wipe the back stack).
+    private val pendingDeepLink = mutableStateOf<DeepLink?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestNotificationPermission()
-        val deepLink = extractDeepLink(intent)
+        // Only consume the launch intent's deep link on a fresh start — after a
+        // configuration change the (persisted) intent has already been handled.
+        if (savedInstanceState == null) {
+            pendingDeepLink.value = extractDeepLink(intent)
+        }
         setContent {
-            FBAApp(deepLink = deepLink)
+            FBAApp(
+                deepLink = pendingDeepLink.value,
+                onDeepLinkConsumed = { pendingDeepLink.value = null },
+            )
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val deepLink = extractDeepLink(intent)
-        if (deepLink != null) {
-            setContent {
-                FBAApp(deepLink = deepLink)
-            }
-        }
+        extractDeepLink(intent)?.let { pendingDeepLink.value = it }
     }
 
     private fun extractDeepLink(intent: Intent?): DeepLink? {
@@ -52,7 +61,8 @@ class MainActivity : ComponentActivity() {
         }
 
         // HTTPS deep links: freebuddhistaudio.com/audio/details?num=01
-        if (uri.host?.contains("freebuddhistaudio.com") != true) return null
+        val host = uri.host ?: return null
+        if (host != "www.freebuddhistaudio.com" && host != "freebuddhistaudio.com") return null
         val path = uri.path ?: return null
         return when {
             path.startsWith("/audio/details") ->

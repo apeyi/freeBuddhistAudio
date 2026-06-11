@@ -220,11 +220,13 @@ actor FBAScraper {
         }
 
         var results: [SearchResult] = []
+        var seen = Set<String>()
         for obj in items {
             let path = str(obj, "url") ?? ""
             guard path.contains("/audio/") else { continue }
             let catNum = str(obj, "cat_num") ?? str(obj, "catNum") ?? ""
-            guard !catNum.isEmpty else { continue }
+            // Dedup: SearchResult.id == catNum; duplicates break SwiftUI ForEach identity
+            guard !catNum.isEmpty, seen.insert(catNum).inserted else { continue }
             results.append(SearchResult(
                 catNum: catNum,
                 title: unescape(str(obj, "title") ?? ""),
@@ -253,9 +255,10 @@ actor FBAScraper {
         }
 
         var results: [SearchResult] = []
+        var seen = Set<String>()
         for obj in members {
             let catNum = str(obj, "cat_num") ?? str(obj, "catNum") ?? str(obj, "member_cat_num") ?? ""
-            guard !catNum.isEmpty else { continue }
+            guard !catNum.isEmpty, seen.insert(catNum).inserted else { continue }
             let path = str(obj, "link") ?? str(obj, "url") ?? str(obj, "href") ?? "/audio/details?num=\(catNum)"
             results.append(SearchResult(
                 catNum: catNum,
@@ -273,10 +276,18 @@ actor FBAScraper {
     // MARK: - Search
 
     func searchAudio(_ query: String) async throws -> [SearchResult] {
+        try await searchByType(query, type: "audio")
+    }
+
+    func searchSeries(_ query: String) async throws -> [SearchResult] {
+        try await searchByType(query, type: "series")
+    }
+
+    private func searchByType(_ query: String, type: String) async throws -> [SearchResult] {
         var components = URLComponents(string: "\(Self.baseUrl)/api/v1/search")!
         components.queryItems = [
             URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "type", value: "audio"),
+            URLQueryItem(name: "type", value: type),
         ]
         let html = try await fetchHtml(components.url!.absoluteString)
         guard let data = html.data(using: .utf8),

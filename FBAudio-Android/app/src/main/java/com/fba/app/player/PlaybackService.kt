@@ -62,15 +62,15 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Stop playback and dismiss notification when user swipes app away
-        mediaSession?.player?.let { player ->
-            if (!player.playWhenReady || player.mediaItemCount == 0) {
-                // Not actively playing — clean up completely
-                player.stop()
-                player.clearMediaItems()
-            }
+        // Swiping the app away should NOT kill active playback (standard media-app
+        // behaviour — the notification keeps controlling it). Only stop the service
+        // when nothing is actually playing.
+        val player = mediaSession?.player
+        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
+            player?.stop()
+            player?.clearMediaItems()
+            stopSelf()
         }
-        stopSelf()
     }
 
     override fun onDestroy() {

@@ -43,7 +43,7 @@ fun TranscriptScreen(
             state.isLoading -> LoadingIndicator()
             state.error != null -> ErrorMessage(
                 message = state.error!!,
-                onRetry = { },
+                onRetry = { viewModel.retry() },
             )
             else -> {
                 Text(

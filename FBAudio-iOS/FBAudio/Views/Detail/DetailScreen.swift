@@ -194,8 +194,15 @@ struct DetailScreen: View {
                     track: talk.tracks[index],
                     isCurrent: isActive && player.currentTrackIndex == index,
                     onTap: {
-                        if !isActive { onPlay(catNum) }
-                        player.playTrackByIndex(index)
+                        if isActive {
+                            player.playTrackByIndex(index)
+                        } else {
+                            // Start THIS talk at the tapped chapter. The old
+                            // onPlay(catNum) + playTrackByIndex(index) pair raced:
+                            // playTrackByIndex ran against the previous talk, and
+                            // the async load then discarded the tapped chapter.
+                            player.playTalk(talk, fromTrackIndex: index)
+                        }
                     }
                 )
                 .padding(.vertical, 8)

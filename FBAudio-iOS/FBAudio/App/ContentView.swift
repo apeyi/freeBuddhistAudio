@@ -27,12 +27,19 @@ struct ContentView: View {
             .tag(0)
 
             NavigationStack {
-                SearchScreen(onTalkClick: { catNum in
-                    selectedTab = 0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                SearchScreen(
+                    onTalkClick: { catNum in
+                        // navigationPath is plain state — appending works even while
+                        // tab 0 is offscreen, no delay needed (the old asyncAfter was
+                        // uncancellable and raced with further taps).
+                        selectedTab = 0
                         navigateToDetail(catNum)
+                    },
+                    onSeriesClick: { seriesUrl in
+                        selectedTab = 0
+                        navigateToBrowse(.series(seriesUrl))
                     }
-                })
+                )
             }
             .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
             .tabItem {
@@ -43,9 +50,7 @@ struct ContentView: View {
             NavigationStack {
                 DownloadsScreen(onTalkClick: { catNum in
                     selectedTab = 0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        navigateToDetail(catNum)
-                    }
+                    navigateToDetail(catNum)
                 })
             }
             .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
@@ -59,13 +64,20 @@ struct ContentView: View {
                 player: player,
                 onNavigateToDetail: { catNum in
                     showPlayer = false
+                    // The push goes onto the Home tab's stack — switch to it, or the
+                    // navigation lands invisibly behind the Search/Downloads tab.
+                    selectedTab = 0
                     navigateToDetail(catNum)
                 },
                 onSpeakerClick: { speaker in
                     showPlayer = false
+                    selectedTab = 0
                     navigateToBrowse(.speaker(speaker))
                 }
             )
+        }
+        .onOpenURL { url in
+            handleDeepLink(url)
         }
         .alert("Delete download?", isPresented: $player.showDeleteDownloadPrompt) {
             Button("Delete", role: .destructive) { player.confirmDeleteAfterPlayback() }
@@ -118,6 +130,43 @@ struct ContentView: View {
 
     private func navigateToBrowse(_ mode: BrowseModeRoute) {
         navigationPath.append(Route.browse(mode))
+    }
+
+    // MARK: - Deep links
+    // fbaudio://talk/01, fbaudio://series/X04, fbaudio://speaker/Name,
+    // and https://(www.)freebuddhistaudio.com/audio/details?num=…  (parity with Android)
+    private func handleDeepLink(_ url: URL) {
+        selectedTab = 0
+        if url.scheme == "fbaudio" {
+            let id = url.pathComponents.count > 1 ? url.pathComponents[1] : nil
+            guard let id else { return }
+            switch url.host {
+            case "talk": navigateToDetail(id)
+            case "series":
+                navigateToBrowse(.series("https://www.freebuddhistaudio.com/series/details?num=\(id)"))
+            case "speaker": navigateToBrowse(.speaker(id))
+            default: break
+            }
+            return
+        }
+
+        guard let host = url.host,
+              host == "www.freebuddhistaudio.com" || host == "freebuddhistaudio.com",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        let num = components.queryItems?.first(where: { $0.name == "num" })?.value
+        let speaker = components.queryItems?.first(where: { $0.name == "s" })?.value
+        switch true {
+        case url.path.hasPrefix("/audio/details"):
+            if let num { navigateToDetail(num) }
+        case url.path.hasPrefix("/series/details"):
+            if let num {
+                navigateToBrowse(.series("https://www.freebuddhistaudio.com/series/details?num=\(num)"))
+            }
+        case url.path.hasPrefix("/browse"):
+            if let speaker { navigateToBrowse(.speaker(speaker)) }
+        default:
+            break
+        }
     }
 
     @ViewBuilder

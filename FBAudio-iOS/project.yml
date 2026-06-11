@@ -35,6 +35,10 @@ targets:
         UIBackgroundModes:
           - audio
         UILaunchScreen: {}
+        CFBundleURLTypes:
+          - CFBundleURLName: com.fba.app.deeplink
+            CFBundleURLSchemes:
+              - fbaudio
 
   FBAudioTests:
     type: bundle.unit-test
