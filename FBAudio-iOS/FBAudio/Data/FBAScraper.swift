@@ -325,7 +325,11 @@ actor FBAScraper {
             URLQueryItem(name: "t", value: "audio"),
         ]
         let html = try await fetchHtml(components.url!.absoluteString)
-        return parseBrowseCollectionPage(html, queryString: "s=\(speakerName)&t=audio")
+        // Percent-encode the pagination query string — fetchMoreItems interpolates
+        // it into URL(string:), which returns nil for raw spaces (multi-word
+        // speakers would silently get no Load More results).
+        let encodedName = speakerName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? speakerName
+        return parseBrowseCollectionPage(html, queryString: "s=\(encodedName)&t=audio")
     }
 
     // MARK: - Pagination
