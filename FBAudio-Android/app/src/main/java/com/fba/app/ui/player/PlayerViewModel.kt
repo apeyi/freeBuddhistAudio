@@ -184,6 +184,10 @@ class PlayerViewModel @Inject constructor(
                     currentTrackIndex = lastTrackIndex,
                     isPlaying = false,
                 )
+                // Live download status for the restored talk — a one-shot snapshot
+                // here left the player's download icon stale (e.g. spinning forever
+                // after the download finished elsewhere).
+                observeDownloadStatus(lastCatNum)
             } catch (e: Exception) {
                 android.util.Log.e("PlayerViewModel", "Failed to restore last playback", e)
                 pendingRestore = null
@@ -221,6 +225,7 @@ class PlayerViewModel @Inject constructor(
                 currentTrackIndex = startIndex,
                 downloadStatus = download?.status,
             )
+            observeDownloadStatus(restore.catNum)
         }
     }
 
