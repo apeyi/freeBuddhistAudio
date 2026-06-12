@@ -215,16 +215,15 @@ fun DetailScreen(
                         }
                         DownloadStatus.DOWNLOADING, DownloadStatus.PENDING -> {
                             OutlinedButton(
-                                onClick = { },
+                                onClick = { viewModel.cancelDownload() },
                                 modifier = Modifier.fillMaxWidth(),
-                                enabled = false,
                             ) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp,
                                 )
                                 Text(
-                                    "Downloading... ${download.progress}%",
+                                    "Downloading... ${download.progress}% — tap to cancel",
                                     modifier = Modifier.padding(start = 8.dp),
                                 )
                             }

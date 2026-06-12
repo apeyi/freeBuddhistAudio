@@ -80,17 +80,33 @@ class DownloadManager: ObservableObject {
 
     // MARK: - Download
 
+    // In-flight download tasks, keyed by catNum, so cancellation can reach them.
+    private var activeTasks: [String: Task<Void, Never>] = [:]
+
     func startDownload(talk: Talk) {
         let catNum = talk.catNum
+        // Replace any existing run for this talk rather than racing it
+        activeTasks[catNum]?.cancel()
         downloads[catNum] = DownloadState(
             catNum: catNum, title: talk.title, speaker: talk.speaker,
             imageUrl: talk.imageUrl, status: .pending, progress: 0, totalBytes: 0
         )
         saveDownloads()
 
-        Task {
+        activeTasks[catNum] = Task {
             await performDownload(talk: talk)
+            activeTasks[catNum] = nil
         }
+    }
+
+    /// Cancel an in-flight download: stop the transfer, remove partial files,
+    /// and forget the entry (back to "not downloaded", not "failed").
+    func cancelDownload(catNum: String) {
+        activeTasks[catNum]?.cancel()
+        activeTasks[catNum] = nil
+        removeFiles(forCatNum: catNum)
+        downloads.removeValue(forKey: catNum)
+        saveDownloads()
     }
 
     private func performDownload(talk: Talk) async {
@@ -142,6 +158,11 @@ class DownloadManager: ObservableObject {
                 let progress = ((index + 1) * 100) / validUrls.count
                 downloads[catNum]?.progress = progress
             } catch {
+                // Cancellation isn't a failure — cancelDownload already cleaned up;
+                // don't resurrect the entry as "failed".
+                if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                    return
+                }
                 print("DownloadManager: Download error for \(urlString): \(error)")
                 downloads[catNum]?.status = .failed
                 saveDownloads()
@@ -174,15 +195,20 @@ class DownloadManager: ObservableObject {
     }
 
     func deleteDownload(catNum: String) {
+        activeTasks[catNum]?.cancel()
+        activeTasks[catNum] = nil
+        removeFiles(forCatNum: catNum)
+        downloads.removeValue(forKey: catNum)
+        saveDownloads()
+    }
+
+    private func removeFiles(forCatNum catNum: String) {
         let sanitized = sanitize(catNum)
-        let dir = downloadsDir
-        if let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+        if let files = try? FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: nil) {
             for file in files where file.lastPathComponent.hasPrefix("\(sanitized)_") {
                 try? FileManager.default.removeItem(at: file)
             }
         }
-        downloads.removeValue(forKey: catNum)
-        saveDownloads()
     }
 
     func deleteAllDownloads() {

@@ -88,4 +88,7 @@ class DetailViewModel @Inject constructor(
             downloadRepository.deleteDownload(catNum)
         }
     }
+
+    /** Cancel an in-flight download — stops the worker and removes partial files. */
+    fun cancelDownload() = deleteDownload()
 }

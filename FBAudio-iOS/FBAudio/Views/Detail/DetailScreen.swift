@@ -162,15 +162,14 @@ struct DetailScreen: View {
                 }
             }
         case .downloading, .pending:
-            Button(action: {}) {
+            Button(action: { downloadManager.cancelDownload(catNum: catNum) }) {
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Downloading... \(state?.progress ?? 0)%")
+                    Text("Downloading... \(state?.progress ?? 0)% — tap to cancel")
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .disabled(true)
         default:
             Button(action: { downloadManager.startDownload(talk: talk) }) {
                 Label("Download for offline", systemImage: "arrow.down.circle")

@@ -108,6 +108,11 @@ fun FBAApp(
                         // re-tapping a tab doesn't recreate its ViewModel (wiping e.g.
                         // search results), and switching tabs preserves each tab's state.
                         fun navigateToTab(route: String) {
+                            // If the tab is already in the back stack (e.g. Downloads →
+                            // talk detail), pop back to it — plain navigate+restoreState
+                            // would restore the saved stack INCLUDING the detail screen,
+                            // so the tap would appear to do nothing.
+                            if (navController.popBackStack(route, inclusive = false)) return
                             navController.navigate(route) {
                                 popUpTo(Routes.HOME) { saveState = true }
                                 launchSingleTop = true

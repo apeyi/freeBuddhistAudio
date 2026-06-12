@@ -102,9 +102,16 @@ struct DownloadsScreen: View {
             )
         case .downloading, .pending:
             return AnyView(
-                ProgressView(value: (Float(download.progress) / 100).safeFraction())
-                    .progressViewStyle(.circular)
-                    .controlSize(.small)
+                HStack(spacing: 8) {
+                    ProgressView(value: (Float(download.progress) / 100).safeFraction())
+                        .progressViewStyle(.circular)
+                        .controlSize(.small)
+                    // Cancel: stops the transfer and removes partial files —
+                    // no confirm needed for an in-flight download.
+                    Button(action: { downloadManager.cancelDownload(catNum: download.catNum) }) {
+                        Image(systemName: "xmark.circle").foregroundStyle(.secondary)
+                    }
+                }
             )
         case .failed:
             return AnyView(

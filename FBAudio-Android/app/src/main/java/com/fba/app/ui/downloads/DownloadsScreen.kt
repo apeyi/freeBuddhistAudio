@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
@@ -30,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.unit.dp
@@ -134,11 +136,23 @@ fun DownloadsScreen(
                                     }
                                 }
                                 DownloadStatus.DOWNLOADING, DownloadStatus.PENDING -> {
-                                    CircularProgressIndicator(
-                                        progress = { (download.progress / 100f).safeFraction() },
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp,
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(
+                                            progress = { (download.progress / 100f).safeFraction() },
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 2.dp,
+                                        )
+                                        // Cancel — deleteDownload stops the worker and
+                                        // removes partial files; no confirm needed for
+                                        // an in-flight download.
+                                        IconButton(onClick = { viewModel.deleteDownload(download.catNum) }) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "Cancel download",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
                                 }
                                 DownloadStatus.FAILED -> {
                                     Row {
