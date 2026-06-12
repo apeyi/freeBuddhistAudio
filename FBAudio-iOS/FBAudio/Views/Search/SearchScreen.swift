@@ -12,6 +12,7 @@ struct SearchScreen: View {
     @State private var error: String?
     @State private var hasSearched = false
     @State private var searchMode: SearchMode = .all
+    @State private var debounceTask: Task<Void, Never>?
 
     let onTalkClick: (String) -> Void
     var onSeriesClick: (String) -> Void = { _ in }
@@ -30,6 +31,19 @@ struct SearchScreen: View {
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { search() }
                     .autocorrectionDisabled()
+                    // Live search after 3+ chars, debounced (parity with Android).
+                    // URL pastes still need an explicit submit — auto-navigating
+                    // away mid-paste would be jarring.
+                    .onChange(of: query) { newValue in
+                        debounceTask?.cancel()
+                        let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+                        guard trimmed.count >= 3, !trimmed.contains("num=") else { return }
+                        debounceTask = Task {
+                            try? await Task.sleep(nanoseconds: 500_000_000)
+                            guard !Task.isCancelled else { return }
+                            search()
+                        }
+                    }
             }
 
             // Mode toggle
@@ -162,13 +176,18 @@ struct SearchScreen: View {
                         words.allSatisfy { r.title.localizedCaseInsensitiveContains($0) }
                     }
                 } else {
-                    // Series first, then audio, deduped (parity with Android)
+                    // Series first, then audio, deduped (parity with Android).
+                    // Type-prefixed key: series and talk numbers are separate
+                    // namespaces, a bare-catNum dedup could hide a talk.
                     async let seriesTask = (try? TalkRepository.shared.searchSeries(trimmed)) ?? []
                     async let audioTask = TalkRepository.shared.searchAudio(trimmed)
                     let series = await seriesTask
                     let audio = try await audioTask
                     var seen = Set<String>()
-                    results = (series + audio).filter { seen.insert($0.catNum).inserted }
+                    results = (series + audio).filter {
+                        let type = $0.path.contains("/series/") ? "s" : "a"
+                        return seen.insert("\(type):\($0.catNum)").inserted
+                    }
                 }
                 hasSearched = true
             } catch {

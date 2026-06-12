@@ -6,7 +6,6 @@ import com.fba.app.domain.model.Talk
 import com.fba.app.domain.model.Track
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import org.jsoup.parser.Parser
 
 @Entity(tableName = "talks")
 data class TalkEntity(
@@ -30,25 +29,25 @@ data class TalkEntity(
         val tracks: List<Track> = if (tracksJson.isNotBlank()) {
             try {
                 val raw: List<Track> = Gson().fromJson(tracksJson, trackType)
-                raw.map { it.copy(
-                    title = Parser.unescapeEntities(it.title, false),
-                    durationSeconds = it.durationSeconds.coerceAtLeast(0),
-                ) }
+                raw.map { it.copy(durationSeconds = it.durationSeconds.coerceAtLeast(0)) }
             } catch (_: Exception) { emptyList() }
         } else emptyList()
+        // Text fields are stored already-unescaped (the scraper unescapes before
+        // fromDomain runs) — unescaping again here made cached reads render
+        // differently from fresh fetches for double-escaped source text.
         return Talk(
             catNum = catNum,
-            title = Parser.unescapeEntities(title, false),
-            speaker = Parser.unescapeEntities(speaker, false),
+            title = title,
+            speaker = speaker,
             year = year,
             genre = genre,
             durationSeconds = durationSeconds.coerceAtLeast(0),
             imageUrl = imageUrl,
             audioUrl = audioUrl,
-            description = Parser.unescapeEntities(description, false),
+            description = description,
             tracks = tracks,
             transcriptUrl = transcriptUrl,
-            series = Parser.unescapeEntities(series, false),
+            series = series,
             seriesHref = seriesHref,
         )
     }

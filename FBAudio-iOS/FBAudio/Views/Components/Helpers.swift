@@ -11,6 +11,15 @@ extension BinaryFloatingPoint {
     }
 }
 
+/// "1x", "1.5x", "1.25x" — up to two decimals, trailing zeros stripped.
+/// (%.2g was wrong: two SIGNIFICANT digits renders 1.25 as "1.2".)
+func formatSpeed(_ speed: Float) -> String {
+    var s = String(format: "%.2f", speed)
+    while s.hasSuffix("0") { s.removeLast() }
+    if s.hasSuffix(".") { s.removeLast() }
+    return s + "x"
+}
+
 func formatDuration(_ seconds: Int) -> String {
     let h = seconds / 3600
     let m = (seconds % 3600) / 60

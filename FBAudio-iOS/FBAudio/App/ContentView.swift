@@ -191,7 +191,8 @@ struct ContentView: View {
         case .browse(let mode):
             BrowseScreen(
                 initialMode: mode.toBrowseMode,
-                onTalkClick: { navigateToDetail($0) }
+                onTalkClick: { navigateToDetail($0) },
+                onSeriesSelect: { navigateToBrowse(.series($0)) }
             )
         case .transcript(let url, let catNum):
             TranscriptScreen(transcriptUrl: url, catNum: catNum)

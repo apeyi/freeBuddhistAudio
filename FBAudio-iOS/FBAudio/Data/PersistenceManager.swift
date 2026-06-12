@@ -14,21 +14,45 @@ class PersistenceManager {
 
     init() {
         try? fileManager.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        pruneTalkCache()
+        pruneStalePlaybackKeys()
     }
 
     // MARK: - Talk Cache
 
-    func cacheTalk(_ talk: Talk) {
-        let url = cacheDir.appendingPathComponent("\(talk.catNum).json")
+    private func cacheFileName(_ catNum: String) -> String {
+        // Sanitized: catNums can arrive from deep links, and raw values would be
+        // interpreted as path components.
+        let safe = catNum.replacing(/[^a-zA-Z0-9_-]/, with: "")
+        return "\(safe).json"
+    }
+
+    /// Cache under the REQUESTED catNum, not the one in the response — any
+    /// casing/format difference between them made every lookup a cache miss.
+    func cacheTalk(_ talk: Talk, key: String) {
+        let url = cacheDir.appendingPathComponent(cacheFileName(key))
         if let data = try? JSONEncoder().encode(talk) {
             try? data.write(to: url)
         }
     }
 
     func getCachedTalk(_ catNum: String) -> Talk? {
-        let url = cacheDir.appendingPathComponent("\(catNum).json")
+        let url = cacheDir.appendingPathComponent(cacheFileName(catNum))
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(Talk.self, from: data)
+    }
+
+    /// Drop cached talk files older than 30 days (mirrors Android's prune).
+    private func pruneTalkCache() {
+        let cutoff = Date().addingTimeInterval(-30 * 24 * 3600)
+        guard let files = try? fileManager.contentsOfDirectory(
+            at: cacheDir, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+        for file in files {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let modified, modified < cutoff {
+                try? fileManager.removeItem(at: file)
+            }
+        }
     }
 
     // MARK: - Recently Listened
@@ -89,6 +113,22 @@ class PersistenceManager {
 
     func getLastDuration(_ catNum: String) -> Int64 {
         Int64(defaults.integer(forKey: "last_duration_\(catNum)"))
+    }
+
+    /// Per-talk playback keys (last_position_X etc.) otherwise accumulate in
+    /// UserDefaults forever. Resume positions only matter for recently played
+    /// talks, so drop keys for anything that has fallen out of the recent list.
+    private func pruneStalePlaybackKeys() {
+        let keep = Set(getRecentlyListened().map(\.catNum) + [getLastCatNum()].compactMap { $0 })
+        let prefixes = ["last_position_", "last_track_index_", "last_duration_"]
+        for key in defaults.dictionaryRepresentation().keys {
+            for prefix in prefixes where key.hasPrefix(prefix) {
+                let catNum = String(key.dropFirst(prefix.count))
+                if !keep.contains(catNum) {
+                    defaults.removeObject(forKey: key)
+                }
+            }
+        }
     }
 
     // MARK: - Playback Speed

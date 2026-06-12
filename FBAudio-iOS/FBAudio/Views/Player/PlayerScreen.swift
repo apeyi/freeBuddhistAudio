@@ -2,6 +2,9 @@ import SwiftUI
 
 struct PlayerScreen: View {
     @ObservedObject var player: AudioPlayer
+    // Observed so the download button re-renders when a download finishes while
+    // playback is paused (player ticks otherwise masked the staleness).
+    @ObservedObject private var downloadManager = DownloadManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showSpeedSlider = false
     @State private var showChapterSheet = false
@@ -169,7 +172,7 @@ struct PlayerScreen: View {
             // Speed & chapters
             HStack {
                 Button(action: { showSpeedSlider.toggle() }) {
-                    Text("\(String(format: "%.2g", player.playbackSpeed))x")
+                    Text(formatSpeed(player.playbackSpeed))
                         .font(.subheadline)
                 }
                 Spacer()
@@ -189,7 +192,7 @@ struct PlayerScreen: View {
             // Speed slider
             if showSpeedSlider {
                 VStack {
-                    Text("\(String(format: "%.2g", player.playbackSpeed))x")
+                    Text(formatSpeed(player.playbackSpeed))
                         .font(.headline)
                     HStack {
                         Text("0.5x").font(.caption2)
@@ -216,7 +219,7 @@ struct PlayerScreen: View {
 
     @ViewBuilder
     private var downloadButton: some View {
-        let status = player.currentTalk.flatMap { DownloadManager.shared.downloads[$0.catNum]?.status }
+        let status = player.currentTalk.flatMap { downloadManager.downloads[$0.catNum]?.status }
         switch status {
         case .complete:
             Image(systemName: "arrow.down.circle.fill")
@@ -226,7 +229,7 @@ struct PlayerScreen: View {
         default:
             Button(action: {
                 if let talk = player.currentTalk {
-                    DownloadManager.shared.startDownload(talk: talk)
+                    downloadManager.startDownload(talk: talk)
                 }
             }) {
                 Image(systemName: "arrow.down.circle")

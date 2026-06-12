@@ -251,12 +251,17 @@ fun DetailScreen(
                         }
                     }
 
-                    // Description — strip HTML tags and decode entities
+                    // Description — strip HTML tags and decode entities.
+                    // remember(): this composable recomposes twice a second while
+                    // audio plays (player state ticks), and Jsoup parsing on every
+                    // pass is wasted main-thread work.
                     if (talk.description.isNotBlank()) {
-                        val doc = org.jsoup.Jsoup.parse(talk.description)
-                        doc.select("p").prepend("\n\n")
-                        doc.select("br").append("\n")
-                        val description = doc.text().trim()
+                        val description = androidx.compose.runtime.remember(talk.description) {
+                            val doc = org.jsoup.Jsoup.parse(talk.description)
+                            doc.select("p").prepend("\n\n")
+                            doc.select("br").append("\n")
+                            doc.text().trim()
+                        }
                         if (description.isNotBlank()) {
                             Spacer(Modifier.height(16.dp))
                             Text(description, style = MaterialTheme.typography.bodyMedium)

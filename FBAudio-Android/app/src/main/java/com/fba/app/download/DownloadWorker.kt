@@ -134,6 +134,9 @@ class DownloadWorker @AssistedInject constructor(
                 client.newCall(Request.Builder().url(url).build()).execute().use { response ->
                     if (!response.isSuccessful) throw IOException("HTTP ${response.code} for $url")
                     val body = response.body ?: throw IOException("Empty body for $url")
+                    val contentLength = body.contentLength() // -1 when the server omits it
+                    var trackDownloaded = 0L
+                    var lastReportedProgress = -1
                     body.byteStream().use { inputStream ->
                         FileOutputStream(partFile).use { outputStream ->
                             val buffer = ByteArray(8192)
@@ -143,6 +146,18 @@ class DownloadWorker @AssistedInject constructor(
                                 if (read == -1) break
                                 outputStream.write(buffer, 0, read)
                                 totalDownloaded += read
+                                trackDownloaded += read
+
+                                // Byte-level progress within the track, so single-track
+                                // talks don't sit at 0% and jump straight to 100%.
+                                if (contentLength > 0) {
+                                    val withinTrack = trackDownloaded.toDouble() / contentLength
+                                    val progress = (((index + withinTrack) * 100) / urls.size).toInt()
+                                    if (progress >= lastReportedProgress + 5) {
+                                        lastReportedProgress = progress
+                                        downloadDao.updateProgress(catNum, DownloadStatus.DOWNLOADING, progress)
+                                    }
+                                }
                             }
                         }
                     }

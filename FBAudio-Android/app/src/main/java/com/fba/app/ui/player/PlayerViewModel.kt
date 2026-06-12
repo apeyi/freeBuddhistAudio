@@ -55,6 +55,7 @@ class PlayerViewModel @Inject constructor(
     private val talkRepository: TalkRepository,
     private val downloadRepository: DownloadRepository,
     private val recentlyListenedDao: RecentlyListenedDao,
+    private val appScope: kotlinx.coroutines.CoroutineScope,
 ) : ViewModel() {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("player_prefs", Context.MODE_PRIVATE)
@@ -274,8 +275,10 @@ class PlayerViewModel @Inject constructor(
             .putLong("last_duration_$catNum", dur)
             .commit() // sync write — survives process death
 
-        // Update recently listened — compute cumulative position across all chapters
-        viewModelScope.launch {
+        // Update recently listened — compute cumulative position across all chapters.
+        // App scope, not viewModelScope: this is also called from onCleared, where
+        // viewModelScope is already cancelled and the write would be dropped.
+        appScope.launch {
             val trackIndex = state.currentTrackIndex
             val tracks = talk.tracks
             val cumulativePos = PlaybackMath.cumulativePositionMs(tracks, trackIndex, pos)
@@ -387,7 +390,10 @@ class PlayerViewModel @Inject constructor(
             val savedTrackIndex = prefs.getInt("last_track_index_$catNum", 0)
             val savedPos = prefs.getLong("last_position_$catNum", 0)
             val startIndex = (trackIndex ?: savedTrackIndex).coerceIn(0, items.size - 1)
-            // Resume position only applies to the track it was saved against
+            // Resume position only applies to the track it was saved against.
+            // INTENTIONAL: resume 10s BEFORE the saved position — after time away
+            // from a talk, a short repeat re-establishes context. Don't "fix" this
+            // to resume exactly. (Same convention on iOS.)
             val startPos = if (startIndex == savedTrackIndex && savedPos > 10_000) {
                 savedPos - 10_000
             } else {

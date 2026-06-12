@@ -39,19 +39,29 @@ class TalkRepository @Inject constructor(
         return scraper.fetchLatestTalks()
     }
 
+    /**
+     * Null-swallowing convenience for best-effort callers (player restore, etc.)
+     * where a missing talk and a network failure are handled the same way.
+     * UI that can offer a Retry should use [fetchTalkDetail] instead.
+     */
     suspend fun getTalkDetail(catNum: String): Talk? {
+        return try {
+            fetchTalkDetail(catNum)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Like [getTalkDetail] but propagates network/parse errors to the caller. */
+    suspend fun fetchTalkDetail(catNum: String): Talk? {
         // Check cache first
         val cached = talkDao.getTalk(catNum)
         if (cached != null) return cached.toDomain()
 
         // Fetch from web and cache
-        return try {
-            val talk = scraper.fetchTalkDetail(catNum) ?: return null
-            talkDao.insertTalk(TalkEntity.fromDomain(talk))
-            talk
-        } catch (_: Exception) {
-            null
-        }
+        val talk = scraper.fetchTalkDetail(catNum) ?: return null
+        talkDao.insertTalk(TalkEntity.fromDomain(talk))
+        return talk
     }
 
     /** General audio search via FBA API. */

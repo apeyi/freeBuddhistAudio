@@ -176,9 +176,14 @@ class SearchViewModel @Inject constructor(
             }
             val audioResults = audioDeferred.await()
             val seriesResults = seriesDeferred.await()
-            // Series first, then audio talks; deduplicate by catNum
+            // Series first, then audio talks. Dedup key is type-prefixed: series and
+            // talk numbers are separate namespaces on FBA, so a bare-catNum dedup
+            // would hide a talk whose number collides with a series.
             val seen = mutableSetOf<String>()
-            val results = (seriesResults + audioResults).filter { seen.add(it.catNum) }
+            val results = (seriesResults + audioResults).filter {
+                val type = if (it.path.contains("/series/")) "s" else "a"
+                seen.add("$type:${it.catNum}")
+            }
             if (results.isNotEmpty()) searchCache[cacheKey] = results
             _uiState.value = _uiState.value.copy(
                 results = results, filteredResults = results,

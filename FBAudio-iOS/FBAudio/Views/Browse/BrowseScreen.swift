@@ -3,6 +3,10 @@ import SwiftUI
 struct BrowseScreen: View {
     let initialMode: BrowseMode?
     let onTalkClick: (String) -> Void
+    // When set, tapping a series pushes a real navigation destination instead of
+    // swapping this screen's content in place — that in-place swap needed a custom
+    // back button, which killed the interactive swipe-back gesture.
+    var onSeriesSelect: ((String) -> Void)? = nil
 
     enum BrowseMode {
         case sangharakshitaByYear
@@ -11,7 +15,6 @@ struct BrowseScreen: View {
         case series(String)
     }
 
-    @Environment(\.dismiss) private var dismiss
     @State private var categories: [BrowseCategory] = []
     @State private var selectedCategory: BrowseCategory?
     @State private var talks: [SearchResult] = []
@@ -54,42 +57,7 @@ struct BrowseScreen: View {
         .miniPlayerClearance()
         .navigationTitle(selectedCategory?.name ?? "Browse")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(canGoBackInternally)
-        .toolbar {
-            if canGoBackInternally {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: goBack) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("Back")
-                        }
-                    }
-                }
-            }
-        }
         .task { await loadInitial() }
-    }
-
-    private var canGoBackInternally: Bool {
-        switch initialMode {
-        case .sangharakshitaSeries:
-            return selectedCategory?.id.hasPrefix("sang_series_") == true
-        default:
-            return false
-        }
-    }
-
-    private func goBack() {
-        // Sangharakshita series: if viewing a series' talks, go back to series list
-        if let cat = selectedCategory, cat.id.hasPrefix("sang_series_") {
-            categories = SharedDataLoader.sangharakshitaSeriesAsCategories()
-            selectedCategory = nil
-            talks = []
-            return
-        }
-
-        // Nothing left to go back to internally — pop nav
-        dismiss()
     }
 
     // MARK: - Categories View
@@ -256,6 +224,12 @@ struct BrowseScreen: View {
     private func selectCategory(_ category: BrowseCategory) {
         selectedDecade = nil
         selectedYear = nil
+
+        // Series open as a pushed destination (real back stack, swipe-back works)
+        if category.id.hasPrefix("sang_series_"), let onSeriesSelect {
+            onSeriesSelect(category.browseUrl)
+            return
+        }
 
         switch category.type {
         case .sangharakshita:

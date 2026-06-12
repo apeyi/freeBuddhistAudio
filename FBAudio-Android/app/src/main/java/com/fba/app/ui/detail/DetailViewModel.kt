@@ -43,8 +43,14 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                val talk = talkRepository.getTalkDetail(catNum)
-                _uiState.value = _uiState.value.copy(talk = talk, isLoading = false)
+                // Throwing variant: a network failure shows the error + Retry UI
+                // instead of being conflated with "talk not found" (null).
+                val talk = talkRepository.fetchTalkDetail(catNum)
+                _uiState.value = _uiState.value.copy(
+                    talk = talk,
+                    isLoading = false,
+                    error = if (talk == null) "Talk not found" else null,
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

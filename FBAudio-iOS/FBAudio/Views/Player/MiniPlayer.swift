@@ -10,7 +10,7 @@ struct MiniPlayer: View {
                 // Progress bar
                 if player.duration > 0 {
                     GeometryReader { geo in
-                        let progress = player.currentPosition / player.duration
+                        let progress = (player.currentPosition / player.duration).safeFraction()
                         Rectangle()
                             .fill(Color.saffronOrange)
                             .frame(width: geo.size.width * CGFloat(progress))

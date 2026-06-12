@@ -13,7 +13,7 @@ class TalkRepository: ObservableObject {
         }
         do {
             let talk = try await scraper.fetchTalkDetail(catNum)
-            persistence.cacheTalk(talk)
+            persistence.cacheTalk(talk, key: catNum)
             return talk
         } catch {
             return nil

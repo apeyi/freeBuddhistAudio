@@ -1,8 +1,11 @@
 import SwiftUI
 
 struct HomeScreen: View {
-    @StateObject private var player = AudioPlayer.shared
-    @StateObject private var downloadManager = DownloadManager.shared
+    // ObservedObject, not StateObject: these are app-wide singletons owned
+    // elsewhere. (An unused player reference here also re-rendered Home twice a
+    // second during playback — only observe what the view actually reads.)
+    @ObservedObject private var downloadManager = DownloadManager.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var recentlyListened: [PersistenceManager.RecentlyListened] = []
 
     let onTalkClick: (String) -> Void
@@ -28,6 +31,13 @@ struct HomeScreen: View {
         }
         .miniPlayerClearance()
         .onAppear { recentlyListened = PersistenceManager.shared.getRecentlyListened() }
+        // Also refresh when returning from background — progress made while the
+        // screen sat behind the lock screen/another app would otherwise be stale.
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                recentlyListened = PersistenceManager.shared.getRecentlyListened()
+            }
+        }
     }
 
     // MARK: - Sangharakshita Section

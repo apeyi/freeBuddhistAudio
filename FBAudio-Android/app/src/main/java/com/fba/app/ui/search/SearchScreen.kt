@@ -180,7 +180,9 @@ fun SearchScreen(
                     )
                 }
                 else -> {
-                    items(state.filteredResults, key = { it.catNum }) { result ->
+                    // Key includes the path: a series and a talk can share a catNum
+                    // (separate namespaces on FBA) and duplicate LazyColumn keys crash.
+                    items(state.filteredResults, key = { "${it.path}|${it.catNum}" }) { result ->
                         val isSeries = result.path.contains("/series/")
                         TalkCard(
                             title = result.title,
