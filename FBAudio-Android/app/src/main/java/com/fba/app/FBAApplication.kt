@@ -16,6 +16,7 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import kotlin.concurrent.thread
+import kotlinx.coroutines.launch
 
 @HiltAndroidApp
 class FBAApplication : Application(), Configuration.Provider {
@@ -23,11 +24,26 @@ class FBAApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var downloadRepository: dagger.Lazy<com.fba.app.data.repository.DownloadRepository>
+
+    @Inject
+    lateinit var appScope: kotlinx.coroutines.CoroutineScope
+
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) {
             setupCrashLogging()
             uploadUnsentCrashLogs()
+        }
+        // Repair download rows orphaned by crashes/process death (status says
+        // "downloading" but no worker exists) so they show Retry instead of 0%.
+        appScope.launch {
+            try {
+                downloadRepository.get().reconcileStaleDownloads()
+            } catch (e: Exception) {
+                Log.e("FBAudio", "Download reconcile failed", e)
+            }
         }
     }
 

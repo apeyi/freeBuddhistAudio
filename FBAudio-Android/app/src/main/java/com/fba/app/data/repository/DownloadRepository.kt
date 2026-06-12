@@ -72,11 +72,39 @@ class DownloadRepository @Inject constructor(
 
         // Unique work keyed by catNum: a double-tap (or retry racing a cancel) must
         // never run two workers writing the same files concurrently.
+        // REPLACE, not KEEP: a zombie entry under this name (e.g. stuck in retry
+        // backoff after a crash) would silently swallow the new request with KEEP,
+        // leaving the UI at 0% forever. Replacement is safe — cancellation cleans
+        // partial files and tracks stream to .part before renaming.
         WorkManager.getInstance(context).enqueueUniqueWork(
             "download_$catNum",
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             request,
         )
+    }
+
+    /**
+     * Reconcile DB state with WorkManager at app start: a row claiming
+     * PENDING/DOWNLOADING with no live work behind it (e.g. after a crash loop or
+     * WorkManager pruning) would otherwise show "0%" forever. Mark those FAILED so
+     * the user gets a Retry button.
+     */
+    suspend fun reconcileStaleDownloads() = withContext(Dispatchers.IO) {
+        val wm = WorkManager.getInstance(context)
+        val active = downloadDao.getAllDownloadsOnce().filter {
+            it.status == DownloadStatus.PENDING || it.status == DownloadStatus.DOWNLOADING
+        }
+        for (download in active) {
+            val infos = try {
+                wm.getWorkInfosForUniqueWork("download_${download.catNum}").get()
+            } catch (_: Exception) {
+                continue
+            }
+            val hasLiveWork = infos.any { !it.state.isFinished }
+            if (!hasLiveWork) {
+                downloadDao.updateStatus(download.catNum, DownloadStatus.FAILED)
+            }
+        }
     }
 
     suspend fun deleteAllDownloads() {
