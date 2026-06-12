@@ -47,6 +47,17 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+            // Remote crash reporting is debug-only; keep release builds tokenless.
+            buildConfigField("String", "CRASH_REPORT_TG_TOKEN", "\"\"")
+            buildConfigField("String", "CRASH_REPORT_TG_CHAT", "\"\"")
+        }
+        debug {
+            // Debug-only remote crash reporting to the developer's own Telegram
+            // chat. Values come from the build environment — empty (disabled)
+            // unless TELEGRAM_BOT_TOKEN/TELEGRAM_USER_ID are set at build time.
+            // NEVER publish an APK built with these set.
+            buildConfigField("String", "CRASH_REPORT_TG_TOKEN", "\"${System.getenv("TELEGRAM_BOT_TOKEN") ?: ""}\"")
+            buildConfigField("String", "CRASH_REPORT_TG_CHAT", "\"${System.getenv("TELEGRAM_USER_ID") ?: ""}\"")
         }
     }
 
