@@ -80,9 +80,17 @@ class PlayerViewModel @Inject constructor(
 
     private data class RestoreState(val catNum: String, val position: Long, val trackIndex: Int)
 
+    /**
+     * What the play/pause UI should show: the user's intent (playWhenReady), not
+     * the raw isPlaying flag — seeks bounce through STATE_BUFFERING where
+     * isPlaying flips false for a moment, which made the pause icon flash to play.
+     */
+    private fun Player.isPlayingForUi(): Boolean =
+        playWhenReady && playbackState != Player.STATE_ENDED && playbackState != Player.STATE_IDLE
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
+            mediaController?.let { _uiState.value = _uiState.value.copy(isPlaying = it.isPlayingForUi()) }
             if (isPlaying) {
                 // Successful playback — clear any prior error and reset retry budget
                 autoRetryCount = 0
@@ -347,7 +355,7 @@ class PlayerViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             currentPosition = pos,
             duration = controller.duration.coerceAtLeast(0),
-            isPlaying = controller.isPlaying,
+            isPlaying = controller.isPlayingForUi(),
         )
         // Save position every 5 seconds for resume
         if (controller.isPlaying) {

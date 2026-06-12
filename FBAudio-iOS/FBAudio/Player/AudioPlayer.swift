@@ -215,10 +215,13 @@ class AudioPlayer: ObservableObject {
             }
         }
 
-        // Rate observer
-        rateObserver = player?.observe(\.rate) { [weak self] player, _ in
+        // Play/pause state for the UI: timeControlStatus, not raw rate — a seek
+        // passes through .waitingToPlayAtSpecifiedRate where rate is 0 for a
+        // moment, which made the pause icon flash to play. "Not paused" (playing
+        // OR buffering-with-intent-to-play) is what the icon should reflect.
+        rateObserver = player?.observe(\.timeControlStatus) { [weak self] player, _ in
             Task { @MainActor in
-                self?.isPlaying = player.rate > 0
+                self?.isPlaying = player.timeControlStatus != .paused
             }
         }
 
