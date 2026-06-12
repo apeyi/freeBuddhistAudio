@@ -17,6 +17,7 @@ class AudioPlayer: ObservableObject {
     @Published var isVisible = false
     @Published var showDeleteDownloadPrompt = false
     @Published var playbackError: String?
+    @Published var isReconnecting = false
 
     private var player: AVPlayer?
     private var timeObserver: Any?
@@ -207,6 +208,7 @@ class AudioPlayer: ObservableObject {
                     self.duration = item.duration.seconds.isFinite ? item.duration.seconds : 0
                     self.autoRetryCount = 0
                     self.playbackError = nil
+                    self.isReconnecting = false
                 case .failed:
                     self.handlePlaybackError(item.error)
                 default:
@@ -299,6 +301,9 @@ class AudioPlayer: ObservableObject {
         // Transient network errors: auto-retry a few times (network may be flapping).
         if isNetwork && autoRetryCount < 3 {
             autoRetryCount += 1
+            // Visible feedback while retrying — otherwise the player looks dead
+            // during the backoff waits.
+            isReconnecting = true
             let delay = Double(autoRetryCount) * 2.0
             retryWorkItem?.cancel()
             let work = DispatchWorkItem { [weak self] in
@@ -307,6 +312,7 @@ class AudioPlayer: ObservableObject {
             retryWorkItem = work
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
         } else {
+            isReconnecting = false
             playbackError = isNetwork
                 ? "Couldn't load audio — check your connection."
                 : "Couldn't play this talk."

@@ -58,9 +58,10 @@ class DownloadWorker @AssistedInject constructor(
         }
     }
 
-    override suspend fun getForegroundInfo(): ForegroundInfo = buildForegroundInfo()
+    override suspend fun getForegroundInfo(): ForegroundInfo = buildForegroundInfo(-1)
 
-    private fun buildForegroundInfo(): ForegroundInfo {
+    /** [progress] 0-100 shows a determinate bar; anything else indeterminate. */
+    private fun buildForegroundInfo(progress: Int): ForegroundInfo {
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
@@ -68,16 +69,28 @@ class DownloadWorker @AssistedInject constructor(
             )
         }
         val title = inputData.getString(KEY_TITLE).takeUnless { it.isNullOrBlank() } ?: "Downloading talk"
+        val determinate = progress in 0..100
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle(title)
-            .setContentText("Downloading…")
+            .setContentText(if (determinate) "Downloading… $progress%" else "Downloading…")
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setProgress(100, progress.coerceIn(0, 100), !determinate)
             .build()
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
             ForegroundInfo(NOTIFICATION_ID, notification)
+        }
+    }
+
+    /** Refresh the foreground notification's progress bar; never fatal. */
+    private suspend fun notifyProgress(progress: Int) {
+        try {
+            setForeground(buildForegroundInfo(progress))
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
         }
     }
 
@@ -93,11 +106,7 @@ class DownloadWorker @AssistedInject constructor(
 
         // Promote to a foreground service so long downloads survive backgrounding.
         // Best-effort: on Android 12+ this can throw if the app is background-restricted.
-        try {
-            setForeground(buildForegroundInfo())
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-        }
+        notifyProgress(-1)
 
         val downloadsDir = File(applicationContext.filesDir, "downloads")
 
@@ -156,6 +165,7 @@ class DownloadWorker @AssistedInject constructor(
                                     if (progress >= lastReportedProgress + 5) {
                                         lastReportedProgress = progress
                                         downloadDao.updateProgress(catNum, DownloadStatus.DOWNLOADING, progress)
+                                        notifyProgress(progress)
                                     }
                                 }
                             }
@@ -169,6 +179,7 @@ class DownloadWorker @AssistedInject constructor(
 
                 val progress = ((index + 1) * 100) / urls.size
                 downloadDao.updateProgress(catNum, DownloadStatus.DOWNLOADING, progress)
+                notifyProgress(progress)
             }
 
             // Download transcript if available (best-effort, don't fail the download)

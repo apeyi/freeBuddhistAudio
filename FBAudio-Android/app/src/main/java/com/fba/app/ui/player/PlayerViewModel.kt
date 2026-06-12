@@ -47,6 +47,7 @@ data class PlayerUiState(
     val currentTrackIndex: Int = 0,
     val showDeleteDownloadPrompt: Boolean = false,
     val playbackError: String? = null,
+    val isReconnecting: Boolean = false,
 )
 
 @HiltViewModel
@@ -94,8 +95,8 @@ class PlayerViewModel @Inject constructor(
             if (isPlaying) {
                 // Successful playback — clear any prior error and reset retry budget
                 autoRetryCount = 0
-                if (_uiState.value.playbackError != null) {
-                    _uiState.value = _uiState.value.copy(playbackError = null)
+                if (_uiState.value.playbackError != null || _uiState.value.isReconnecting) {
+                    _uiState.value = _uiState.value.copy(playbackError = null, isReconnecting = false)
                 }
                 startPositionUpdates()
             } else {
@@ -126,6 +127,9 @@ class PlayerViewModel @Inject constructor(
             )
             if (isNetwork && autoRetryCount < 3) {
                 autoRetryCount++
+                // Visible feedback while retrying — without it the player just
+                // flip-flops its icon and looks dead during the backoff waits.
+                _uiState.value = _uiState.value.copy(isReconnecting = true)
                 viewModelScope.launch {
                     delay(2000L * autoRetryCount)
                     mediaController?.run { prepare(); play() }
@@ -134,6 +138,7 @@ class PlayerViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     playbackError = if (isNetwork) "Couldn't load audio — check your connection."
                     else "Couldn't play this talk.",
+                    isReconnecting = false,
                 )
             }
         }
@@ -380,7 +385,7 @@ class PlayerViewModel @Inject constructor(
         userInitiatedPlayback = true
         pendingRestore = null
         autoRetryCount = 0
-        _uiState.value = _uiState.value.copy(playbackError = null)
+        _uiState.value = _uiState.value.copy(playbackError = null, isReconnecting = false)
         viewModelScope.launch {
             val controller = controllerReady.await()
             val talk = talkRepository.getTalkDetail(catNum)
@@ -465,7 +470,7 @@ class PlayerViewModel @Inject constructor(
     /** Manual retry after a playback error (re-prepares the current media item). */
     fun retry() {
         autoRetryCount = 0
-        _uiState.value = _uiState.value.copy(playbackError = null)
+        _uiState.value = _uiState.value.copy(playbackError = null, isReconnecting = false)
         mediaController?.run {
             prepare()
             play()
@@ -474,14 +479,20 @@ class PlayerViewModel @Inject constructor(
 
     fun seekTo(positionMs: Long) {
         mediaController?.seekTo(positionMs)
+        // Reflect the seek target immediately: position polling pauses while the
+        // player re-buffers, so without this a second +10s press wouldn't update
+        // the displayed time until buffering finished.
+        updatePosition()
     }
 
     fun seekForward() {
         mediaController?.let { it.seekTo(it.currentPosition + 10_000) }
+        updatePosition()
     }
 
     fun seekBack() {
         mediaController?.let { it.seekTo((it.currentPosition - 10_000).coerceAtLeast(0)) }
+        updatePosition()
     }
 
     fun nextTrack() {

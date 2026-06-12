@@ -89,11 +89,14 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        // Minimal top bar — back, info, download
+        // Minimal top bar — back, info, download. Sized like a Material3 TopAppBar
+        // (64dp tall, 4dp leading inset) so the back icon lines up with every
+        // other screen's toolbar back button.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 8.dp),
+                .height(64.dp)
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -190,6 +193,16 @@ fun PlayerScreen(
             if (hasMultipleTracks) {
                 Text(
                     text = "Chapter ${state.currentTrackIndex + 1} of ${tracks.size}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // Reconnecting feedback during auto-retry (otherwise the player looks
+            // dead while it waits out the retry backoff)
+            if (state.isReconnecting && state.playbackError == null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Reconnecting…",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

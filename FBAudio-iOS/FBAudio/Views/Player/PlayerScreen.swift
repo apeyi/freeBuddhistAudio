@@ -74,6 +74,12 @@ struct PlayerScreen: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if player.isReconnecting && player.playbackError == nil {
+                    Text("Reconnecting…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                }
                 if let err = player.playbackError {
                     Text(err)
                         .font(.caption)
