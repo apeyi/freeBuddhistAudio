@@ -48,6 +48,7 @@ data class PlayerUiState(
     val showDeleteDownloadPrompt: Boolean = false,
     val playbackError: String? = null,
     val isReconnecting: Boolean = false,
+    val isBuffering: Boolean = false,
 )
 
 @HiltViewModel
@@ -145,6 +146,14 @@ class PlayerViewModel @Inject constructor(
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             updatePosition()
+            // Buffering with intent to play → show a spinner. Distinguishes
+            // "loading, audio coming" from "playing with sound" (the icon now
+            // reflects intent, so without this a buffering stream looks like it's
+            // playing silently).
+            _uiState.value = _uiState.value.copy(
+                isBuffering = playbackState == Player.STATE_BUFFERING &&
+                    mediaController?.playWhenReady == true,
+            )
             if (playbackState == Player.STATE_ENDED) {
                 // Whole queue finished (chapter advance is handled by the player).
                 val state = _uiState.value

@@ -300,15 +300,25 @@ fun PlayerScreen(
 
             Spacer(Modifier.width(16.dp))
 
-            IconButton(
-                onClick = { playerViewModel.togglePlayPause() },
-                modifier = Modifier.size(64.dp),
-            ) {
-                Icon(
-                    imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (state.isPlaying) "Pause" else "Play",
-                    modifier = Modifier.size(48.dp),
-                )
+            Box(contentAlignment = Alignment.Center) {
+                IconButton(
+                    onClick = { playerViewModel.togglePlayPause() },
+                    modifier = Modifier.size(64.dp),
+                ) {
+                    Icon(
+                        imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (state.isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(48.dp),
+                    )
+                }
+                // Spinner ring around the button while the stream buffers, so
+                // "playing icon but momentarily silent" reads as loading, not stuck.
+                if (state.isBuffering) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(64.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
             }
 
             Spacer(Modifier.width(16.dp))

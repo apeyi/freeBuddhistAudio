@@ -18,6 +18,7 @@ class AudioPlayer: ObservableObject {
     @Published var showDeleteDownloadPrompt = false
     @Published var playbackError: String?
     @Published var isReconnecting = false
+    @Published var isBuffering = false
 
     private var player: AVPlayer?
     private var timeObserver: Any?
@@ -223,7 +224,11 @@ class AudioPlayer: ObservableObject {
         // OR buffering-with-intent-to-play) is what the icon should reflect.
         rateObserver = player?.observe(\.timeControlStatus) { [weak self] player, _ in
             Task { @MainActor in
-                self?.isPlaying = player.timeControlStatus != .paused
+                guard let self else { return }
+                self.isPlaying = player.timeControlStatus != .paused
+                // Buffering: intends to play but isn't yet. Drives a spinner so a
+                // momentarily-silent stream reads as loading, not stuck.
+                self.isBuffering = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
             }
         }
 

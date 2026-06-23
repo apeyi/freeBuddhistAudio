@@ -148,9 +148,17 @@ struct PlayerScreen: View {
 
                 Spacer()
 
-                Button(action: player.togglePlayPause) {
-                    Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 56))
+                ZStack {
+                    Button(action: player.togglePlayPause) {
+                        Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 56))
+                    }
+                    // Spinner while the stream buffers, so a momentarily-silent
+                    // "playing" state reads as loading rather than stuck.
+                    if player.isBuffering {
+                        ProgressView()
+                            .controlSize(.large)
+                    }
                 }
 
                 Spacer()
