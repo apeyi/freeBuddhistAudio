@@ -41,6 +41,17 @@ targets:
         UIBackgroundModes:
           - audio
         UILaunchScreen: {}
+        # Required by App Store upload (error 90474): a Universal app must
+        # declare orientations, and iPad needs all four for multitasking.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         # App only uses standard HTTPS — exempt from export-compliance, so
         # TestFlight won't prompt on every upload.
         ITSAppUsesNonExemptEncryption: false
