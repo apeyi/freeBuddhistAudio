@@ -102,7 +102,11 @@ workflows:
           # 1. Put the distribution cert + our private key into the keychain so
           #    Xcode has a valid "Apple Distribution" identity to reuse.
           keychain initialize
+          # The bundle ID is registered as UNIVERSAL (Apple's modern default);
+          # the CLI's default platform=IOS filter misses it and --create then
+          # collides with the existing App ID (409). Match UNIVERSAL instead.
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --platform UNIVERSAL \
             --type IOS_APP_STORE \
             --issuer-id "$ASC_ISSUER_ID" --key-id "$ASC_KEY_ID" --private-key @file:/tmp/asc_key.p8 \
             --certificate-key @file:/tmp/cert_key.pem \
