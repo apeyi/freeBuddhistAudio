@@ -87,38 +87,58 @@ workflows:
       - name: Generate Xcode project
         script: cd FBAudio-iOS && xcodegen generate
 
-      - name: Fetch signing files (cert from ASC + auto-created profile)
+      - name: Build, sign & export IPA (automatic signing via API key)
         script: |
-          # Downloads the existing distribution cert matching our private key and
-          # creates/fetches the App Store provisioning profile (App Manager key
-          # can create profiles; the cert already exists so nothing is created).
+          set -e
+          # 1. Put the distribution cert + our private key into the keychain so
+          #    Xcode has a valid "Apple Distribution" identity to reuse.
+          keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --certificate-key "@env:CERTIFICATE_PRIVATE_KEY" \
-            --create
-          keychain initialize
+            --create || true
           keychain add-certificates
-          # use-profiles patches the .xcodeproj's signing settings, so it must run
-          # where the project actually is (it lives in FBAudio-iOS/, not the root).
-          cd FBAudio-iOS && xcode-project use-profiles
 
-      - name: Set build number
-        script: |
+          # 2. Expose the App Store Connect API key to xcodebuild so
+          #    -allowProvisioningUpdates can create/download the profile itself.
+          KEYDIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEYDIR"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            > "$KEYDIR/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
+          AUTH="-allowProvisioningUpdates \
+            -authenticationKeyPath $KEYDIR/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 \
+            -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} \
+            -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID}"
+
           cd FBAudio-iOS
-          # Unique, increasing build number from the latest TestFlight build.
+
+          # 3. Unique, increasing build number from the latest TestFlight build.
           LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
-          agvtool new-version -all $(( ${LATEST:-0} + 1 ))
+          agvtool new-version -all $(( ${LATEST:-0} + 1 )) || true
 
-      - name: Build IPA
-        script: |
           set -o pipefail
-          cd FBAudio-iOS
-          xcode-project build-ipa \
-            --project FBAudio.xcodeproj \
-            --scheme FBAudio 2>&1 | tee ../testflight-build.log
+          # 4. Archive — automatic signing; Xcode reuses the keychain identity and
+          #    provisions via the API key.
+          xcodebuild -project FBAudio.xcodeproj -scheme FBAudio \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/FBAudio.xcarchive \
+            $AUTH \
+            CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=QF9T4N59B4 \
+            clean archive 2>&1 | tee ../testflight-build.log
+
+          # Diagnostic: what signing actually got applied.
+          grep -iE "CODE_SIGN|PROVISIONING|DEVELOPMENT_TEAM|Signing Identity" ../testflight-build.log | head -20 || true
+
+          # 5. Export the IPA.
+          printf '%s' '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>method</key><string>app-store-connect</string><key>teamID</key><string>QF9T4N59B4</string><key>signingStyle</key><string>automatic</string></dict></plist>' > exportOptions.plist
+          xcodebuild -exportArchive \
+            -archivePath build/FBAudio.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist exportOptions.plist \
+            $AUTH 2>&1 | tee -a ../testflight-build.log
 
     artifacts:
-      - FBAudio-iOS/build/ios/ipa/*.ipa
+      - FBAudio-iOS/build/ipa/*.ipa
       - testflight-build.log
       - /tmp/xcodebuild_logs/*.log
 

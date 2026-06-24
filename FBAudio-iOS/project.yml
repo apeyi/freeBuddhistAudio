@@ -26,9 +26,9 @@ targets:
       CURRENT_PROJECT_VERSION: 1
       # Required for `agvtool new-version` to set the build number in CI.
       VERSIONING_SYSTEM: "apple-generic"
-      # Manual signing for CI: the profile/identity are injected by Codemagic's
-      # `xcode-project use-profiles`; the team is fixed (Dharmachakra Inc.).
-      CODE_SIGN_STYLE: Manual
+      # Automatic signing in CI via -allowProvisioningUpdates + the App Store
+      # Connect API key; team fixed to Dharmachakra Inc.
+      CODE_SIGN_STYLE: Automatic
       DEVELOPMENT_TEAM: QF9T4N59B4
       INFOPLIST_FILE: FBAudio/Resources/Info.plist
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
