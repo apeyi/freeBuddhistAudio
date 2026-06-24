@@ -88,7 +88,7 @@ workflows:
       - name: Generate Xcode project
         script: cd FBAudio-iOS && xcodegen generate
 
-      - name: Build, sign, export & upload to TestFlight
+      - name: Fetch signing files & build IPA
         script: |
           set -e
           # 0. Decode the base64 secrets to files (base64 avoids the multi-line
@@ -97,14 +97,14 @@ workflows:
           echo "$CERT_KEY_B64" | base64 --decode > /tmp/cert_key.pem
           KEYDIR="$HOME/.appstoreconnect/private_keys"
           mkdir -p "$KEYDIR"
-          cp /tmp/asc_key.p8 "$KEYDIR/AuthKey_${ASC_KEY_ID}.p8"   # altool/xcodebuild look here
+          cp /tmp/asc_key.p8 "$KEYDIR/AuthKey_${ASC_KEY_ID}.p8"   # altool reads from here
 
-          # 1. Put the distribution cert + our private key into the keychain so
-          #    Xcode has a valid "Apple Distribution" identity to reuse.
+          # 1. Install the distribution cert + our private key into the keychain
+          #    and download the App Store provisioning profile for the bundle ID.
+          #    The bundle ID is registered UNIVERSAL (Apple's modern default), so
+          #    match that — the default platform=IOS filter misses it and --create
+          #    would then 409 against the existing App ID.
           keychain initialize
-          # The bundle ID is registered as UNIVERSAL (Apple's modern default);
-          # the CLI's default platform=IOS filter misses it and --create then
-          # collides with the existing App ID (409). Match UNIVERSAL instead.
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --platform UNIVERSAL \
             --type IOS_APP_STORE \
@@ -113,41 +113,29 @@ workflows:
             --create
           keychain add-certificates
 
-          AUTH="-allowProvisioningUpdates \
-            -authenticationKeyPath $KEYDIR/AuthKey_${ASC_KEY_ID}.p8 \
-            -authenticationKeyID ${ASC_KEY_ID} \
-            -authenticationKeyIssuerID ${ASC_ISSUER_ID}"
-
           cd FBAudio-iOS
 
-          # 2. Unique, increasing build number from the latest TestFlight build.
+          # 2. Apply the downloaded App Store profile to the project (manual
+          #    signing). Automatic signing tried to mint a *development* profile
+          #    and failed on "no devices"; the fetched App Store profile needs none.
+          xcode-project use-profiles
+
+          # 3. Unique, increasing build number from the latest TestFlight build.
           LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" \
             --issuer-id "$ASC_ISSUER_ID" --key-id "$ASC_KEY_ID" --private-key @file:/tmp/asc_key.p8 2>/dev/null || echo 0)
           agvtool new-version -all $(( ${LATEST:-0} + 1 )) || true
 
-          set -o pipefail
-          # 3. Archive (automatic signing; Xcode reuses the keychain identity,
-          #    provisions via the API key).
-          xcodebuild -project FBAudio.xcodeproj -scheme FBAudio \
-            -destination 'generic/platform=iOS' \
-            -archivePath build/FBAudio.xcarchive \
-            $AUTH \
-            CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=QF9T4N59B4 \
-            clean archive 2>&1 | tee ../testflight-build.log
+          # 4. Archive + export the App Store IPA using the fetched profile.
+          xcode-project build-ipa --project FBAudio.xcodeproj --scheme FBAudio
 
-          # 4. Export the IPA.
-          printf '%s' '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>method</key><string>app-store-connect</string><key>teamID</key><string>QF9T4N59B4</string><key>signingStyle</key><string>automatic</string></dict></plist>' > exportOptions.plist
-          xcodebuild -exportArchive \
-            -archivePath build/FBAudio.xcarchive \
-            -exportPath build/ipa \
-            -exportOptionsPlist exportOptions.plist \
-            $AUTH 2>&1 | tee -a ../testflight-build.log
-
-          # 5. Upload to TestFlight (altool reads the API key from $KEYDIR).
-          IPA=$(ls build/ipa/*.ipa | head -1)
+      - name: Upload to TestFlight
+        script: |
+          set -e
+          IPA=$(find FBAudio-iOS/build -name '*.ipa' | head -1)
+          echo "Uploading: $IPA"
           xcrun altool --upload-app -f "$IPA" -t ios \
-            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee -a ../testflight-build.log
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
 
     artifacts:
-      - FBAudio-iOS/build/ipa/*.ipa
-      - testflight-build.log
+      - FBAudio-iOS/build/**/*.ipa
+      - /tmp/xcodebuild_logs/*.log
