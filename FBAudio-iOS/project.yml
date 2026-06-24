@@ -21,7 +21,7 @@ targets:
         type: folder
         buildPhase: resources
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.fba.app
+      PRODUCT_BUNDLE_IDENTIFIER: com.dharmachakra.fba
       MARKETING_VERSION: "0.6.5"
       CURRENT_PROJECT_VERSION: 1
       # Required for `agvtool new-version` to set the build number in CI.
@@ -45,7 +45,7 @@ targets:
         # TestFlight won't prompt on every upload.
         ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:
-          - CFBundleURLName: com.fba.app.deeplink
+          - CFBundleURLName: com.dharmachakra.fba.deeplink
             CFBundleURLSchemes:
               - fbaudio
 

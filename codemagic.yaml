@@ -79,7 +79,7 @@ workflows:
         #   CERT_KEY_B64  = base64 of fba_distribution.key    (distribution signing key)
         - appstore
       vars:
-        BUNDLE_ID: "com.fba.app"
+        BUNDLE_ID: "com.dharmachakra.fba"
     # Manual trigger only — TestFlight builds are deliberate, not every push.
     scripts:
       - name: Install XcodeGen

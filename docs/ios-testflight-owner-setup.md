@@ -25,9 +25,10 @@ never have to run a build or click through an upload yourself.
 ## Step 0 — prerequisites
 - You're the **Account Holder** or an **Admin** on the Apple Developer account
   (these steps need that level; App Manager/Developer can't do them).
-- The app record already exists in App Store Connect (bundle ID `com.fba.app`).
+- The app record already exists in App Store Connect (bundle ID
+  `com.dharmachakra.fba`, app "Free Buddhist Audio").
   If it doesn't, create it first: App Store Connect → Apps → ➕ → New App → iOS,
-  bundle ID `com.fba.app`, a primary language, and any SKU.
+  bundle ID `com.dharmachakra.fba`, a primary language, and any SKU.
 
 ---
 
