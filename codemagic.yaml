@@ -98,7 +98,9 @@ workflows:
             --create
           keychain initialize
           keychain add-certificates
-          xcode-project use-profiles
+          # use-profiles patches the .xcodeproj's signing settings, so it must run
+          # where the project actually is (it lives in FBAudio-iOS/, not the root).
+          cd FBAudio-iOS && xcode-project use-profiles
 
       - name: Set build number
         script: |
