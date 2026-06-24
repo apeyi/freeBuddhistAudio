@@ -70,12 +70,13 @@ workflows:
       xcode: latest
       groups:
         # Set up once in the Codemagic UI (Settings → Environment variables),
-        # group name "appstore", all marked Secure:
-        #   APP_STORE_CONNECT_ISSUER_ID   = 4606a2fd-8b6a-4691-98a5-fe3770977a91
-        #   APP_STORE_CONNECT_KEY_IDENTIFIER = D7W67V45YF
-        #   APP_STORE_CONNECT_PRIVATE_KEY = <contents of AuthKey_D7W67V45YF.p8>
-        #   CERTIFICATE_PRIVATE_KEY       = <contents of fba_distribution.key>
-        # (These conventional names are auto-read by the codemagic CLI tools.)
+        # group name "appstore", all marked Secure. The two keys are stored
+        # BASE64-ENCODED (single line) — pasting raw multi-line PEM into the UI
+        # mangles the newlines and breaks them ("not a valid PEM private key").
+        #   ASC_ISSUER_ID = 4606a2fd-8b6a-4691-98a5-fe3770977a91
+        #   ASC_KEY_ID    = D7W67V45YF
+        #   ASC_KEY_B64   = base64 of AuthKey_D7W67V45YF.p8   (App Store Connect API key)
+        #   CERT_KEY_B64  = base64 of fba_distribution.key    (distribution signing key)
         - appstore
       vars:
         BUNDLE_ID: "com.fba.app"
@@ -87,38 +88,42 @@ workflows:
       - name: Generate Xcode project
         script: cd FBAudio-iOS && xcodegen generate
 
-      - name: Build, sign & export IPA (automatic signing via API key)
+      - name: Build, sign, export & upload to TestFlight
         script: |
           set -e
+          # 0. Decode the base64 secrets to files (base64 avoids the multi-line
+          #    PEM mangling that broke earlier builds).
+          echo "$ASC_KEY_B64"  | base64 --decode > /tmp/asc_key.p8
+          echo "$CERT_KEY_B64" | base64 --decode > /tmp/cert_key.pem
+          KEYDIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEYDIR"
+          cp /tmp/asc_key.p8 "$KEYDIR/AuthKey_${ASC_KEY_ID}.p8"   # altool/xcodebuild look here
+
           # 1. Put the distribution cert + our private key into the keychain so
           #    Xcode has a valid "Apple Distribution" identity to reuse.
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
-            --certificate-key "@env:CERTIFICATE_PRIVATE_KEY" \
-            --create || true
+            --issuer-id "$ASC_ISSUER_ID" --key-id "$ASC_KEY_ID" --private-key @file:/tmp/asc_key.p8 \
+            --certificate-key @file:/tmp/cert_key.pem \
+            --create
           keychain add-certificates
 
-          # 2. Expose the App Store Connect API key to xcodebuild so
-          #    -allowProvisioningUpdates can create/download the profile itself.
-          KEYDIR="$HOME/.appstoreconnect/private_keys"
-          mkdir -p "$KEYDIR"
-          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            > "$KEYDIR/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8"
           AUTH="-allowProvisioningUpdates \
-            -authenticationKeyPath $KEYDIR/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 \
-            -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} \
-            -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID}"
+            -authenticationKeyPath $KEYDIR/AuthKey_${ASC_KEY_ID}.p8 \
+            -authenticationKeyID ${ASC_KEY_ID} \
+            -authenticationKeyIssuerID ${ASC_ISSUER_ID}"
 
           cd FBAudio-iOS
 
-          # 3. Unique, increasing build number from the latest TestFlight build.
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
+          # 2. Unique, increasing build number from the latest TestFlight build.
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" \
+            --issuer-id "$ASC_ISSUER_ID" --key-id "$ASC_KEY_ID" --private-key @file:/tmp/asc_key.p8 2>/dev/null || echo 0)
           agvtool new-version -all $(( ${LATEST:-0} + 1 )) || true
 
           set -o pipefail
-          # 4. Archive — automatic signing; Xcode reuses the keychain identity and
-          #    provisions via the API key.
+          # 3. Archive (automatic signing; Xcode reuses the keychain identity,
+          #    provisions via the API key).
           xcodebuild -project FBAudio.xcodeproj -scheme FBAudio \
             -destination 'generic/platform=iOS' \
             -archivePath build/FBAudio.xcarchive \
@@ -126,10 +131,7 @@ workflows:
             CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=QF9T4N59B4 \
             clean archive 2>&1 | tee ../testflight-build.log
 
-          # Diagnostic: what signing actually got applied.
-          grep -iE "CODE_SIGN|PROVISIONING|DEVELOPMENT_TEAM|Signing Identity" ../testflight-build.log | head -20 || true
-
-          # 5. Export the IPA.
+          # 4. Export the IPA.
           printf '%s' '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>method</key><string>app-store-connect</string><key>teamID</key><string>QF9T4N59B4</string><key>signingStyle</key><string>automatic</string></dict></plist>' > exportOptions.plist
           xcodebuild -exportArchive \
             -archivePath build/FBAudio.xcarchive \
@@ -137,19 +139,11 @@ workflows:
             -exportOptionsPlist exportOptions.plist \
             $AUTH 2>&1 | tee -a ../testflight-build.log
 
+          # 5. Upload to TestFlight (altool reads the API key from $KEYDIR).
+          IPA=$(ls build/ipa/*.ipa | head -1)
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee -a ../testflight-build.log
+
     artifacts:
       - FBAudio-iOS/build/ipa/*.ipa
       - testflight-build.log
-      - /tmp/xcodebuild_logs/*.log
-
-    publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
-        # To auto-distribute to an external group, create the group once in
-        # App Store Connect and uncomment (the first external build triggers a
-        # one-time Beta App Review):
-        # beta_groups:
-        #   - "External Testers"
