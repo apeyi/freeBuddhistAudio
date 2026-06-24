@@ -61,3 +61,73 @@ workflows:
       - build.log
       - test.log
       - ~/FBAudio-simulator.zip
+
+  ios-testflight:
+    name: iOS TestFlight
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      groups:
+        # Set up once in the Codemagic UI (Settings → Environment variables),
+        # group name "appstore", all marked Secure:
+        #   APP_STORE_CONNECT_ISSUER_ID   = 4606a2fd-8b6a-4691-98a5-fe3770977a91
+        #   APP_STORE_CONNECT_KEY_IDENTIFIER = D7W67V45YF
+        #   APP_STORE_CONNECT_PRIVATE_KEY = <contents of AuthKey_D7W67V45YF.p8>
+        #   CERTIFICATE_PRIVATE_KEY       = <contents of fba_distribution.key>
+        # (These conventional names are auto-read by the codemagic CLI tools.)
+        - appstore
+      vars:
+        BUNDLE_ID: "com.fba.app"
+    # Manual trigger only — TestFlight builds are deliberate, not every push.
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+
+      - name: Generate Xcode project
+        script: cd FBAudio-iOS && xcodegen generate
+
+      - name: Fetch signing files (cert from ASC + auto-created profile)
+        script: |
+          # Downloads the existing distribution cert matching our private key and
+          # creates/fetches the App Store provisioning profile (App Manager key
+          # can create profiles; the cert already exists so nothing is created).
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key "@env:CERTIFICATE_PRIVATE_KEY" \
+            --create
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Set build number
+        script: |
+          cd FBAudio-iOS
+          # Unique, increasing build number from the latest TestFlight build.
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $(( ${LATEST:-0} + 1 ))
+
+      - name: Build IPA
+        script: |
+          set -o pipefail
+          cd FBAudio-iOS
+          xcode-project build-ipa \
+            --project FBAudio.xcodeproj \
+            --scheme FBAudio 2>&1 | tee ../testflight-build.log
+
+    artifacts:
+      - FBAudio-iOS/build/ios/ipa/*.ipa
+      - testflight-build.log
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        # To auto-distribute to an external group, create the group once in
+        # App Store Connect and uncomment (the first external build triggers a
+        # one-time Beta App Review):
+        # beta_groups:
+        #   - "External Testers"
