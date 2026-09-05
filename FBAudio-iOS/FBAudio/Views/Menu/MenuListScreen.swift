@@ -25,15 +25,29 @@ struct MenuListScreen: View {
                 Text("Nothing here yet").foregroundStyle(.secondary)
             } else {
                 List(nodes) { node in
+                    // "all speakers" / "all our places" / "all themes": FBA's complete A–Z index,
+                    // as opposed to the curated picks below — shown as a distinct list row.
+                    let isIndex: Bool = {
+                        if case .apiCollection = node.toSource(), !node.hasChildren { return true }
+                        return false
+                    }()
                     Button(action: { onNodeClick(node) }) {
                         HStack(spacing: 12) {
-                            CollectionTile(title: "", slug: node.collectionSlug ?? node.label,
-                                           imageUrl: images[FBAScraper.normalizeBrowsePath(node.link)] ?? "", showTitle: false)
-                                .frame(width: 48, height: 48)
+                            if isIndex {
+                                Image(systemName: "list.bullet")
+                                    .font(.title2).foregroundStyle(Color.saffronOrange)
+                                    .frame(width: 48, height: 48)
+                            } else {
+                                CollectionTile(title: "", slug: node.collectionSlug ?? node.label,
+                                               imageUrl: images[FBAScraper.normalizeBrowsePath(node.link)] ?? "", showTitle: false)
+                                    .frame(width: 48, height: 48)
+                            }
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(capitalizedFirst(node.label))
                                     .font(.body).foregroundStyle(.primary)
-                                if node.hasChildren {
+                                if isIndex {
+                                    Text("Complete A–Z list").font(.caption).foregroundStyle(.secondary)
+                                } else if node.hasChildren {
                                     Text("\(node.children.count) entries").font(.caption).foregroundStyle(.secondary)
                                 }
                             }
@@ -41,7 +55,8 @@ struct MenuListScreen: View {
                             Image(systemName: "chevron.right").foregroundStyle(.secondary)
                         }
                         .padding(12)
-                        .background(Color(.secondarySystemGroupedBackground))
+                        .background(isIndex ? Color.clear : Color(.secondarySystemGroupedBackground))
+                        .overlay(isIndex ? RoundedRectangle(cornerRadius: 12).stroke(Color(.separator)) : nil)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)

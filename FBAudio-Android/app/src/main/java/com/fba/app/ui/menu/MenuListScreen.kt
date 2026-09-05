@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.fba.app.data.remote.FBAScraper
 import com.fba.app.data.repository.ContentRepository
+import com.fba.app.domain.model.ContentSource
 import com.fba.app.domain.model.MenuNode
 import com.fba.app.ui.components.CollectionTile
 import com.fba.app.ui.components.EmptyState
@@ -128,6 +130,42 @@ fun MenuListScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(state.nodes, key = { it.label + it.link }) { node ->
+                    // "all speakers" / "all our places" / "all themes": FBA's complete A–Z index,
+                    // as opposed to the curated picks below — shown as a distinct list row.
+                    val isIndex = node.toSource() is ContentSource.ApiCollection && !node.hasChildren
+                    if (isIndex) {
+                        androidx.compose.material3.OutlinedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onNodeClick(node) },
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.List,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp),
+                                )
+                                Spacer12()
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        node.label.replaceFirstChar { it.uppercase() },
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                    Text(
+                                        "Complete A–Z list",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        return@items
+                    }
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
