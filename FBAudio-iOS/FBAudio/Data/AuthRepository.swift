@@ -44,7 +44,7 @@ final class AuthRepository: ObservableObject {
     }
 
     /// The login is complete once the SAML token and the site session are both present.
-    static func isCompleteSession(_ cookies: [String: String]) -> Bool {
+    nonisolated static func isCompleteSession(_ cookies: [String: String]) -> Bool {
         cookies["SimpleSAMLAuthToken"] != nil && cookies["fba"] != nil && cookies["PHPSESSID"] != nil
     }
 
