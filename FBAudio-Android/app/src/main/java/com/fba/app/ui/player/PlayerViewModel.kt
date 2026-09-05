@@ -351,9 +351,11 @@ class PlayerViewModel @Inject constructor(
             .commit() // sync write — survives process death
 
         // Save the position on the FBA account too (what the website does while
-        // playing), at most every 10 s.
+        // playing): at most every 10 s while playing, always on pause/stop so the
+        // account holds the final position.
         val now = System.currentTimeMillis()
-        if (auth.isLoggedIn && now - lastCheckpointTime > 10_000) {
+        val playing = controller?.isPlaying == true
+        if (auth.isLoggedIn && (!playing || now - lastCheckpointTime > 10_000)) {
             lastCheckpointTime = now
             val trackId = talk.tracks.getOrNull(state.currentTrackIndex)?.trackId ?: ""
             appScope.launch { history.postCheckpoint(catNum, trackId, (pos / 1000).toInt()) }
@@ -476,12 +478,13 @@ class PlayerViewModel @Inject constructor(
             val items = buildMediaItems(effectiveTalk, download, useRemaster)
             if (items.isEmpty()) return@launch
 
-            // Resume point: local first; otherwise the position saved on the FBA
-            // account (website or another device), when logged in.
+            // Resume point: the position saved on the FBA account (website or another
+            // device) always wins when logged in — the app keeps it current by posting
+            // its own checkpoints; otherwise the local position.
             var savedTrackIndex = prefs.getInt("last_track_index_$catNum", 0)
             var savedPos = prefs.getLong("last_position_$catNum", 0)
             val checkpoint = effectiveTalk.checkpoint
-            if (savedPos <= 0 && checkpoint != null) {
+            if (checkpoint != null) {
                 val cpIndex = effectiveTalk.tracks.indexOfFirst { it.trackId == checkpoint.trackId }
                 if (cpIndex >= 0) {
                     savedTrackIndex = cpIndex

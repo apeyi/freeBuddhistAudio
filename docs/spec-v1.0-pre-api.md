@@ -164,7 +164,7 @@ transcripts **are** downloaded with a talk (since v0.3), and downloaded talks
 |---|---|---|
 | No account concept. | **My FBA** tab: account header with Log in / out, Recently listened (moved from Home), Donate, Settings (language toggle, remastered default). | **Now** |
 | — | **Log in** with the existing FBA/Triratna account on a native login screen (username + password; the website's single sign-on runs behind the scenes). Shows the username after login. | **Now** (D6) |
-| Recently listened is app-only. | **Syncs with the website**: talks listened to on the web appear in the app and vice versa; the resume position also syncs, so a talk started on the web continues in the app. Verified with the test account. | **Now, switched off** with login |
+| Recently listened is app-only. | **Syncs with the website**: talks listened to on the web appear in the app and vice versa; the resume position also syncs, so a talk started on the web continues in the app. When logged in, the position saved on the account always wins over the app's own (the app posts its position every 10 s and on pause). Verified with the test account. | **Now** with login |
 | — | **Order talks** link on Home and Order-only items in lists, for logged-in Order members. The website already hides these for everyone else. | **Now, switched off** — needs an **Order-member test account** to verify |
 | — | Subscription status tied to the FBA account. | **Needs API** |
 

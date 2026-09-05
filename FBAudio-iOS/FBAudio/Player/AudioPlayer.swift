@@ -109,11 +109,12 @@ class AudioPlayer: ObservableObject {
     // MARK: - Playback
 
     func playTalk(_ talk: Talk, fromTrackIndex: Int? = nil) {
-        // Resume point: local first; otherwise the position saved on the FBA
-        // account (website or another device), when logged in.
+        // Resume point: the position saved on the FBA account (website or another
+        // device) always wins when logged in — the app keeps it current by posting
+        // its own checkpoints; otherwise the local position.
         var localTrackIndex = persistence.getLastTrackIndex(talk.catNum)
         var savedPos = persistence.getLastPosition(talk.catNum)
-        if savedPos <= 0, let cp = talk.checkpoint,
+        if let cp = talk.checkpoint,
            let cpIndex = talk.tracks.firstIndex(where: { $0.trackId == cp.trackId }) {
             localTrackIndex = cpIndex
             savedPos = Int64(cp.timeSeconds) * 1000
@@ -491,8 +492,9 @@ class AudioPlayer: ObservableObject {
         )
 
         // Save the position on the FBA account too (what the website does while
-        // playing), at most every 10 s.
-        if AuthRepository.shared.isLoggedIn, Date().timeIntervalSince(lastCheckpointTime) > 10 {
+        // playing): at most every 10 s while playing, always on pause/stop so the
+        // account holds the final position.
+        if AuthRepository.shared.isLoggedIn, !isPlaying || Date().timeIntervalSince(lastCheckpointTime) > 10 {
             lastCheckpointTime = Date()
             let trackId = talk.tracks[safe: currentTrackIndex]?.trackId ?? ""
             let seconds = Int(posMs / 1000)
