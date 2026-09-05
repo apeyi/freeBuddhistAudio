@@ -11,6 +11,7 @@ object Routes {
     const val JOIN = "join"
     const val MY_FBA = "my_fba"
     const val LOGIN = "login"
+    const val SETTINGS = "settings"
     const val PLAYER = "player"
     const val BROWSE_SPEAKER = "browse_speaker/{speakerName}"
     const val BROWSE_SERIES = "browse_series/{seriesName}"

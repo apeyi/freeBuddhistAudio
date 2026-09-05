@@ -142,6 +142,47 @@ class ContentRepository @Inject constructor(
         }
     }
 
+    private class EntryList(val items: List<SearchResult> = emptyList())
+
+    /** All speakers or places as browse links (cached daily), language-filtered. */
+    suspend fun getIndexEntries(type: String): List<SearchResult> {
+        val key = "index:$type"
+        val cached = cache.get(key, EntryList::class.java)
+        val items = if (cached != null && cached.second) cached.first.items else try {
+            scraper.fetchIndexEntries(type).also { cache.put(key, EntryList(it)) }
+        } catch (_: Exception) {
+            cached?.first?.items ?: emptyList()
+        }
+        // Index tiles carry the name in `title`; expose it as speaker/centre so the
+        // language filter can apply its lists, then strip it again for display.
+        val tagged = items.map { if (type == "speakers") it.copy(speaker = it.title) else it.copy(centre = it.title) }
+        return filterForLanguage(tagged).map { if (type == "speakers") it.copy(speaker = "") else it.copy(centre = "") }
+    }
+
+    /** Curated collections + themes as `/collection/` links (for search). */
+    suspend fun getCollectionEntries(): List<SearchResult> {
+        val menu = try { getMenu() } catch (_: Exception) { return emptyList() }
+        val nodes = SiteMenuParser.collectionTiles(menu) +
+            (SiteMenuParser.section(menu, "themes")?.children ?: emptyList()).filter { it.collectionSlug != null }
+        return LanguageFilter.filterMenu(nodes, settings.englishOnly.value)
+            .distinctBy { it.collectionSlug }
+            .map { SearchResult(catNum = it.collectionSlug ?: it.label, title = it.label, speaker = "", imageUrl = "", path = "/collection/${it.collectionSlug}") }
+    }
+
+    /** Speakers, places and collections whose name contains the query (for the search screen). */
+    data class NameMatches(val speakers: List<SearchResult>, val places: List<SearchResult>, val collections: List<SearchResult>)
+
+    suspend fun matchNames(query: String): NameMatches {
+        val q = query.trim().lowercase()
+        if (q.length < 2) return NameMatches(emptyList(), emptyList(), emptyList())
+        fun List<SearchResult>.matching() = filter { it.title.lowercase().contains(q) }.take(20)
+        return NameMatches(
+            speakers = getIndexEntries("speakers").matching(),
+            places = getIndexEntries("places").matching(),
+            collections = getCollectionEntries().matching(),
+        )
+    }
+
     suspend fun getDigitalLegacy(): DigitalLegacy? {
         val cached = cache.get("digital_legacy", DigitalLegacy::class.java)
         if (cached != null && cached.second) return cached.first

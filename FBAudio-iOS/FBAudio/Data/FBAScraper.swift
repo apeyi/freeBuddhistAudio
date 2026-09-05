@@ -499,6 +499,18 @@ actor FBAScraper {
         return out
     }
 
+    /// All entries of an index collection (speakers, places) as browse links with images.
+    func fetchIndexEntries(type: String) async throws -> [SearchResult] {
+        let encoded = type.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? type
+        let json = try await fetchJson("\(Self.baseUrl)/api/v1/collections/\(encoded)?page=1&limit=1000")
+        let items = parseListItems((json["collection"] as? [String: Any])?["items"] as? [[String: Any]])
+        return items.map { item in
+            guard item.imageUrl.contains("/default") else { return item }
+            return SearchResult(catNum: item.catNum, title: item.title, speaker: item.speaker, imageUrl: "",
+                                path: item.path, year: item.year, centre: item.centre, omOnly: item.omOnly)
+        }
+    }
+
     /// "https://www.freebuddhistaudio.com/browse?p=Adhisthana " → "/browse?p=adhisthana"
     nonisolated static func normalizeBrowsePath(_ link: String) -> String {
         var l = link.trimmingCharacters(in: .whitespaces)

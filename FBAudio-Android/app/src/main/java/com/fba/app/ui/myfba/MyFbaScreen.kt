@@ -17,16 +17,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -52,19 +52,27 @@ fun MyFbaScreen(
     onDonateClick: () -> Unit,
     onLoginClick: () -> Unit,
     onJoinClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     viewModel: MyFbaViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val auth by viewModel.authState.collectAsStateWithLifecycle()
-    val englishOnly by viewModel.englishOnly.collectAsStateWithLifecycle()
-    val preferRemastered by viewModel.preferRemastered.collectAsStateWithLifecycle()
 
     // Pull the account's web history each time the tab is opened while logged in.
     LaunchedEffect(auth.loggedIn) { if (auth.loggedIn) viewModel.syncHistory() }
 
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
-        topBar = { TopAppBar(title = { Text("My FBA") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("My FBA") },
+                actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                },
+            )
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -221,44 +229,6 @@ fun MyFbaScreen(
                 }
             }
 
-            // --- Settings ---
-            item {
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    "Settings",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                SettingRow(
-                    title = "English only",
-                    subtitle = if (englishOnly) "Talks in other languages are hidden" else "Showing all languages",
-                    checked = englishOnly,
-                    onCheckedChange = { viewModel.setEnglishOnly(it) },
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                SettingRow(
-                    title = "Prefer remastered audio",
-                    subtitle = "Play the remastered version when a talk has one",
-                    checked = preferRemastered,
-                    onCheckedChange = { viewModel.setPreferRemastered(it) },
-                )
-            }
         }
-    }
-}
-
-@Composable
-private fun SettingRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

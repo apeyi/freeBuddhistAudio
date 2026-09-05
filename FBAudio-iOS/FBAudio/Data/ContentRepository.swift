@@ -129,6 +129,62 @@ final class ContentRepository {
         return cached?.0.images ?? [:]
     }
 
+    private struct EntryList: Codable { let items: [SearchResult] }
+
+    /// All speakers or places as browse links (cached daily), language-filtered.
+    func getIndexEntries(_ type: String) async -> [SearchResult] {
+        let key = "index:\(type)"
+        let cached: (EntryList, Bool)? = await cache.get(key, EntryList.self)
+        var items: [SearchResult]
+        if let cached, cached.1 {
+            items = cached.0.items
+        } else if let fresh = try? await scraper.fetchIndexEntries(type: type) {
+            await cache.put(key, EntryList(items: fresh))
+            items = fresh
+        } else {
+            items = cached?.0.items ?? []
+        }
+        // Index tiles carry the name in `title`; expose it as speaker/centre so the
+        // language filter can apply its lists, then strip it again for display.
+        let tagged = items.map { i in
+            SearchResult(catNum: i.catNum, title: i.title, speaker: type == "speakers" ? i.title : "", imageUrl: i.imageUrl,
+                         path: i.path, year: i.year, centre: type == "places" ? i.title : "", omOnly: i.omOnly)
+        }
+        return await filterForLanguage(tagged).map { i in
+            SearchResult(catNum: i.catNum, title: i.title, speaker: "", imageUrl: i.imageUrl, path: i.path, year: i.year, centre: "", omOnly: i.omOnly)
+        }
+    }
+
+    /// Curated collections + themes as `/collection/` links (for search).
+    func getCollectionEntries() async -> [SearchResult] {
+        guard let menu = try? await getMenu() else { return [] }
+        let nodes = SiteMenuParser.collectionTiles(menu)
+            + (SiteMenuParser.section(menu, "themes")?.children ?? []).filter { $0.collectionSlug != nil }
+        var seen = Set<String>()
+        return LanguageFilter.filterMenu(nodes, englishOnly: englishOnly).compactMap { node in
+            guard let slug = node.collectionSlug, seen.insert(slug).inserted else { return nil }
+            return SearchResult(catNum: slug, title: node.label, path: "/collection/\(slug)")
+        }
+    }
+
+    struct NameMatches {
+        var speakers: [SearchResult] = []
+        var places: [SearchResult] = []
+        var collections: [SearchResult] = []
+    }
+
+    /// Speakers, places and collections whose name contains the query (for the search screen).
+    func matchNames(_ query: String) async -> NameMatches {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard q.count >= 2 else { return NameMatches() }
+        func matching(_ items: [SearchResult]) -> [SearchResult] { Array(items.filter { $0.title.lowercased().contains(q) }.prefix(20)) }
+        return NameMatches(
+            speakers: matching(await getIndexEntries("speakers")),
+            places: matching(await getIndexEntries("places")),
+            collections: matching(await getCollectionEntries())
+        )
+    }
+
     func getDigitalLegacy() async -> DigitalLegacy? {
         let cached: (DigitalLegacy, Bool)? = await cache.get("digital_legacy", DigitalLegacy.self)
         if let cached, cached.1 { return cached.0 }

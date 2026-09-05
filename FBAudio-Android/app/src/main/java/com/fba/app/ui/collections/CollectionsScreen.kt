@@ -126,7 +126,8 @@ fun CollectionsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(hub, key = { "hub:" + it.slug }) { tile ->
-                    CollectionTile(title = tile.title, slug = tile.slug, imageUrl = "", onClick = tile.open)
+                    // Hub tiles that open a curated collection show that collection's cover
+                    CollectionTile(title = tile.title, slug = tile.slug, imageUrl = state.covers[tile.slug] ?: "", onClick = tile.open)
                 }
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
                     Text(
@@ -136,7 +137,9 @@ fun CollectionsScreen(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                items(state.tiles, key = { it.collectionSlug ?: it.label }) { node ->
+                // Don't repeat a collection the hub already points at (e.g. Meditations → guided-meditations)
+                val hubSlugs = hub.map { it.slug }.toSet()
+                items(state.tiles.filter { (it.collectionSlug ?: it.label) !in hubSlugs }, key = { it.collectionSlug ?: it.label }) { node ->
                     val slug = node.collectionSlug ?: node.label
                     CollectionTile(
                         title = node.label,

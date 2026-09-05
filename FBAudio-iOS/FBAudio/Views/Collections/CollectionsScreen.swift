@@ -40,12 +40,15 @@ struct CollectionsScreen: View {
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(hub) { tile in
                     Button(action: tile.open) {
-                        CollectionTile(title: tile.title, slug: tile.slug, imageUrl: "")
+                        // Hub tiles that open a curated collection show that collection's cover
+                        CollectionTile(title: tile.title, slug: tile.slug, imageUrl: covers[tile.slug] ?? "")
                     }
                     .buttonStyle(.plain)
                 }
+                // Don't repeat a collection the hub already points at (e.g. Meditations → guided-meditations)
+                let hubSlugs = Set(hub.map(\.slug))
                 Section {
-                    ForEach(tiles) { node in
+                    ForEach(tiles.filter { !hubSlugs.contains($0.collectionSlug ?? $0.label) }) { node in
                         let slug = node.collectionSlug ?? node.label
                         Button(action: { onCollectionClick(node) }) {
                             CollectionTile(title: node.label, slug: slug, imageUrl: covers[slug] ?? "")

@@ -1,29 +1,57 @@
 import SwiftUI
 
-/// All = talks and series; Audio = talks only. A Text tab follows when the server supports transcript search.
-enum SearchMode {
-    case all, audio
+/// Result categories. Chips are shown for All plus every category that has results.
+enum SearchFilter: String, CaseIterable {
+    case all = "All", talks = "Talks", series = "Series", speakers = "Speakers", places = "Places", collections = "Collections"
+}
+
+struct SearchResults {
+    var talks: [SearchResult] = []
+    var series: [SearchResult] = []
+    var speakers: [SearchResult] = []
+    var places: [SearchResult] = []
+    var collections: [SearchResult] = []
+
+    var isEmpty: Bool { talks.isEmpty && series.isEmpty && speakers.isEmpty && places.isEmpty && collections.isEmpty }
+
+    func of(_ filter: SearchFilter) -> [SearchResult] {
+        switch filter {
+        case .all: return []
+        case .talks: return talks
+        case .series: return series
+        case .speakers: return speakers
+        case .places: return places
+        case .collections: return collections
+        }
+    }
+
+    /// Categories with results, in display order.
+    var available: [SearchFilter] {
+        [.speakers, .places, .collections, .series, .talks].filter { !of($0).isEmpty }
+    }
 }
 
 struct SearchScreen: View {
     @State private var query = ""
-    @State private var results: [SearchResult] = []
+    @State private var results = SearchResults()
+    @State private var filter: SearchFilter = .all
     @State private var isLoading = false
     @State private var error: String?
     @State private var hasSearched = false
-    @State private var searchMode: SearchMode = .all
     @State private var debounceTask: Task<Void, Never>?
 
     let onTalkClick: (String) -> Void
-    var onSeriesClick: (String) -> Void = { _ in }
+    /// Series, speaker, place and collection results — routed by the caller.
+    var onItemClick: (SearchResult) -> Void = { _ in }
 
-    private var series: [SearchResult] { searchMode == .all ? results.filter(\.isSeries) : [] }
-    private var talks: [SearchResult] { results.filter { !$0.isSeries } }
+    /// Chips to show: All + categories with results (none when there's only one category).
+    private var chips: [SearchFilter] { results.available.count > 1 ? [.all] + results.available : [] }
+    private var effectiveFilter: SearchFilter { filter == .all || results.available.contains(filter) ? filter : .all }
 
     var body: some View {
         List {
             Section {
-                TextField("Search talks and series", text: $query)
+                TextField("Search talks, series, speakers, places", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { search() }
                     .autocorrectionDisabled()
@@ -41,11 +69,16 @@ struct SearchScreen: View {
                     }
             }
 
-            // All | Audio
-            Section {
-                HStack(spacing: 8) {
-                    modeChip("All", selected: searchMode == .all) { searchMode = .all }
-                    modeChip("Audio", selected: searchMode == .audio) { searchMode = .audio }
+            // Category chips: All + every category that has results
+            if !chips.isEmpty && !isLoading {
+                Section {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(chips, id: \.self) { f in
+                                modeChip(f.rawValue, selected: effectiveFilter == f) { filter = f }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -56,21 +89,16 @@ struct SearchScreen: View {
                     Text(error).foregroundStyle(.secondary)
                     Button("Retry") { search() }
                 }
-            } else if hasSearched && talks.isEmpty && series.isEmpty {
+            } else if hasSearched && results.isEmpty {
                 Text("No results found for \"\(query)\"").foregroundStyle(.secondary)
             } else {
-                if !series.isEmpty {
-                    sectionHeader("Series", series.count)
-                    ForEach(series) { result in
-                        ListItemCard(item: result, onClick: { onSeriesClick(result.path) })
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                            .listRowSeparator(.hidden)
-                    }
-                }
-                if !talks.isEmpty {
-                    if !series.isEmpty { sectionHeader("Talks", talks.count) }
-                    ForEach(talks) { result in
-                        ListItemCard(item: result, onClick: { onTalkClick(result.catNum) })
+                let sections = effectiveFilter == .all ? results.available : [effectiveFilter]
+                let showHeaders = sections.count > 1
+                ForEach(sections, id: \.self) { section in
+                    let items = results.of(section)
+                    if showHeaders { sectionHeader(section.rawValue, items.count) }
+                    ForEach(items) { result in
+                        ListItemCard(item: result, onClick: { open(result) })
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                             .listRowSeparator(.hidden)
                     }
@@ -80,6 +108,10 @@ struct SearchScreen: View {
         .listStyle(.plain)
         .miniPlayerClearance()
         .navigationTitle("Search")
+    }
+
+    private func open(_ result: SearchResult) {
+        if result.isTalk { onTalkClick(result.catNum) } else { onItemClick(result) }
     }
 
     private func sectionHeader(_ title: String, _ count: Int) -> some View {
@@ -120,7 +152,7 @@ struct SearchScreen: View {
         // URL paste: navigate straight to the talk or series
         if let (catNum, isSeries) = extractCatNumFromUrl(trimmed) {
             if isSeries {
-                onSeriesClick("https://www.freebuddhistaudio.com/series/details?num=\(catNum)")
+                onItemClick(SearchResult(catNum: catNum, path: "https://www.freebuddhistaudio.com/series/details?num=\(catNum)"))
             } else {
                 onTalkClick(catNum)
             }
@@ -131,25 +163,33 @@ struct SearchScreen: View {
         error = nil
         Task {
             do {
+                var found = SearchResults()
                 if trimmed.lowercased().hasPrefix("sangharakshita") {
                     // "sangharakshita <words>" answers from the bundled catalogue (works offline)
                     let words = trimmed.split(separator: " ").dropFirst().map(String.init)
                     let all = SharedDataLoader.sangharakshitaTalks
-                    results = words.isEmpty ? all : all.filter { r in
+                    found.talks = words.isEmpty ? all : all.filter { r in
                         words.allSatisfy { r.title.localizedCaseInsensitiveContains($0) }
                     }
                 } else {
-                    // Series first, then talks, deduped (type-prefixed: separate namespaces).
-                    async let seriesTask = (try? TalkRepository.shared.searchSeries(trimmed)) ?? []
-                    async let audioTask = TalkRepository.shared.searchAudio(trimmed)
-                    let seriesResults = await seriesTask
-                    let audio = try await audioTask
+                    // Sequential, not parallel: while logged in the site rotates the session
+                    // cookie per response, so concurrent calls would invalidate each other.
+                    let audio = try await TalkRepository.shared.searchAudio(trimmed)
+                    let seriesResults = (try? await TalkRepository.shared.searchSeries(trimmed)) ?? []
                     var seen = Set<String>()
-                    let merged = (seriesResults + audio).filter {
+                    let merged = await ContentRepository.shared.filterForLanguage((seriesResults + audio).filter {
                         seen.insert("\($0.isSeries ? "s" : "a"):\($0.catNum)").inserted
-                    }
-                    results = await ContentRepository.shared.filterForLanguage(merged)
+                    })
+                    found.talks = merged.filter { !$0.isSeries }
+                    found.series = merged.filter(\.isSeries)
                 }
+                // Speakers / places / collections come from FBA's indexes and curated menu
+                // (the site's search only returns talks and series).
+                let names = await ContentRepository.shared.matchNames(trimmed)
+                found.speakers = names.speakers
+                found.places = names.places
+                found.collections = names.collections
+                results = found
                 hasSearched = true
             } catch {
                 self.error = friendlyError(error)

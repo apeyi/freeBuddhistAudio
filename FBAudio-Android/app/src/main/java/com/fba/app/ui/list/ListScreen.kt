@@ -154,6 +154,7 @@ fun ListItemCard(item: SearchResult, onClick: () -> Unit) {
         title = item.title,
         speaker = when {
             item.isSeries -> "Series${if (item.speaker.isNotBlank()) " · ${item.speaker}" else ""}"
+            item.isCollection -> "Collection"
             else -> item.speaker
         },
         imageUrl = item.imageUrl,

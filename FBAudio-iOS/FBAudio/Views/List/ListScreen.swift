@@ -137,7 +137,8 @@ struct ListItemCard: View {
             .compactMap { $0 }.joined(separator: " · ")
         TalkCard(
             title: item.title,
-            speaker: item.isSeries ? "Series" + (item.speaker.isEmpty ? "" : " · \(item.speaker)") : item.speaker,
+            speaker: item.isSeries ? "Series" + (item.speaker.isEmpty ? "" : " · \(item.speaker)")
+                : (item.isCollection ? "Collection" : item.speaker),
             imageUrl: item.imageUrl,
             subtitle: item.isBrowseLink || subtitle.isEmpty ? nil : subtitle,
             onClick: onClick

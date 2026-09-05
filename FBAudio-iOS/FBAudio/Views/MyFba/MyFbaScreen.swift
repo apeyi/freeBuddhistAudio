@@ -6,7 +6,6 @@ struct MyFbaScreen: View {
     let onLoginClick: () -> Void
 
     @ObservedObject private var auth = AuthRepository.shared
-    @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var recentlyListened: [PersistenceManager.RecentlyListened] = []
@@ -33,34 +32,19 @@ struct MyFbaScreen: View {
                     recentRow(entry)
                 }
 
-                Text("Settings")
-                    .font(.headline)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 24)
-                Toggle(isOn: $settings.englishOnly) {
-                    VStack(alignment: .leading) {
-                        Text("English only")
-                        Text(settings.englishOnly ? "Talks in other languages are hidden" : "Showing all languages")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .onChange(of: settings.englishOnly) { _ in ContentRepository.shared.invalidateMemo() }
-                Divider().padding(.horizontal, 16)
-                Toggle(isOn: $settings.preferRemastered) {
-                    VStack(alignment: .leading) {
-                        Text("Prefer remastered audio")
-                        Text("Play the remastered version when a talk has one")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 16)
             }
             .padding(.bottom, 24)
         }
         .tint(.saffronOrange)
         .miniPlayerClearance()
         .navigationTitle("My FBA")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                NavigationLink(destination: SettingsScreen()) {
+                    Image(systemName: "gearshape")
+                }
+            }
+        }
         .onAppear { refresh() }
         .onChange(of: scenePhase) { phase in if phase == .active { refresh() } }
         .onChange(of: auth.state.loggedIn) { _ in refresh() }

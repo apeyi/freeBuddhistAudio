@@ -46,9 +46,9 @@ struct ContentView: View {
                         selectedTab = 0
                         navigateToDetail(catNum)
                     },
-                    onSeriesClick: { seriesUrl in
+                    onItemClick: { item in
                         selectedTab = 0
-                        navigate(Route.seriesFromHref(seriesUrl))
+                        openItem(item)
                     }
                 )
             }
@@ -195,6 +195,9 @@ struct ContentView: View {
     private func openItem(_ item: SearchResult) {
         if item.isSeries {
             navigate(Route.seriesFromHref(item.path))
+        } else if item.isCollection, let range = item.path.range(of: "/collection/") {
+            let slug = String(item.path[range.upperBound...].prefix { $0 != "/" && $0 != "?" })
+            navigate(.list(.namedCollection(slug), item.title))
         } else if item.isBrowseLink {
             let path = item.path.hasPrefix("https://www.freebuddhistaudio.com")
                 ? String(item.path.dropFirst("https://www.freebuddhistaudio.com".count)) : item.path

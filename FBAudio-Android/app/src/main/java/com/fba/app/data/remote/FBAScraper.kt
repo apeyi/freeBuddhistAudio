@@ -561,6 +561,15 @@ class FBAScraper @Inject constructor(
         return out
     }
 
+    /** All entries of an index collection (speakers, places) as browse links with images. */
+    suspend fun fetchIndexEntries(type: String): List<SearchResult> {
+        val url = "$BASE_URL/api/v1/collections/${java.net.URLEncoder.encode(type, "UTF-8")}?page=1&limit=1000"
+        val coll = fetchJson(url).getAsJsonObject("collection") ?: return emptyList()
+        return parseListItems(coll.getAsJsonArray("items")).map { item ->
+            if (item.imageUrl.contains("/default")) item.copy(imageUrl = "") else item
+        }
+    }
+
     private fun normalizeBrowsePath(link: String): String = normalizeBrowsePathStatic(link)
 
     /** One page of a `/browse?…` listing (a speaker, place, year or genre). */

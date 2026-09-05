@@ -54,7 +54,9 @@ data class SearchResult(
     val isSeries: Boolean get() = path.contains("/series/")
     /** Speaker / place / year / genre entries link to a browse listing, not a talk. */
     val isBrowseLink: Boolean get() = path.contains("/browse")
-    val isTalk: Boolean get() = !isSeries && !isBrowseLink
+    /** Curated `/collection/<slug>` pages (themes, collections). */
+    val isCollection: Boolean get() = path.contains("/collection/")
+    val isTalk: Boolean get() = !isSeries && !isBrowseLink && !isCollection
 }
 
 data class BrowseCategory(

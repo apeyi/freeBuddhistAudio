@@ -18,7 +18,9 @@ struct SearchResult: Identifiable, Equatable, Codable {
     var isSeries: Bool { path.contains("/series/") }
     /// Speaker / place / year / genre entries link to a browse listing, not a talk.
     var isBrowseLink: Bool { path.contains("/browse") }
-    var isTalk: Bool { !isSeries && !isBrowseLink }
+    /// Curated `/collection/<slug>` pages (themes, collections).
+    var isCollection: Bool { path.contains("/collection/") }
+    var isTalk: Bool { !isSeries && !isBrowseLink && !isCollection }
 
     init(catNum: String, title: String = "", speaker: String = "",
          imageUrl: String = "", path: String = "", year: Int = 0,

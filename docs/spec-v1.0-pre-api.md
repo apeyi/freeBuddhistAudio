@@ -132,7 +132,7 @@ The app hides menu entries via (1), and talks via speakers marked in (1)/(2) and
 
 | Today | Change |
 |---|---|
-| Two modes: **All** and **By speaker**. Talks and series appear in one mixed list. | Tabs **All · Audio**; *All* shows Talks and Series as separate groups, *Audio* shows talks only. The **By speaker** mode is removed (speakers are browsed from People instead). A **Text** tab is added when the server supports transcript search. |
+| Two modes: **All** and **By speaker**. Talks and series appear in one mixed list. | Results are grouped into **Speakers, Places, Collections, Series, Talks**; an *All* chip plus one chip per category that actually has results. Speakers/places/collections are matched against FBA's indexes and curated menu (the site's search only returns talks and series); tapping a speaker or place opens its listing, a collection its page. A **Text** category is added when the server supports transcript search. |
 | Seminars were never reachable in the app. | Nothing to remove; the texts/seminars section is deliberately not added. |
 
 ### 3.8 Talk and series pages — **Now**

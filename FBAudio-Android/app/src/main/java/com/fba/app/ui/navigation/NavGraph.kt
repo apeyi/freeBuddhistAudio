@@ -24,6 +24,7 @@ import com.fba.app.ui.legacy.DigitalLegacyScreen
 import com.fba.app.ui.list.ListScreen
 import com.fba.app.ui.menu.MenuListScreen
 import com.fba.app.ui.myfba.MyFbaScreen
+import com.fba.app.ui.myfba.SettingsScreen
 import com.fba.app.ui.player.PlayerScreen
 import com.fba.app.ui.player.PlayerViewModel
 import com.fba.app.ui.search.SearchScreen
@@ -50,6 +51,9 @@ fun NavGraph(
     val onItemClick: (SearchResult) -> Unit = { item ->
         when {
             item.isSeries -> navController.navigate(Routes.seriesFromHref(item.path))
+            item.isCollection -> Regex("/collection/([^/?#]+)").find(item.path)?.groupValues?.get(1)?.let { slug ->
+                navController.navigate(Routes.list(ContentSource.NamedCollection(slug), item.title))
+            }
             item.isBrowseLink -> navController.navigate(
                 Routes.list(ContentSource.Browse(item.path.removePrefix("https://www.freebuddhistaudio.com")), item.title)
             )
@@ -93,7 +97,7 @@ fun NavGraph(
         composable(Routes.SEARCH) {
             SearchScreen(
                 onTalkClick = { navController.navigate(Routes.detail(it)) },
-                onSeriesClick = { navController.navigate(Routes.seriesFromHref(it)) },
+                onItemClick = onItemClick,
                 onBack = { navController.popBackStack() },
             )
         }
@@ -135,7 +139,11 @@ fun NavGraph(
                 onDonateClick = onDonate,
                 onLoginClick = { navController.navigate(Routes.LOGIN) },
                 onJoinClick = { navController.navigate(Routes.JOIN) },
+                onSettingsClick = { navController.navigate(Routes.SETTINGS) },
             )
+        }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
         if (FeatureFlags.AUTH) {
             composable(Routes.LOGIN) {
