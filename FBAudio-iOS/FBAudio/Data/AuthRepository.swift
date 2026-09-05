@@ -10,8 +10,8 @@ struct AuthState: Equatable {
     var checking = false
 }
 
-/// Login with the existing FBA (Triratna single sign-on) account through the
-/// website's own login page in a web view. The captured session cookies are
+/// Login with the existing FBA (Triratna single sign-on) account. `SsoLogin`
+/// runs the website's sign-on natively; the resulting session cookies are
 /// stored and installed into the shared cookie storage so every website
 /// request (scraper, downloads) carries them.
 ///
@@ -48,8 +48,23 @@ final class AuthRepository: ObservableObject {
         cookies["SimpleSAMLAuthToken"] != nil && cookies["fba"] != nil && cookies["PHPSESSID"] != nil
     }
 
-    /// Called by the login web view once it has landed back on the site with a complete session.
-    func completeLoginFromWebView(_ cookies: [String: String]) async -> Bool {
+    /// Log in with the Triratna username (not the email) and password through the
+    /// single sign-on, natively. Returns nil on success or a user-facing message.
+    func login(username: String, password: String) async -> String? {
+        let user = username.trimmingCharacters(in: .whitespaces)
+        guard !user.isEmpty, !password.isEmpty else { return "Enter your username and password." }
+        switch await SsoLogin().login(username: user, password: password) {
+        case .success(let cookies):
+            return await installSession(cookies) ? nil : "Couldn't complete the login. Please try again."
+        case .invalidCredentials:
+            return "Username or password not recognised. Use your Triratna username, not your email address."
+        case .failure:
+            return "Couldn't reach the login service. Check your connection and try again."
+        }
+    }
+
+    /// Install a complete FBA session (from the sign-on), verify it and load the user header.
+    func installSession(_ cookies: [String: String]) async -> Bool {
         guard Self.isCompleteSession(cookies) else { return false }
         let session = cookies.filter { Self.sessionCookies.contains($0.key) }
         defaults.set(session, forKey: cookiesKey)

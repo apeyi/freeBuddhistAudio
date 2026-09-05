@@ -62,7 +62,7 @@ Everything applies to both Android and iOS.
 | D3 | Which version plays when a talk has a remastered version | **Remastered** by default, toggle to Original in the player, choice remembered per talk. | Matches FBA's Digital Legacy push. |
 | D4 | English \| All languages toggle | Ship as a setting, default **English**, using the language markers available today; refine when FBA supplies proper tags. | Best effort now beats nothing. |
 | D5 | Text (transcript) search | **Server-side only.** The app does not ship or use our own transcripts; the Text tab appears when FBA's search supports it. *Agreed.* | Keeps content handling with FBA. |
-| D6 | Login before the API | Use the website's Triratna login inside the app (**switched on** once tested on devices). | It's FBA's real login and works today. Downsides: the login page isn't mobile-styled, and we don't yet know how long a session lasts before re-login. |
+| D6 | Login before the API | A native login screen that performs the website's Triratna sign-on behind the scenes (**switched on**). | It's FBA's real login and works today, verified against the live servers. Downside: we don't yet know how long a session lasts before re-login. |
 | D7 | Analytics | None in v1 beyond the app-store consoles. | Nothing in the spec needs them; avoids privacy-policy work before launch. |
 
 ---
@@ -163,7 +163,7 @@ transcripts **are** downloaded with a talk (since v0.3), and downloaded talks
 | Today | Change | Tag |
 |---|---|---|
 | No account concept. | **My FBA** tab: account header with Log in / out, Recently listened (moved from Home), Donate, Settings (language toggle, remastered default). | **Now** |
-| — | **Log in** with the existing FBA/Triratna account, via the website's own login page shown inside the app. Shows the username after login. | **Now, switched off** until device-tested (D6) |
+| — | **Log in** with the existing FBA/Triratna account on a native login screen (username + password; the website's single sign-on runs behind the scenes). Shows the username after login. | **Now** (D6) |
 | Recently listened is app-only. | **Syncs with the website**: talks listened to on the web appear in the app and vice versa; the resume position also syncs, so a talk started on the web continues in the app. Verified with the test account. | **Now, switched off** with login |
 | — | **Order talks** link on Home and Order-only items in lists, for logged-in Order members. The website already hides these for everyone else. | **Now, switched off** — needs an **Order-member test account** to verify |
 | — | Subscription status tied to the FBA account. | **Needs API** |
@@ -204,7 +204,7 @@ post-launch swap.
 5. Are transcript-only downloads free or member-only?
 6. Store policy: link-out donations vs in-app donation; non-profit status; who sets up the subscription products (3.10)? This gates submission to the stores.
 7. An **Order-member test account** (or the Order role on our test user) so Order-only talks can be verified (3.11).
-8. Is using the website's Triratna login inside the app acceptable until the API ships (D6)? How long does a login session last?
+8. Is signing in with the Triratna account from the app acceptable until the API ships (D6)? How long does a login session last?
 9. When the API arrives: will audio be behind protected links, and what will login look like?
 
 ---

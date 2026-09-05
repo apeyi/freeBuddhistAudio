@@ -19,12 +19,12 @@ data class AuthState(
 )
 
 /**
- * Login with the existing FBA (Triratna single sign-on) account, done through the
- * website's own login page in a WebView. The captured session cookies are then
+ * Login with the existing FBA (Triratna single sign-on) account. [SsoLogin] runs
+ * the website's sign-on natively; the resulting session cookies are then
  * attached to every website request (see [SessionCookieStore]).
  *
  * To be replaced by a token-based login when the FBA API provides one — keep
- * callers on [state] / [logout] / [completeLoginFromWebView] only.
+ * callers on [login] / [state] / [logout] only.
  */
 class AuthRepository(
     private val store: SessionCookieStore,
@@ -43,10 +43,22 @@ class AuthRepository(
     }
 
     /**
-     * Called by the login WebView once it has landed back on the site with a
-     * complete session. Verifies the session and loads the user header.
+     * Log in with the Triratna username (not the email) and password through the
+     * single sign-on, natively. Returns null on success or a user-facing message.
      */
-    suspend fun completeLoginFromWebView(cookies: Map<String, String>): Boolean {
+    suspend fun login(username: String, password: String): String? {
+        val user = username.trim()
+        if (user.isEmpty() || password.isEmpty()) return "Enter your username and password."
+        return when (val result = SsoLogin(client).login(user, password)) {
+            is SsoLogin.Result.Success ->
+                if (installSession(result.cookies)) null else "Couldn't complete the login. Please try again."
+            SsoLogin.Result.InvalidCredentials -> "Username or password not recognised. Use your Triratna username, not your email address."
+            is SsoLogin.Result.Failure -> "Couldn't reach the login service. Check your connection and try again."
+        }
+    }
+
+    /** Install a complete FBA session (from the sign-on), verify it and load the user header. */
+    suspend fun installSession(cookies: Map<String, String>): Boolean {
         if (!SessionCookieStore.isCompleteSession(cookies)) return false
         store.setCookies(cookies)
         store.setLoggedIn(true)

@@ -14,7 +14,7 @@
 - Search: All | Audio, with Series and Talks grouped; speaker mode removed (People replaces it)
 - Downloads: All | Talks | Transcripts filter, "Audio · Transcript · Remastered" labels, save a transcript on its own
 - Settings: English only (default on, using FBA's language markers), Prefer remastered audio
-- Log in with the FBA / Triratna account (website login inside the app); listening history and resume position sync with the website
+- Log in with the FBA / Triratna account (native login screen); listening history and resume position sync with the website
 - Join page (subscriptions open at launch); download gating behind a feature flag
 
 **Changed**

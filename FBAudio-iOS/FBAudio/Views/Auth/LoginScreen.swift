@@ -1,92 +1,96 @@
 import SwiftUI
-import WebKit
 
-/// Logs in with the FBA / Triratna account using the website's own login page.
-/// The site redirects to sso.triratna.co and back; once it lands on
-/// freebuddhistaudio.com with a complete session we copy the cookies into the
-/// app and close.
+/// Native login with the FBA / Triratna account (the single sign-on runs behind the scenes).
 struct LoginScreen: View {
     let onDone: () -> Void
 
-    @State private var loading = true
-    @State private var finishing = false
-    @State private var failed = false
+    @State private var username = ""
+    @State private var password = ""
+    @State private var showPassword = false
+    @State private var isLoading = false
+    @State private var error: String?
+    @FocusState private var focused: Field?
+
+    private enum Field { case username, password }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                if loading { ProgressView().progressViewStyle(.linear) }
-                if failed {
-                    Text("Couldn't complete the login. Please try again.")
-                        .font(.caption).foregroundStyle(.red).padding()
-                }
-                ZStack {
-                    LoginWebView(
-                        onLoadingChanged: { loading = $0 },
-                        onSessionCookies: { cookies in
-                            guard !finishing else { return }
-                            finishing = true
-                            Task {
-                                let ok = await AuthRepository.shared.completeLoginFromWebView(cookies)
-                                if ok { onDone() } else { failed = true; finishing = false }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Your FBA account").font(.title2).bold()
+                    Text("Free Buddhist Audio uses the Triratna login — the same username and password as The Buddhist Centre Online.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+
+                    TextField("Username", text: $username)
+                        .textContentType(.username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.next)
+                        .focused($focused, equals: .username)
+                        .onSubmit { focused = .password }
+                        .textFieldStyle(.roundedBorder)
+                        .padding(.top, 12)
+
+                    HStack {
+                        Group {
+                            if showPassword {
+                                TextField("Password", text: $password)
+                            } else {
+                                SecureField("Password", text: $password)
                             }
                         }
-                    )
-                    if finishing { ProgressView().controlSize(.large) }
+                        .textContentType(.password)
+                        .submitLabel(.go)
+                        .focused($focused, equals: .password)
+                        .onSubmit(submit)
+                        Button(action: { showPassword.toggle() }) {
+                            Image(systemName: showPassword ? "eye.slash" : "eye").foregroundStyle(.secondary)
+                        }
+                    }
+                    .textFieldStyle(.roundedBorder)
+
+                    if let error {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    }
+
+                    Button(action: submit) {
+                        Group {
+                            if isLoading { ProgressView().tint(.white) } else { Text("Log in") }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isLoading)
+                    .padding(.top, 8)
+
+                    HStack {
+                        Link("Forgot your details?", destination: URL(string: "https://thebuddhistcentre.com/user/password")!)
+                        Spacer()
+                        Link("Create an account", destination: URL(string: "https://thebuddhistcentre.com/register")!)
+                    }
+                    .font(.footnote)
+                    .padding(.top, 8)
                 }
+                .padding(24)
             }
-            .navigationTitle("Log in to FBA")
+            .tint(.saffronOrange)
+            .navigationTitle("Log in")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onDone) }
             }
+            .onAppear { focused = .username }
         }
     }
-}
 
-private struct LoginWebView: UIViewRepresentable {
-    let onLoadingChanged: (Bool) -> Void
-    let onSessionCookies: ([String: String]) -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-
-    func makeUIView(context: Context) -> WKWebView {
-        // Non-persistent store: start from a clean browser session so the SSO
-        // form shows rather than silently reusing a previous account.
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = .nonPersistent()
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = context.coordinator
-        webView.load(URLRequest(url: AuthRepository.loginURL))
-        return webView
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        let parent: LoginWebView
-        init(_ parent: LoginWebView) { self.parent = parent }
-
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            parent.onLoadingChanged(true)
-        }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            parent.onLoadingChanged(false)
-            guard let url = webView.url, url.host == AuthRepository.host, !url.path.hasPrefix("/sso") else { return }
-            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
-                var map: [String: String] = [:]
-                for c in cookies where c.domain.hasSuffix("freebuddhistaudio.com") && AuthRepository.sessionCookies.contains(c.name) {
-                    map[c.name] = c.value
-                }
-                if AuthRepository.isCompleteSession(map) {
-                    self.parent.onSessionCookies(map)
-                }
-            }
-        }
-
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            parent.onLoadingChanged(false)
+    private func submit() {
+        guard !isLoading else { return }
+        isLoading = true
+        error = nil
+        Task {
+            let result = await AuthRepository.shared.login(username: username, password: password)
+            isLoading = false
+            if let result { error = result } else { onDone() }
         }
     }
 }
