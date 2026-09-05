@@ -22,24 +22,21 @@ final class HistoryRepository {
         return ISO8601DateFormatter().date(from: trimmed)
     }
 
-    /// Merge the account's history into Recently listened. Talks not yet known
-    /// locally are added; known talks keep their local position and take the
-    /// newer of the two timestamps.
+    /// Merge the account's history into Recently listened: talks not yet known
+    /// locally are added, timestamps take the newer of the two, and positions
+    /// come from the account's checkpoints (which always win when logged in).
     func syncFromServer(maxItems: Int = 30) async {
         guard auth.isLoggedIn else { return }
         guard let json = await getJson("\(Self.base)/api/v1/history?maxItems=\(maxItems)"),
               let items = json["historyItems"] as? [[String: Any]] else { return }
         var local = persistence.getRecentlyListened()
-        var changed = false
+        var syncedCatNums: [String] = []
         for item in items {
             guard let talk = item["talk"] as? [String: Any],
                   let catNum = talk["cat_num"] as? String,
                   let time = (item["listenTime"] as? String).flatMap(Self.parseListenTime) else { continue }
             if let idx = local.firstIndex(where: { $0.catNum == catNum }) {
-                if time > local[idx].timestamp {
-                    local[idx].timestamp = time
-                    changed = true
-                }
+                if time > local[idx].timestamp { local[idx].timestamp = time }
             } else {
                 let image = (talk["image"] as? String) ?? ""
                 local.append(PersistenceManager.RecentlyListened(
@@ -49,12 +46,38 @@ final class HistoryRepository {
                     imageUrl: image.hasPrefix("http") || image.isEmpty ? image : Self.base + image,
                     positionMs: 0, trackIndex: 0, totalDurationSeconds: 0, timestamp: time
                 ))
-                changed = true
+            }
+            if !syncedCatNums.contains(catNum) { syncedCatNums.append(catNum) }
+        }
+        // The history feed has no positions — those live on each talk's page as the
+        // account's checkpoint. Fetch them so synced entries show their progress
+        // marker, and so the account's position wins locally too.
+        let positions = await withTaskGroup(of: (String, Int64, Int, Int)?.self) { group in
+            for catNum in syncedCatNums {
+                group.addTask { await Self.checkpointPosition(catNum) }
+            }
+            var out: [String: (Int64, Int, Int)] = [:]
+            for await r in group { if let r { out[r.0] = (r.1, r.2, r.3) } }
+            return out
+        }
+        for (i, entry) in local.enumerated() {
+            if let p = positions[entry.catNum] {
+                local[i].positionMs = p.0
+                local[i].trackIndex = p.1
+                local[i].totalDurationSeconds = p.2
             }
         }
-        if changed {
-            persistence.replaceRecentlyListened(local.sorted { $0.timestamp > $1.timestamp })
-        }
+        persistence.replaceRecentlyListened(local.sorted { $0.timestamp > $1.timestamp })
+    }
+
+    /// (catNum, cumulative position ms, track index, total seconds) from the talk page's checkpoint.
+    private static func checkpointPosition(_ catNum: String) async -> (String, Int64, Int, Int)? {
+        guard let talk = await TalkRepository.shared.getTalkDetail(catNum, forceRefresh: true) else { return nil }
+        let total = PlaybackMath.totalDurationSeconds(talkDurationSeconds: talk.durationSeconds, tracks: talk.tracks, playerDurationMs: 0)
+        guard let cp = talk.checkpoint else { return (catNum, 0, 0, total) }
+        let trackIndex = max(talk.tracks.firstIndex { $0.trackId == cp.trackId } ?? 0, 0)
+        let pos = PlaybackMath.cumulativePositionMs(tracks: talk.tracks, trackIndex: trackIndex, positionInTrackMs: Int64(cp.timeSeconds) * 1000)
+        return (catNum, pos, trackIndex, total)
     }
 
     /// The website records a "stream start" per play; mirror it so web history shows app listens.

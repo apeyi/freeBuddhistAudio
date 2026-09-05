@@ -3,9 +3,15 @@ package com.fba.app.data.repository
 import com.fba.app.data.auth.AuthRepository
 import com.fba.app.data.local.RecentlyListenedDao
 import com.fba.app.data.local.RecentlyListenedEntity
+import com.fba.app.ui.player.PlaybackMath
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -25,6 +31,7 @@ class HistoryRepository(
     private val client: OkHttpClient,
     private val auth: AuthRepository,
     private val recentlyListenedDao: RecentlyListenedDao,
+    private val talkRepository: TalkRepository,
 ) {
     companion object {
         private const val BASE = "https://www.freebuddhistaudio.com"
@@ -42,36 +49,59 @@ class HistoryRepository(
     }
 
     /**
-     * Merge the account's history into Recently listened. Talks not yet known
-     * locally are added; known talks keep their local position and take the
-     * newer of the two timestamps.
+     * Merge the account's history into Recently listened: talks not yet known
+     * locally are added, timestamps take the newer of the two, and positions
+     * come from the account's checkpoints (which always win when logged in).
      */
     suspend fun syncFromServer(maxItems: Int = 30) {
         if (!auth.isLoggedIn) return
         val json = getJson("$BASE/api/v1/history?maxItems=$maxItems") ?: return
         val items = json.getAsJsonArray("historyItems") ?: return
         val local = recentlyListenedDao.getAllOnce().associateBy { it.catNum }
+        val synced = mutableListOf<RecentlyListenedEntity>()
         for (el in items) {
             val item = el.asJsonObject
             val talk = item.getAsJsonObject("talk") ?: continue
             val catNum = talk.str("cat_num") ?: continue
             val listenedAt = item.str("listenTime")?.let { parseListenTime(it) } ?: continue
             val existing = local[catNum]
-            if (existing == null) {
-                recentlyListenedDao.upsert(
-                    RecentlyListenedEntity(
-                        catNum = catNum,
-                        title = Parser.unescapeEntities(talk.str("title") ?: "", false),
-                        speaker = Parser.unescapeEntities(talk.str("speaker") ?: "", false),
-                        imageUrl = talk.str("image")?.let { if (it.startsWith("http")) it else "$BASE$it" } ?: "",
-                        listenedAt = listenedAt,
-                    )
+            val entity = existing?.let { if (listenedAt > it.listenedAt) it.copy(listenedAt = listenedAt) else it }
+                ?: RecentlyListenedEntity(
+                    catNum = catNum,
+                    title = Parser.unescapeEntities(talk.str("title") ?: "", false),
+                    speaker = Parser.unescapeEntities(talk.str("speaker") ?: "", false),
+                    imageUrl = talk.str("image")?.let { if (it.startsWith("http")) it else "$BASE$it" } ?: "",
+                    listenedAt = listenedAt,
                 )
-            } else if (listenedAt > existing.listenedAt) {
-                recentlyListenedDao.upsert(existing.copy(listenedAt = listenedAt))
-            }
+            if (synced.none { it.catNum == catNum }) synced.add(entity)
         }
+        // The history feed has no positions — those live on each talk's page as the
+        // account's checkpoint. Fetch them (a few at a time) so synced entries show
+        // their progress marker, and so the account's position wins locally too.
+        val withPositions = coroutineScope {
+            val gate = Semaphore(4)
+            synced.map { entity -> async { gate.withPermit { applyCheckpoint(entity) } } }.awaitAll()
+        }
+        for (entity in withPositions) recentlyListenedDao.upsert(entity)
         recentlyListenedDao.pruneOld()
+    }
+
+    /** Fill position/duration from the account's checkpoint on the talk page; unchanged if unavailable. */
+    private suspend fun applyCheckpoint(entity: RecentlyListenedEntity): RecentlyListenedEntity {
+        val talk = try { talkRepository.fetchTalkDetail(entity.catNum, forceRefresh = true) } catch (_: Exception) { null }
+            ?: return entity
+        val totalSeconds = PlaybackMath.totalDurationSeconds(talk.durationSeconds, talk.tracks, 0)
+        val cp = talk.checkpoint ?: return if (entity.totalDurationSeconds == 0) entity.copy(totalDurationSeconds = totalSeconds) else entity
+        val trackIndex = talk.tracks.indexOfFirst { it.trackId == cp.trackId }.coerceAtLeast(0)
+        val positionMs = PlaybackMath.cumulativePositionMs(talk.tracks, trackIndex, cp.timeSeconds * 1000L)
+        return entity.copy(
+            title = entity.title.ifBlank { talk.title },
+            speaker = entity.speaker.ifBlank { talk.speaker },
+            imageUrl = entity.imageUrl.ifBlank { talk.imageUrl },
+            positionMs = positionMs,
+            trackIndex = trackIndex,
+            totalDurationSeconds = totalSeconds,
+        )
     }
 
     /** The website records a "stream start" per play; mirror it so web history shows app listens. */

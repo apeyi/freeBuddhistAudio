@@ -141,7 +141,8 @@ object AppModule {
         client: OkHttpClient,
         auth: AuthRepository,
         recentlyListenedDao: RecentlyListenedDao,
-    ): HistoryRepository = HistoryRepository(client, auth, recentlyListenedDao)
+        talkRepository: TalkRepository,
+    ): HistoryRepository = HistoryRepository(client, auth, recentlyListenedDao, talkRepository)
 
     @Provides
     @Singleton
