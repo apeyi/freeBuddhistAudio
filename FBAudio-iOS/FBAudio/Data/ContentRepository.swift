@@ -200,11 +200,15 @@ final class ContentRepository {
     func matchNames(_ query: String) async -> NameMatches {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard q.count >= 2 else { return NameMatches() }
+        // Typo-tolerant, like the site's own talk search ("adhistana" → Adhisthana)
         func matching(_ items: [SearchResult]) -> [SearchResult] {
-            Array(items.filter { $0.title.lowercased().contains(q) || $0.centre.lowercased().contains(q) }
+            Array(items.filter { FuzzyMatch.matches(q, $0.title) || FuzzyMatch.matches(q, $0.centre) }
                 .map { SearchResult(catNum: $0.catNum, title: $0.title, speaker: $0.speaker, imageUrl: $0.imageUrl,
                                     path: $0.path, year: $0.year, centre: "", omOnly: $0.omOnly) }
-                .sorted { $0.title.lowercased() < $1.title.lowercased() }
+                .sorted { a, b in
+                    let ea = a.title.lowercased().contains(q), eb = b.title.lowercased().contains(q)
+                    return ea != eb ? ea : a.title.lowercased() < b.title.lowercased()
+                }
                 .prefix(20))
         }
         return NameMatches(

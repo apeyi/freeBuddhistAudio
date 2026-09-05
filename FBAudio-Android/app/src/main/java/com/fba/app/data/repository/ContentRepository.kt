@@ -4,6 +4,7 @@ import com.fba.app.data.local.AppSettings
 import com.fba.app.data.local.ContentCache
 import com.fba.app.data.remote.FBAScraper
 import com.fba.app.data.remote.SiteMenuParser
+import com.fba.app.domain.FuzzyMatch
 import com.fba.app.domain.LanguageFilter
 import com.fba.app.domain.model.ContentSource
 import com.fba.app.domain.model.DigitalLegacy
@@ -208,10 +209,11 @@ class ContentRepository @Inject constructor(
     suspend fun matchNames(query: String): NameMatches {
         val q = query.trim().lowercase()
         if (q.length < 2) return NameMatches(emptyList(), emptyList(), emptyList())
-        // `centre` temporarily carries the curated label for index entries (see nameEntries)
-        fun List<SearchResult>.matching() = filter { it.title.lowercase().contains(q) || it.centre.lowercase().contains(q) }
+        // `centre` temporarily carries the curated label for index entries (see nameEntries).
+        // Typo-tolerant, like the site's own talk search ("adhistana" → Adhisthana).
+        fun List<SearchResult>.matching() = filter { FuzzyMatch.matches(q, it.title) || FuzzyMatch.matches(q, it.centre) }
             .map { it.copy(centre = "") }
-            .sortedBy { it.title.lowercase() }
+            .sortedWith(compareBy({ !it.title.lowercase().contains(q) }, { it.title.lowercase() }))
             .take(20)
         return NameMatches(
             speakers = nameEntries("speakers", "people").matching(),
