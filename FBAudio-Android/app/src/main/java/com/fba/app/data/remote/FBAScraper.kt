@@ -250,6 +250,36 @@ class FBAScraper @Inject constructor(
         return result
     }
 
+    /**
+     * Some chapters have no length on the website (a data problem — e.g. LOC3883
+     * chapters 5 and 6). Estimate them from the audio file sizes, using a sibling
+     * chapter with a known length as the bitrate reference. Audio URLs carry no
+     * session cookies, so these HEAD requests run in parallel.
+     */
+    suspend fun fillMissingTrackDurations(talk: Talk): Talk {
+        val missing = talk.tracks.withIndex().filter { it.value.durationSeconds <= 0 && it.value.audioUrl.isNotBlank() }
+        if (missing.isEmpty()) return talk
+        val reference = talk.tracks.filter { it.durationSeconds > 0 && it.audioUrl.isNotBlank() }
+            .maxByOrNull { it.durationSeconds } ?: return talk
+        return withContext(Dispatchers.IO) {
+            val refBytes = async { contentLength(reference.audioUrl) }
+            val sizes = missing.map { (i, t) -> async { i to contentLength(t.audioUrl) } }.awaitAll()
+            val ref = refBytes.await()
+            val updated = talk.tracks.toMutableList()
+            for ((i, bytes) in sizes) {
+                val seconds = com.fba.app.ui.player.PlaybackMath.estimateDurationSeconds(bytes, ref, reference.durationSeconds)
+                if (seconds > 0) updated[i] = updated[i].copy(durationSeconds = seconds)
+            }
+            talk.copy(tracks = updated)
+        }
+    }
+
+    private fun contentLength(url: String): Long = try {
+        client.newCall(Request.Builder().url(url).head().build()).execute().use { r ->
+            if (r.isSuccessful) r.header("Content-Length")?.toLongOrNull() ?: -1L else -1L
+        }
+    } catch (_: Exception) { -1L }
+
     private fun buildAudioUrl(catNum: String): String {
         return "$BASE_URL/audio/stream?num=$catNum"
     }

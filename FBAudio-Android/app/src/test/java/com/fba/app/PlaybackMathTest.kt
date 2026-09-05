@@ -74,4 +74,13 @@ class PlaybackMathTest {
         assertTrue(PlaybackMath.isPlausibleDuration(20 * 3600))
         assertFalse(PlaybackMath.isPlausibleDuration(0))
     }
+
+    @Test
+    fun estimateDurationFromSiblingBitrate() {
+        // LOC3883: chapter 4 is 27,933,382 bytes for 3491 s (64 kbps); chapter 5 has no duration on the site
+        assertEquals(4229, PlaybackMath.estimateDurationSeconds(33_842_698L, 27_933_382L, 3491))
+        assertEquals(0, PlaybackMath.estimateDurationSeconds(0L, 27_933_382L, 3491))
+        assertEquals(0, PlaybackMath.estimateDurationSeconds(1_000L, 0L, 3491))
+        assertEquals(0, PlaybackMath.estimateDurationSeconds(1_000L, 27_933_382L, 0))
+    }
 }

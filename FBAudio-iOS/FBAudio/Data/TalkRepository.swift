@@ -14,7 +14,8 @@ class TalkRepository: ObservableObject {
             return cached
         }
         do {
-            let talk = try await scraper.fetchTalkDetail(catNum)
+            // Fetch from web, fill chapter lengths the site lacks, and cache
+            let talk = await scraper.fillMissingTrackDurations(try await scraper.fetchTalkDetail(catNum))
             persistence.cacheTalk(talk, key: catNum)
             return talk
         } catch {
@@ -25,7 +26,12 @@ class TalkRepository: ObservableObject {
     /// Talks cached before remastered audio / track ids were parsed have tracks
     /// without ids — those are refetched once.
     private static func isCurrentSchema(_ talk: Talk) -> Bool {
-        talk.tracks.isEmpty || talk.tracks.contains { !$0.trackId.isEmpty }
+        if talk.tracks.isEmpty { return true }
+        guard talk.tracks.contains(where: { !$0.trackId.isEmpty }) else { return false }
+        // Chapters without a length are now estimated from file sizes — refetch once.
+        let known = talk.tracks.contains { $0.durationSeconds > 0 }
+        let missing = talk.tracks.contains { $0.durationSeconds <= 0 }
+        return !(known && missing)
     }
 
     func searchAudio(_ query: String) async throws -> [SearchResult] {

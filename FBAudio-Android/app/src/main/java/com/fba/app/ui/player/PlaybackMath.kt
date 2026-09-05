@@ -57,4 +57,17 @@ object PlaybackMath {
         if (newDurationMs == null || newDurationMs <= 0) return pos
         return pos.coerceAtMost((newDurationMs - 1000).coerceAtLeast(0))
     }
+
+    /**
+     * Length of a chapter whose duration the website lacks, from its file size and
+     * a sibling chapter with a known length (bitrate is constant within a talk but
+     * varies between talks — 64 kbps originals, 256 kbps remasters). 0 when the
+     * inputs can't support an estimate.
+     */
+    fun estimateDurationSeconds(bytes: Long, refBytes: Long, refSeconds: Int): Int {
+        if (bytes <= 0 || refBytes <= 0 || refSeconds <= 0) return 0
+        val bytesPerSecond = refBytes.toDouble() / refSeconds
+        val estimate = (bytes / bytesPerSecond).toInt()
+        return if (isPlausibleDuration(estimate)) estimate else 0
+    }
 }

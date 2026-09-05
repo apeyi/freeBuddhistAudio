@@ -64,4 +64,12 @@ final class PlaybackMathTests: XCTestCase {
         XCTAssertTrue(PlaybackMath.isPlausibleDuration(20 * 3600))
         XCTAssertFalse(PlaybackMath.isPlausibleDuration(0))
     }
+
+    func testEstimateDurationFromSiblingBitrate() {
+        // LOC3883: chapter 4 is 27,933,382 bytes for 3491 s (64 kbps); chapter 5 has no duration on the site
+        XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 33_842_698, refBytes: 27_933_382, refSeconds: 3491), 4229)
+        XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 0, refBytes: 27_933_382, refSeconds: 3491), 0)
+        XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 1_000, refBytes: 0, refSeconds: 3491), 0)
+        XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 1_000, refBytes: 27_933_382, refSeconds: 0), 0)
+    }
 }

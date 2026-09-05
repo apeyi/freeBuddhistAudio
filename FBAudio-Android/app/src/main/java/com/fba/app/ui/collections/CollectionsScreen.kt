@@ -131,7 +131,7 @@ fun CollectionsScreen(
                 }
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
                     Text(
-                        "From Free Buddhist Audio",
+                        "More from Free Buddhist Audio",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),

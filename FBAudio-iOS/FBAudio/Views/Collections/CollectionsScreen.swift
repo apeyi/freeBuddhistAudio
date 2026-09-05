@@ -56,7 +56,7 @@ struct CollectionsScreen: View {
                         .buttonStyle(.plain)
                     }
                 } header: {
-                    Text("From Free Buddhist Audio")
+                    Text("More from Free Buddhist Audio")
                         .font(.subheadline).bold().foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 8)

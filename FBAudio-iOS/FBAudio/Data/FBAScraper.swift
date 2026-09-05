@@ -183,6 +183,44 @@ actor FBAScraper {
         }
     }
 
+    // MARK: - Missing chapter lengths
+
+    /// Some chapters have no length on the website (a data problem — e.g. LOC3883
+    /// chapters 5 and 6). Estimate them from the audio file sizes, using a sibling
+    /// chapter with a known length as the bitrate reference. Audio URLs carry no
+    /// session cookies (URLSession.shared), so these HEAD requests run in parallel.
+    func fillMissingTrackDurations(_ talk: Talk) async -> Talk {
+        let missing = talk.tracks.indices.filter { talk.tracks[$0].durationSeconds <= 0 && !talk.tracks[$0].audioUrl.isEmpty }
+        guard !missing.isEmpty,
+              let reference = talk.tracks.filter({ $0.durationSeconds > 0 && !$0.audioUrl.isEmpty }).max(by: { $0.durationSeconds < $1.durationSeconds })
+        else { return talk }
+        let refBytes = await Self.contentLength(reference.audioUrl)
+        var tracks = talk.tracks
+        await withTaskGroup(of: (Int, Int64).self) { group in
+            for i in missing { group.addTask { (i, await Self.contentLength(talk.tracks[i].audioUrl)) } }
+            for await (i, bytes) in group {
+                let seconds = PlaybackMath.estimateDurationSeconds(bytes: bytes, refBytes: refBytes, refSeconds: reference.durationSeconds)
+                if seconds > 0 {
+                    let t = tracks[i]
+                    tracks[i] = Track(title: t.title, durationSeconds: seconds, audioUrl: t.audioUrl, trackId: t.trackId,
+                                      remasterAudioUrl: t.remasterAudioUrl, remasterDurationSeconds: t.remasterDurationSeconds)
+                }
+            }
+        }
+        var copy = talk
+        copy.tracks = tracks
+        return copy
+    }
+
+    private static func contentLength(_ urlString: String) async -> Int64 {
+        guard let url = URL(string: urlString) else { return -1 }
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200 else { return -1 }
+        return http.expectedContentLength
+    }
+
     // MARK: - Browse
 
     nonisolated func fetchBrowseCategories() -> [BrowseCategory] {

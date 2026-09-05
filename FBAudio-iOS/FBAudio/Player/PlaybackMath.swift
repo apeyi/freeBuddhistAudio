@@ -45,4 +45,15 @@ enum PlaybackMath {
         guard let d = newDurationMs, d > 0 else { return pos }
         return min(pos, max(d - 1000, 0))
     }
+
+    /// Length of a chapter whose duration the website lacks, from its file size and
+    /// a sibling chapter with a known length (bitrate is constant within a talk but
+    /// varies between talks — 64 kbps originals, 256 kbps remasters). 0 when the
+    /// inputs can't support an estimate.
+    static func estimateDurationSeconds(bytes: Int64, refBytes: Int64, refSeconds: Int) -> Int {
+        guard bytes > 0, refBytes > 0, refSeconds > 0 else { return 0 }
+        let bytesPerSecond = Double(refBytes) / Double(refSeconds)
+        let estimate = Int(Double(bytes) / bytesPerSecond)
+        return isPlausibleDuration(estimate) ? estimate : 0
+    }
 }

@@ -65,15 +65,15 @@ class TalkRepository @Inject constructor(
             if (cached != null && cached.cachedAt >= TALK_CACHE_EPOCH) return cached.toDomain()
         }
 
-        // Fetch from web and cache
-        val talk = scraper.fetchTalkDetail(catNum) ?: return null
+        // Fetch from web, fill chapter lengths the site lacks, and cache
+        val talk = scraper.fetchTalkDetail(catNum)?.let { scraper.fillMissingTrackDurations(it) } ?: return null
         talkDao.insertTalk(TalkEntity.fromDomain(talk))
         return talk
     }
 
     companion object {
-        /** 2026-09-05: Track gained remasterAudioUrl/trackId — older cache rows are stale. */
-        const val TALK_CACHE_EPOCH = 1_788_566_400_000L
+        /** 2026-09-05 (evening): chapter lengths the site lacks are now estimated — older cache rows are stale. */
+        const val TALK_CACHE_EPOCH = 1_788_645_034_506L
     }
 
     /** General audio search via FBA API. */
