@@ -160,10 +160,10 @@ fun NavGraph(
         }
         composable(Routes.DIGITAL_LEGACY) {
             DigitalLegacyScreen(
-                onPlaySample = { catNum -> onPlayTalk(catNum) },
                 onSeriesClick = { path -> navController.navigate(Routes.list(ContentSource.Series(path))) },
                 onDonateClick = onDonate,
                 onBack = { navController.popBackStack() },
+                playerViewModel = playerViewModel,
             )
         }
         composable(

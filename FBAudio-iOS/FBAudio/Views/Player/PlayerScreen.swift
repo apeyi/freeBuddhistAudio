@@ -80,8 +80,8 @@ struct PlayerScreen: View {
                         get: { player.useRemaster },
                         set: { player.setUseRemaster($0) }
                     )) {
-                        Text("Remastered").tag(true)
                         Text("Original").tag(false)
+                        Text("Remastered").tag(true)
                     }
                     .pickerStyle(.segmented)
                     .frame(maxWidth: 260)

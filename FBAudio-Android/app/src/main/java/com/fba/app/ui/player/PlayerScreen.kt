@@ -205,17 +205,17 @@ fun PlayerScreen(
                 Spacer(Modifier.height(8.dp))
                 SingleChoiceSegmentedButtonRow {
                     SegmentedButton(
-                        selected = state.useRemaster,
-                        onClick = { playerViewModel.setUseRemaster(true) },
-                        enabled = !state.versionLocked,
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    ) { Text("Remastered") }
-                    SegmentedButton(
                         selected = !state.useRemaster,
                         onClick = { playerViewModel.setUseRemaster(false) },
                         enabled = !state.versionLocked,
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                     ) { Text("Original") }
+                    SegmentedButton(
+                        selected = state.useRemaster,
+                        onClick = { playerViewModel.setUseRemaster(true) },
+                        enabled = !state.versionLocked,
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) { Text("Remastered") }
                 }
                 if (state.versionLocked) {
                     Text(

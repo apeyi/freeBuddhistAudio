@@ -296,14 +296,6 @@ struct ContentView: View {
             )
         case .digitalLegacy:
             DigitalLegacyScreen(
-                onPlaySample: { catNum in
-                    Task {
-                        if let talk = await TalkRepository.shared.getTalkDetailForPlayback(catNum) {
-                            player.playTalk(talk)
-                            showPlayer = true
-                        }
-                    }
-                },
                 onSeriesClick: { path in navigate(.list(.series(path), "")) },
                 onDonateClick: openDonate
             )
