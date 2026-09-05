@@ -37,4 +37,15 @@ object PlaybackMath {
         if (summed > 0) return summed
         return (playerDurationMs / 1000L).toInt().coerceAtLeast(0)
     }
+
+    /**
+     * Position to resume at after switching between the remastered and original
+     * recording: the same absolute time, clamped to the new track's duration
+     * (the two versions differ by a few seconds). Unknown duration → unchanged.
+     */
+    fun clampPosition(positionMs: Long, newDurationMs: Long?): Long {
+        val pos = positionMs.coerceAtLeast(0)
+        if (newDurationMs == null || newDurationMs <= 0) return pos
+        return pos.coerceAtMost((newDurationMs - 1000).coerceAtLeast(0))
+    }
 }

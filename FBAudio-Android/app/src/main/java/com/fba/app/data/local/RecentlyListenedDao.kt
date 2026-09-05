@@ -11,6 +11,9 @@ interface RecentlyListenedDao {
     @Query("SELECT * FROM recently_listened ORDER BY listenedAt DESC LIMIT 20")
     fun getRecentlyListened(): Flow<List<RecentlyListenedEntity>>
 
+    @Query("SELECT * FROM recently_listened")
+    suspend fun getAllOnce(): List<RecentlyListenedEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: RecentlyListenedEntity)
 

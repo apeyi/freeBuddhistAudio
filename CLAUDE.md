@@ -1,6 +1,6 @@
 # FBAudio Project
 
-A mobile app for the [Free Buddhist Audio](https://www.freebuddhistaudio.com/) archive — Android (Kotlin/Jetpack Compose) and iOS (SwiftUI). Provides streaming and offline playback of dharma talks, with hardcoded data for Sangharakshita talks and the Mitra Study curriculum so they work offline.
+A mobile app for the [Free Buddhist Audio](https://www.freebuddhistaudio.com/) archive — Android (Kotlin/Jetpack Compose) and iOS (SwiftUI). Provides streaming and offline playback of dharma talks, with hardcoded data for Sangharakshita talks so they work offline (the Mitra Study JSON is still bundled but no longer surfaced).
 
 ## Repo Structure (Monorepo)
 
@@ -93,8 +93,13 @@ APK is attached as a release asset.
 
 ## Key Architecture Notes
 
-- **Brand color**: hardcoded `#A85D21` on both platforms. Android: no dynamic/Material You colors. iOS: `Color.saffronOrange` used via `.tint()`.
-- **Home navigation**: Sangharakshita, Mitra Study, etc. are navigated to directly from home — Browse is not a standalone destination.
+- **Brand color**: hardcoded `#A85D21` on both platforms, used for controls/accents only — body text is black (spec v1.0). Android: no dynamic/Material You colors. iOS: `Color.saffronOrange` used via `.tint()`.
+- **Tabs**: Home · Search · Downloads · Join · My FBA. Recently listened lives on My FBA. Home is the spec v1.0 layout (Sangharakshita, Digital Legacy, Collections, Introductions/Meditations/Latest/Themes/Series/People/Places rows, Support, Connect). See `docs/spec-v1.0-pre-api.md`.
+- **Website content layer**: `ContentRepository` (Android `data/repository`, iOS `Data/`) serves the curated menu (`SiteMenuParser` on `document.__FBA__.sidebar_menu`), API collections (`/api/v1/collections/{type}?page=&limit=24`), named `/collection/<slug>` pages (`?pageNo=`), series pages and the Digital Legacy page, cached on disk for 24 h (`ContentCache`). Lists are addressed by `ContentSource` (api | named | browse | series), which is string-encoded into routes.
+- **Language filter** (`LanguageFilter`, pure, unit-tested): "English only" setting hides entries/talks using FBA's own markers (menu label suffixes, Languages section, Places country labels). The search API's `lang_code` is unreliable and not used.
+- **Remastered audio**: `Track.remasterAudioUrl` / `remasterDurationSeconds`; the player has a Remastered | Original toggle (per-talk choice in `AppSettings`), downloads record `audioVersion`. Talks cached before this existed are refetched once (`TalkRepository.TALK_CACHE_EPOCH` / iOS `isCurrentSchema`).
+- **Login**: Triratna SAML SSO via the website's login page in a WebView (`LoginScreen`), capturing `PHPSESSID`, `SimpleSAMLAuthToken`, `fba` cookies (`SessionCookieStore` → OkHttp CookieJar; iOS `HTTPCookieStorage`). `AuthRepository` verifies with `/api/v1/my-details` and reads `document.__FBA__.user`. `HistoryRepository` syncs `/api/v1/history` and `/api/v1/checkpoints/` (resume position). Feature switches live in `FeatureFlags` (both platforms).
+- **Downloads**: transcript-only downloads are rows with `filePath == ""` (Android) / `transcriptOnly` (iOS); the Downloads screen filters All | Talks | Transcripts and shows what's stored.
 - **Title fixup**: `fixTitle()` moves "The/A/An" from end to front of Sangharakshita talk titles.
 - **Download filenames** are sanitized (alphanumeric + `_-` only) to prevent path traversal.
 - **HTTP logging** disabled in release builds (Android).

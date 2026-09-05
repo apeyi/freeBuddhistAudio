@@ -1,63 +1,95 @@
 import SwiftUI
 
+let donateURL = URL(string: "https://www.freebuddhistaudio.com/donate/")!
+
 struct ContentView: View {
     @EnvironmentObject var player: AudioPlayer
+    @ObservedObject private var membership = MembershipRepository.shared
     @State private var selectedTab = 0
     @State private var showPlayer = false
+    @State private var showLogin = false
     @State private var navigationPath = NavigationPath()
+
+    /// Downloads are member-only when gating is on; non-members land on Join.
+    private var canDownload: Bool { !FeatureFlags.membershipGating || membership.isMember }
 
     var body: some View {
         TabView(selection: tabSelection) {
             NavigationStack(path: $navigationPath) {
                 HomeScreen(
-                    onTalkClick: { navigateToDetail($0) },
                     onSangharakshitaByYearClick: { navigateToBrowse(.sangharakshitaByYear) },
-                    onSangharakshitaSeriesClick: { navigateToBrowse(.sangharakshitaSeries) },
-                    onDonateClick: { openDonateUrl() }
+                    onSangharakshitaSeriesClick: {
+                        navigate(.list(.apiCollection("series_sangharakshita", title: "Series by Sangharakshita"), "Series by Sangharakshita"))
+                    },
+                    onDigitalLegacyClick: { navigate(.digitalLegacy) },
+                    onCollectionsClick: { navigate(.collections) },
+                    onSourceClick: { source, title in navigate(.list(source, title)) },
+                    onMenuClick: { path, title in navigate(.menu(path, title)) },
+                    onDonateClick: openDonate,
+                    onLoginClick: { showLogin = true },
+                    onOpenUrl: { url in if let u = URL(string: url) { UIApplication.shared.open(u) } }
                 )
-                .navigationTitle("Free Buddhist Audio")
                 .navigationDestination(for: Route.self) { route in
                     routeView(route)
                 }
             }
             .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
-            .tabItem {
-                Label("Home", systemImage: "house")
-            }
+            .tabItem { Label("Home", systemImage: "house") }
             .tag(0)
 
             NavigationStack {
                 SearchScreen(
                     onTalkClick: { catNum in
                         // navigationPath is plain state — appending works even while
-                        // tab 0 is offscreen, no delay needed (the old asyncAfter was
-                        // uncancellable and raced with further taps).
+                        // tab 0 is offscreen, no delay needed.
                         selectedTab = 0
                         navigateToDetail(catNum)
                     },
                     onSeriesClick: { seriesUrl in
                         selectedTab = 0
-                        navigateToBrowse(.series(seriesUrl))
+                        navigate(Route.seriesFromHref(seriesUrl))
                     }
                 )
             }
             .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
-            .tabItem {
-                Label("Search", systemImage: "magnifyingglass")
-            }
+            .tabItem { Label("Search", systemImage: "magnifyingglass") }
             .tag(1)
 
             NavigationStack {
-                DownloadsScreen(onTalkClick: { catNum in
-                    selectedTab = 0
-                    navigateToDetail(catNum)
-                })
+                if canDownload {
+                    DownloadsScreen(onTalkClick: { catNum in
+                        selectedTab = 0
+                        navigateToDetail(catNum)
+                    })
+                } else {
+                    // Downloads are a membership benefit: the tab explains how to join.
+                    JoinScreen(onDonateClick: openDonate)
+                }
             }
             .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
-            .tabItem {
-                Label("Downloads", systemImage: "arrow.down.circle")
-            }
+            .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
             .tag(2)
+
+            NavigationStack {
+                JoinScreen(onDonateClick: openDonate)
+            }
+            .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
+            .tabItem { Label("Join", systemImage: "heart") }
+            .tag(3)
+
+            NavigationStack {
+                MyFbaScreen(
+                    onTalkClick: { catNum in
+                        selectedTab = 0
+                        navigateToDetail(catNum)
+                    },
+                    onDonateClick: openDonate,
+                    onLoginClick: { showLogin = true }
+                )
+            }
+            .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
+            .tabItem { Label("My FBA", systemImage: "person.crop.circle") }
+            .tag(4)
         }
         .fullScreenCover(isPresented: $showPlayer) {
             PlayerScreen(
@@ -65,7 +97,7 @@ struct ContentView: View {
                 onNavigateToDetail: { catNum in
                     showPlayer = false
                     // The push goes onto the Home tab's stack — switch to it, or the
-                    // navigation lands invisibly behind the Search/Downloads tab.
+                    // navigation lands invisibly behind another tab.
                     selectedTab = 0
                     navigateToDetail(catNum)
                 },
@@ -75,6 +107,9 @@ struct ContentView: View {
                     navigateToBrowse(.speaker(speaker))
                 }
             )
+        }
+        .sheet(isPresented: $showLogin) {
+            LoginScreen(onDone: { showLogin = false })
         }
         .onOpenURL { url in
             handleDeepLink(url)
@@ -106,6 +141,20 @@ struct ContentView: View {
         case detail(String)
         case browse(BrowseModeRoute)
         case transcript(String, String)
+        /// A list of talks/series from any source
+        case list(ContentSource, String)
+        /// A section of the website's curated menu ("themes", "people", "places", …)
+        case menu([String], String)
+        case collections
+        case digitalLegacy
+
+        /// Series links from talk pages / search are hrefs; resolve them to the series list.
+        static func seriesFromHref(_ href: String) -> Route {
+            let path = href.hasPrefix("https://www.freebuddhistaudio.com")
+                ? String(href.dropFirst("https://www.freebuddhistaudio.com".count)) : href
+            if path.hasPrefix("/series/details") { return .list(.series(path), "") }
+            return .browse(.series(href))
+        }
     }
 
     enum BrowseModeRoute: Hashable {
@@ -124,12 +173,40 @@ struct ContentView: View {
         }
     }
 
+    private func navigate(_ route: Route) {
+        navigationPath.append(route)
+    }
+
     private func navigateToDetail(_ catNum: String) {
         navigationPath.append(Route.detail(catNum))
     }
 
     private func navigateToBrowse(_ mode: BrowseModeRoute) {
         navigationPath.append(Route.browse(mode))
+    }
+
+    /// Talks → detail; series → series list; speaker/place/year tiles → their listing.
+    private func openItem(_ item: SearchResult) {
+        if item.isSeries {
+            navigate(Route.seriesFromHref(item.path))
+        } else if item.isBrowseLink {
+            let path = item.path.hasPrefix("https://www.freebuddhistaudio.com")
+                ? String(item.path.dropFirst("https://www.freebuddhistaudio.com".count)) : item.path
+            navigate(.list(.browse(path), item.title))
+        } else {
+            navigateToDetail(item.catNum)
+        }
+    }
+
+    /// Menu entries → the right screen for their link type.
+    private func openMenuNode(_ node: MenuNode, parentPath: [String]) {
+        if node.hasChildren {
+            navigate(.menu(parentPath + [node.label], node.label))
+        } else if node.isExternal {
+            if let url = URL(string: node.link) { UIApplication.shared.open(url) }
+        } else if let source = node.toSource() {
+            navigate(.list(source, node.label))
+        }
     }
 
     // MARK: - Deep links
@@ -142,8 +219,7 @@ struct ContentView: View {
             guard let id else { return }
             switch url.host {
             case "talk": navigateToDetail(id)
-            case "series":
-                navigateToBrowse(.series("https://www.freebuddhistaudio.com/series/details?num=\(id)"))
+            case "series": navigate(.list(.seriesByCatNum(id), ""))
             case "speaker": navigateToBrowse(.speaker(id))
             default: break
             }
@@ -159,9 +235,7 @@ struct ContentView: View {
         case url.path.hasPrefix("/audio/details"):
             if let num { navigateToDetail(num) }
         case url.path.hasPrefix("/series/details"):
-            if let num {
-                navigateToBrowse(.series("https://www.freebuddhistaudio.com/series/details?num=\(num)"))
-            }
+            if let num { navigate(.list(.seriesByCatNum(num), "")) }
         case url.path.hasPrefix("/browse"):
             if let speaker { navigateToBrowse(.speaker(speaker)) }
         default:
@@ -177,40 +251,59 @@ struct ContentView: View {
                 catNum: catNum,
                 onPlay: { catNum in
                     Task {
-                        if let talk = await TalkRepository.shared.getTalkDetail(catNum) {
+                        if let talk = await TalkRepository.shared.getTalkDetailForPlayback(catNum) {
                             player.playTalk(talk)
                         }
                     }
                 },
                 onSpeakerClick: { navigateToBrowse(.speaker($0)) },
-                onSeriesClick: { navigateToBrowse(.series($0)) },
+                onSeriesClick: { navigate(Route.seriesFromHref($0)) },
                 onTranscriptClick: { url, catNum in
                     navigationPath.append(Route.transcript(url, catNum))
-                }
+                },
+                onDonateClick: openDonate,
+                onJoinClick: { selectedTab = 3 },
+                canDownload: canDownload
             )
         case .browse(let mode):
             BrowseScreen(
                 initialMode: mode.toBrowseMode,
                 onTalkClick: { navigateToDetail($0) },
-                onSeriesSelect: { navigateToBrowse(.series($0)) }
+                onSeriesSelect: { navigate(Route.seriesFromHref($0)) }
             )
         case .transcript(let url, let catNum):
             TranscriptScreen(transcriptUrl: url, catNum: catNum)
+        case .list(let source, let title):
+            ListScreen(source: source, initialTitle: title, onItemClick: openItem, onDonateClick: openDonate)
+        case .menu(let path, let title):
+            MenuListScreen(path: path, title: title, onNodeClick: { openMenuNode($0, parentPath: path) })
+        case .collections:
+            CollectionsScreen(onCollectionClick: { openMenuNode($0, parentPath: ["collections"]) })
+        case .digitalLegacy:
+            DigitalLegacyScreen(
+                onPlaySample: { catNum in
+                    Task {
+                        if let talk = await TalkRepository.shared.getTalkDetailForPlayback(catNum) {
+                            player.playTalk(talk)
+                            showPlayer = true
+                        }
+                    }
+                },
+                onSeriesClick: { path in navigate(.list(.series(path), "")) },
+                onDonateClick: openDonate
+            )
         }
     }
 
-    private func openDonateUrl() {
-        if let url = URL(string: "https://www.freebuddhistaudio.com/donate/") {
-            UIApplication.shared.open(url)
-        }
+    private func openDonate() {
+        UIApplication.shared.open(donateURL)
     }
 }
 
 private extension View {
     /// Places the mini player in a reserved strip at the bottom of a tab's
     /// content — above the tab bar, not floating over it — so SwiftUI insets the
-    /// tab's scroll views by the player's real height. Content (e.g. talk
-    /// chapters) is never hidden behind it, with no hardcoded height guess.
+    /// tab's scroll views by the player's real height.
     func miniPlayerInset(player: AudioPlayer, isHidden: Bool, onExpand: @escaping () -> Void) -> some View {
         safeAreaInset(edge: .bottom, spacing: 0) {
             if !isHidden {

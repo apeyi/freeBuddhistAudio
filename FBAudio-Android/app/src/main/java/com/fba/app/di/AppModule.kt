@@ -8,6 +8,13 @@ import com.fba.app.data.local.RecentlyListenedDao
 import com.fba.app.data.remote.FBAScraper
 import com.fba.app.data.repository.TalkRepository
 import com.fba.app.data.repository.DownloadRepository
+import com.fba.app.data.repository.ContentRepository
+import com.fba.app.data.local.AppSettings
+import com.fba.app.data.local.ContentCache
+import com.fba.app.data.auth.AuthRepository
+import com.fba.app.data.auth.MembershipRepository
+import com.fba.app.data.auth.SessionCookieStore
+import com.fba.app.data.repository.HistoryRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,10 +45,17 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideSessionCookieStore(@ApplicationContext context: Context): SessionCookieStore =
+        SessionCookieStore(context)
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(sessionCookieStore: SessionCookieStore): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            // Attaches the FBA login session (when logged in) to website requests.
+            .cookieJar(sessionCookieStore)
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36")
@@ -92,6 +106,42 @@ object AppModule {
     ): TalkRepository {
         return TalkRepository(scraper, talkDao)
     }
+
+    @Provides
+    @Singleton
+    fun provideAppSettings(@ApplicationContext context: Context): AppSettings = AppSettings(context)
+
+    @Provides
+    @Singleton
+    fun provideContentCache(@ApplicationContext context: Context): ContentCache = ContentCache(context)
+
+    @Provides
+    @Singleton
+    fun provideContentRepository(
+        scraper: FBAScraper,
+        cache: ContentCache,
+        settings: AppSettings,
+    ): ContentRepository = ContentRepository(scraper, cache, settings)
+
+    @Provides
+    @Singleton
+    fun provideAuthRepository(
+        store: SessionCookieStore,
+        scraper: FBAScraper,
+        client: OkHttpClient,
+    ): AuthRepository = AuthRepository(store, scraper, client)
+
+    @Provides
+    @Singleton
+    fun provideMembershipRepository(): MembershipRepository = MembershipRepository()
+
+    @Provides
+    @Singleton
+    fun provideHistoryRepository(
+        client: OkHttpClient,
+        auth: AuthRepository,
+        recentlyListenedDao: RecentlyListenedDao,
+    ): HistoryRepository = HistoryRepository(client, auth, recentlyListenedDao)
 
     @Provides
     @Singleton

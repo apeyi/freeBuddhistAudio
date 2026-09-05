@@ -43,4 +43,15 @@ final class PlaybackMathTests: XCTestCase {
     func testTotalIsZeroOnlyWhenNothingKnown() {
         XCTAssertEqual(PlaybackMath.totalDurationSeconds(talkDurationSeconds: 0, tracks: [], playerDurationMs: 0), 0)
     }
+
+    // MARK: clampPosition
+
+    func testClampPositionKeepsTimeWithinNewVersion() {
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 120_000, newDurationMs: 760_000), 120_000)
+        // Remastered track is 9 s shorter than where we were → land just before its end
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 768_000, newDurationMs: 760_000), 759_000)
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 50_000, newDurationMs: nil), 50_000)
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 50_000, newDurationMs: 0), 50_000)
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: -5, newDurationMs: 10_000), 0)
+    }
 }

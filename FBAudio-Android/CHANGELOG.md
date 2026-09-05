@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — spec v1.0 (pre-API)
+
+<details>
+<summary>Changes</summary>
+
+**New**
+- Five tabs: Home · Search · Downloads · Join · My FBA. Recently listened moved to My FBA (with Donate and Settings)
+- Home redesigned per the v1.0 spec: header with Log in, Sangharakshita (Year / Series with images), Digital Legacy card and page, Collections grid, Introductions / Meditations / Latest / Themes / Series / People / Places, Support FBA, Connect links
+- Collections, Themes, People and Places come from FBA's curated website menu; tiles use FBA cover images or stable generated artwork
+- Remastered audio: Remastered | Original toggle in the player (remembered per talk), badges on talks and series, downloads record the version
+- Series pages show image, blurb and a Donate button; Donate button on every talk page
+- Search: All | Audio, with Series and Talks grouped; speaker mode removed (People replaces it)
+- Downloads: All | Talks | Transcripts filter, "Audio · Transcript · Remastered" labels, save a transcript on its own
+- Settings: English only (default on, using FBA's language markers), Prefer remastered audio
+- Log in with the FBA / Triratna account (website login inside the app); listening history and resume position sync with the website
+- Join page (subscriptions open at launch); download gating behind a feature flag
+
+**Changed**
+- Light-mode text is black instead of brown
+
+</details>
+
 ## v0.6.0
 
 <details>

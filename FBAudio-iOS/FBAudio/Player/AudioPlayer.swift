@@ -19,6 +19,10 @@ class AudioPlayer: ObservableObject {
     @Published var playbackError: String?
     @Published var isReconnecting = false
     @Published var isBuffering = false
+    /// Remastered version selected (only meaningful when the talk has one).
+    @Published var useRemaster = false
+    /// Playing from a download, so the version can't be switched.
+    @Published var versionLocked = false
 
     private var player: AVPlayer?
     private var timeObserver: Any?
@@ -29,6 +33,7 @@ class AudioPlayer: ObservableObject {
     private let persistence = PersistenceManager.shared
     private let downloadManager = DownloadManager.shared
     private var lastSaveTime: Date = .distantPast
+    private var lastCheckpointTime: Date = .distantPast
     private var autoRetryCount = 0
     // Pending delayed auto-retry — must be cancellable, or a stale retry fires
     // into a different (healthy) playback started in the meantime.
@@ -104,8 +109,16 @@ class AudioPlayer: ObservableObject {
     // MARK: - Playback
 
     func playTalk(_ talk: Talk, fromTrackIndex: Int? = nil) {
-        let savedTrackIndex = fromTrackIndex ?? persistence.getLastTrackIndex(talk.catNum)
-        let savedPos = persistence.getLastPosition(talk.catNum)
+        // Resume point: local first; otherwise the position saved on the FBA
+        // account (website or another device), when logged in.
+        var localTrackIndex = persistence.getLastTrackIndex(talk.catNum)
+        var savedPos = persistence.getLastPosition(talk.catNum)
+        if savedPos <= 0, let cp = talk.checkpoint,
+           let cpIndex = talk.tracks.firstIndex(where: { $0.trackId == cp.trackId }) {
+            localTrackIndex = cpIndex
+            savedPos = Int64(cp.timeSeconds) * 1000
+        }
+        let savedTrackIndex = fromTrackIndex ?? localTrackIndex
         let trackIndex = savedTrackIndex < talk.tracks.count ? savedTrackIndex : 0
 
         currentTalk = talk
@@ -113,6 +126,10 @@ class AudioPlayer: ObservableObject {
         isVisible = true
         playbackError = nil
         autoRetryCount = 0
+        useRemaster = talk.hasRemaster && AppSettings.shared.useRemaster(talk.catNum)
+        versionLocked = downloadManager.trackFileUrl(catNum: talk.catNum, trackIndex: 0) != nil
+        // Mirror the website's history so web and app listening stay in step.
+        Task { await HistoryRepository.shared.recordStreamStart(talk.catNum) }
 
         // Set duration from metadata immediately (player will update when ready)
         let metaDuration = talk.tracks[safe: trackIndex]?.durationSeconds ?? talk.durationSeconds
@@ -181,9 +198,44 @@ class AudioPlayer: ObservableObject {
         if let localUrl = downloadManager.trackFileUrl(catNum: talk.catNum, trackIndex: trackIndex) {
             return localUrl
         }
-        // Stream
-        let urlString = talk.tracks.isEmpty ? talk.audioUrl : (talk.tracks[safe: trackIndex]?.audioUrl ?? talk.audioUrl)
+        // Stream — remastered version when chosen and available
+        let track = talk.tracks[safe: trackIndex]
+        let urlString: String
+        if let track {
+            urlString = (useRemaster && track.hasRemaster) ? track.remasterAudioUrl : track.audioUrl
+        } else {
+            urlString = talk.audioUrl
+        }
         return URL(string: urlString)
+    }
+
+    /// Switch between the remastered and original recording of the current talk,
+    /// keeping the current chapter and position (clamped — the versions differ by
+    /// a few seconds). Remembered per talk.
+    func setUseRemaster(_ value: Bool) {
+        guard let talk = currentTalk, talk.hasRemaster, !versionLocked, value != useRemaster else { return }
+        AppSettings.shared.setRemasterChoice(talk.catNum, useRemaster: value)
+        useRemaster = value
+        let wasPlaying = isPlaying
+        let track = talk.tracks[safe: currentTrackIndex]
+        let newDurationMs: Int64? = {
+            guard let track else { return nil }
+            let secs = value ? track.remasterDurationSeconds : track.durationSeconds
+            return secs > 0 ? Int64(secs) * 1000 : nil
+        }()
+        let resumeMs = PlaybackMath.clampPosition(positionMs: Int64(currentPosition * 1000), newDurationMs: newDurationMs)
+        guard let url = audioUrl(for: talk, trackIndex: currentTrackIndex) else { return }
+        setupPlayer(url: url)
+        currentPosition = Double(resumeMs) / 1000
+        if resumeMs > 0 {
+            player?.seek(to: CMTime(seconds: currentPosition, preferredTimescale: 600))
+        }
+        if wasPlaying {
+            activateSession()
+            player?.play()
+            player?.rate = playbackSpeed
+        }
+        updateNowPlayingInfo()
     }
 
     private func setupPlayer(url: URL) {
@@ -438,6 +490,15 @@ class AudioPlayer: ObservableObject {
             trackIndex: currentTrackIndex, duration: durMs
         )
 
+        // Save the position on the FBA account too (what the website does while
+        // playing), at most every 10 s.
+        if AuthRepository.shared.isLoggedIn, Date().timeIntervalSince(lastCheckpointTime) > 10 {
+            lastCheckpointTime = Date()
+            let trackId = talk.tracks[safe: currentTrackIndex]?.trackId ?? ""
+            let seconds = Int(posMs / 1000)
+            Task { await HistoryRepository.shared.postCheckpoint(catNum: talk.catNum, trackId: trackId, positionSeconds: seconds) }
+        }
+
         // Update recently listened
         let tracks = talk.tracks
         let cumulativePos = PlaybackMath.cumulativePositionMs(
@@ -476,6 +537,8 @@ class AudioPlayer: ObservableObject {
             duration = trackDuration
             currentTrackIndex = lastTrackIndex
             isPlaying = false
+            useRemaster = talk.hasRemaster && AppSettings.shared.useRemaster(talk.catNum)
+            versionLocked = downloadManager.trackFileUrl(catNum: talk.catNum, trackIndex: 0) != nil
         }
     }
 

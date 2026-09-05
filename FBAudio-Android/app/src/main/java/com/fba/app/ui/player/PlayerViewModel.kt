@@ -13,7 +13,10 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.fba.app.data.auth.AuthRepository
+import com.fba.app.data.local.AppSettings
 import com.fba.app.data.local.DownloadEntity
+import com.fba.app.data.repository.HistoryRepository
 import com.fba.app.data.local.DownloadStatus
 import com.fba.app.data.local.RecentlyListenedDao
 import com.fba.app.data.local.RecentlyListenedEntity
@@ -49,6 +52,10 @@ data class PlayerUiState(
     val playbackError: String? = null,
     val isReconnecting: Boolean = false,
     val isBuffering: Boolean = false,
+    /** Remastered version selected (only meaningful when the talk has one). */
+    val useRemaster: Boolean = false,
+    /** Playing from a download, so the version can't be switched. */
+    val versionLocked: Boolean = false,
 )
 
 @HiltViewModel
@@ -58,6 +65,9 @@ class PlayerViewModel @Inject constructor(
     private val downloadRepository: DownloadRepository,
     private val recentlyListenedDao: RecentlyListenedDao,
     private val appScope: kotlinx.coroutines.CoroutineScope,
+    private val settings: AppSettings,
+    private val auth: AuthRepository,
+    private val history: HistoryRepository,
 ) : ViewModel() {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("player_prefs", Context.MODE_PRIVATE)
@@ -74,6 +84,7 @@ class PlayerViewModel @Inject constructor(
     private var downloadObservationJob: Job? = null
     private var positionUpdateJob: Job? = null
     private var lastSaveTime: Long = 0
+    private var lastCheckpointTime: Long = 0
     private var pendingRestore: RestoreState? = null
     // Set as soon as the user explicitly starts playback; gates the passive
     // last-session restore so it can never clobber a user-initiated talk.
@@ -222,7 +233,8 @@ class PlayerViewModel @Inject constructor(
             // Bail if the user started their own playback while we were fetching.
             if (userInitiatedPlayback || controller.mediaItemCount > 0) return@launch
 
-            val items = buildMediaItems(talk, download)
+            val useRemaster = talk.hasRemaster && settings.useRemaster(talk.catNum)
+            val items = buildMediaItems(talk, download, useRemaster)
             if (items.isEmpty()) return@launch
             val startIndex = restore.trackIndex.coerceIn(0, items.size - 1)
             val startPos = (restore.position - 10_000).coerceAtLeast(0)
@@ -238,6 +250,8 @@ class PlayerViewModel @Inject constructor(
                 isVisible = true,
                 currentTrackIndex = startIndex,
                 downloadStatus = download?.status,
+                useRemaster = useRemaster,
+                versionLocked = hasOfflineAudio(talk.catNum, download),
             )
             observeDownloadStatus(restore.catNum)
         }
@@ -263,8 +277,13 @@ class PlayerViewModel @Inject constructor(
         return if (streamUrl.isNotBlank()) Uri.parse(streamUrl) else null
     }
 
+    /** Is any audio for this talk stored offline? (Then the stored version is what plays.) */
+    private fun hasOfflineAudio(catNum: String, download: DownloadEntity?): Boolean =
+        File(DownloadWorker.trackFilePath(context, catNum, 0)).exists() ||
+            (download?.status == DownloadStatus.COMPLETE && download.filePath.isNotBlank() && File(download.filePath).exists())
+
     /** Build the full playlist for a talk — one MediaItem per chapter (or one for single-track talks). */
-    private fun buildMediaItems(talk: Talk, download: DownloadEntity?): List<MediaItem> {
+    private fun buildMediaItems(talk: Talk, download: DownloadEntity?, useRemaster: Boolean = false): List<MediaItem> {
         fun item(uri: Uri, chapterTitle: String): MediaItem = MediaItem.Builder()
             .setUri(uri)
             .setMediaMetadata(
@@ -282,7 +301,36 @@ class PlayerViewModel @Inject constructor(
             return listOf(item(uri, ""))
         }
         return talk.tracks.mapIndexedNotNull { index, track ->
-            resolveTrackUri(talk.catNum, index, track.audioUrl, download)?.let { item(it, track.title) }
+            val streamUrl = if (useRemaster && track.hasRemaster) track.remasterAudioUrl else track.audioUrl
+            resolveTrackUri(talk.catNum, index, streamUrl, download)?.let { item(it, track.title) }
+        }
+    }
+
+    /**
+     * Switch between the remastered and original recording of the current talk,
+     * keeping the current chapter and position (clamped — the versions differ by
+     * a few seconds). Remembered per talk.
+     */
+    fun setUseRemaster(useRemaster: Boolean) {
+        val state = _uiState.value
+        val talk = state.currentTalk ?: return
+        if (!talk.hasRemaster || state.versionLocked || useRemaster == state.useRemaster) return
+        settings.setRemasterChoice(talk.catNum, useRemaster)
+        val controller = mediaController ?: return
+        viewModelScope.launch {
+            val download = downloadRepository.getDownload(talk.catNum)
+            val items = buildMediaItems(talk, download, useRemaster)
+            if (items.isEmpty()) return@launch
+            val index = state.currentTrackIndex.coerceIn(0, items.size - 1)
+            val track = talk.tracks.getOrNull(index)
+            val newDurationMs = (if (useRemaster) track?.remasterDurationSeconds else track?.durationSeconds)
+                ?.takeIf { it > 0 }?.let { it * 1000L }
+            val wasPlaying = controller.playWhenReady
+            val position = PlaybackMath.clampPosition(controller.currentPosition, newDurationMs)
+            controller.setMediaItems(items, index, position)
+            controller.prepare()
+            if (wasPlaying) controller.play()
+            _uiState.value = _uiState.value.copy(useRemaster = useRemaster)
         }
     }
 
@@ -301,6 +349,15 @@ class PlayerViewModel @Inject constructor(
             .putInt("last_track_index_$catNum", state.currentTrackIndex)
             .putLong("last_duration_$catNum", dur)
             .commit() // sync write — survives process death
+
+        // Save the position on the FBA account too (what the website does while
+        // playing), at most every 10 s.
+        val now = System.currentTimeMillis()
+        if (auth.isLoggedIn && now - lastCheckpointTime > 10_000) {
+            lastCheckpointTime = now
+            val trackId = talk.tracks.getOrNull(state.currentTrackIndex)?.trackId ?: ""
+            appScope.launch { history.postCheckpoint(catNum, trackId, (pos / 1000).toInt()) }
+        }
 
         // Update recently listened — compute cumulative position across all chapters.
         // App scope, not viewModelScope: this is also called from onCleared, where
@@ -397,7 +454,11 @@ class PlayerViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(playbackError = null, isReconnecting = false)
         viewModelScope.launch {
             val controller = controllerReady.await()
-            val talk = talkRepository.getTalkDetail(catNum)
+            // Logged in: fetch fresh so the page carries the account's saved position.
+            val talk = if (auth.isLoggedIn) {
+                try { talkRepository.fetchTalkDetail(catNum, forceRefresh = true) } catch (_: Exception) { null }
+                    ?: talkRepository.getTalkDetail(catNum)
+            } else talkRepository.getTalkDetail(catNum)
             val download = downloadRepository.getDownload(catNum)
 
             // Build a Talk for the UI/queue even if network fetch failed (offline, downloaded)
@@ -411,11 +472,22 @@ class PlayerViewModel @Inject constructor(
                 description = "",
             )
 
-            val items = buildMediaItems(effectiveTalk, download)
+            val useRemaster = effectiveTalk.hasRemaster && settings.useRemaster(catNum)
+            val items = buildMediaItems(effectiveTalk, download, useRemaster)
             if (items.isEmpty()) return@launch
 
-            val savedTrackIndex = prefs.getInt("last_track_index_$catNum", 0)
-            val savedPos = prefs.getLong("last_position_$catNum", 0)
+            // Resume point: local first; otherwise the position saved on the FBA
+            // account (website or another device), when logged in.
+            var savedTrackIndex = prefs.getInt("last_track_index_$catNum", 0)
+            var savedPos = prefs.getLong("last_position_$catNum", 0)
+            val checkpoint = effectiveTalk.checkpoint
+            if (savedPos <= 0 && checkpoint != null) {
+                val cpIndex = effectiveTalk.tracks.indexOfFirst { it.trackId == checkpoint.trackId }
+                if (cpIndex >= 0) {
+                    savedTrackIndex = cpIndex
+                    savedPos = checkpoint.timeSeconds * 1000L
+                }
+            }
             val startIndex = (trackIndex ?: savedTrackIndex).coerceIn(0, items.size - 1)
             // Resume position only applies to the track it was saved against.
             // INTENTIONAL: resume 10s BEFORE the saved position — after time away
@@ -438,23 +510,29 @@ class PlayerViewModel @Inject constructor(
                 currentTrackIndex = startIndex,
                 currentPosition = 0,
                 duration = 0,
+                useRemaster = useRemaster,
+                versionLocked = hasOfflineAudio(catNum, download),
             )
 
             observeDownloadStatus(catNum)
+            // Mirror the website's history so web and app listening stay in step.
+            appScope.launch { history.recordStreamStart(catNum) }
         }
     }
 
     fun downloadCurrentTalk() {
         val talk = _uiState.value.currentTalk ?: return
         viewModelScope.launch {
+            val useRemaster = talk.hasRemaster && settings.useRemaster(talk.catNum)
             downloadRepository.startDownload(
                 catNum = talk.catNum,
                 title = talk.title,
                 speaker = talk.speaker,
                 imageUrl = talk.imageUrl,
                 audioUrl = talk.audioUrl,
-                trackUrls = talk.tracks.map { it.audioUrl },
+                trackUrls = talk.tracks.map { if (useRemaster && it.hasRemaster) it.remasterAudioUrl else it.audioUrl },
                 transcriptUrl = talk.transcriptUrl,
+                audioVersion = if (useRemaster) "remastered" else "original",
             )
             observeDownloadStatus(talk.catNum)
         }

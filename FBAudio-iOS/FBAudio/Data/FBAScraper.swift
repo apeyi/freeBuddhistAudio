@@ -155,11 +155,19 @@ actor FBAScraper {
             seriesHref = ""
         }
 
+        // Saved position from the FBA account — only present on logged-in page loads.
+        var checkpoint: Checkpoint?
+        if let cp = json["checkpoint"] as? [String: Any], let trackId = str(cp, "track_id"),
+           let seconds = int(cp, "time_seconds") {
+            checkpoint = Checkpoint(trackId: trackId, timeSeconds: seconds)
+        }
+
         return Talk(
             catNum: catNum, title: title, speaker: speaker, year: year,
             genre: genre, durationSeconds: duration, imageUrl: resolveUrl(imageUrl),
             audioUrl: resolveUrl(audioUrl), description: description, tracks: tracks,
-            transcriptUrl: transcriptUrl, series: seriesTitle, seriesHref: seriesHref
+            transcriptUrl: transcriptUrl, series: seriesTitle, seriesHref: seriesHref,
+            omOnly: (int(json, "om") ?? 0) != 0, checkpoint: checkpoint
         )
     }
 
@@ -168,10 +176,14 @@ actor FBAScraper {
         return tracksArr.compactMap { t in
             guard let audio = t["audio"] as? [String: Any],
                   let mp3 = audio["mp3"] as? String else { return nil }
+            let remaster = (t["remasterAudio"] as? [String: Any])?["mp3"] as? String ?? ""
             return Track(
                 title: unescape(str(t, "title") ?? ""),
                 durationSeconds: max(int(t, "durationSeconds") ?? 0, 0),
-                audioUrl: resolveUrl(mp3)
+                audioUrl: resolveUrl(mp3),
+                trackId: str(t, "trackId") ?? "",
+                remasterAudioUrl: resolveUrl(remaster),
+                remasterDurationSeconds: max(int(t, "remasterDurationSeconds") ?? 0, 0)
             )
         }
     }
@@ -377,6 +389,193 @@ actor FBAScraper {
         let url = resolveUrl(transcriptUrl)
         let html = try await fetchHtml(url)
         return TranscriptParser.parseTranscriptHtml(html)
+    }
+
+    // MARK: - Website content: menu, collections, series, Digital Legacy
+
+    private func fetchJson(_ urlString: String) async throws -> [String: Any] {
+        guard let url = URL(string: urlString) else { throw ScraperError.invalidUrl(urlString) }
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw ScraperError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ScraperError.parseError("Not JSON: \(urlString)")
+        }
+        return obj
+    }
+
+    private func bool(_ dict: [String: Any], _ key: String) -> Bool {
+        if let b = dict[key] as? Bool { return b }
+        if let n = dict[key] as? Int { return n != 0 }
+        if let s = dict[key] as? String { return s == "1" || s == "true" }
+        return false
+    }
+
+    /// Talk, series or speaker/place/year item of any listing.
+    private func makeResult(_ obj: [String: Any], catNum: String, path: String) -> SearchResult {
+        SearchResult(
+            catNum: catNum,
+            title: unescape(str(obj, "title") ?? ""),
+            speaker: unescape(str(obj, "speaker") ?? str(obj, "author") ?? ""),
+            imageUrl: resolveUrl(str(obj, "image_url") ?? str(obj, "image") ?? ""),
+            path: resolveUrl(path),
+            year: int(obj, "year") ?? 0,
+            centre: unescape(str(obj, "centre") ?? ""),
+            omOnly: bool(obj, "om_only") || (str(obj, "om") == "1")
+        )
+    }
+
+    /// Items of any collection/browse listing: talks, series, and speaker/place/year links.
+    private func parseListItems(_ items: [[String: Any]]?) -> [SearchResult] {
+        guard let items else { return [] }
+        var out: [SearchResult] = []
+        var seen = Set<String>()
+        for obj in items {
+            guard let path = str(obj, "url") ?? str(obj, "link") else { continue }
+            var catNum = str(obj, "cat_num") ?? str(obj, "catNum") ?? ""
+            if catNum.isEmpty {
+                catNum = ContentSource.queryValue("num", in: path) ?? path
+            }
+            guard !catNum.isEmpty, seen.insert("\(path)|\(catNum)").inserted else { continue }
+            var result = makeResult(obj, catNum: catNum, path: path)
+            if path.contains("/browse") {
+                // Speaker/place/year tiles carry a count in the title: "Abayanandi (1)"
+                let cleaned = result.title.replacing(/\s*\(\d+\)$/, with: "")
+                result = SearchResult(catNum: result.catNum, title: cleaned, speaker: result.speaker,
+                                      imageUrl: result.imageUrl, path: result.path, year: result.year,
+                                      centre: result.centre, omOnly: result.omOnly)
+            }
+            out.append(result)
+        }
+        return out
+    }
+
+    /// HTML blurb → readable plain text with paragraph breaks.
+    func htmlToText(_ html: String) -> String {
+        guard html.contains("<") else { return unescape(html).trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard let doc = try? SwiftSoup.parse(html) else { return html }
+        try? doc.select("p").prepend("\n\n")
+        try? doc.select("br").append("\n")
+        let text = (try? doc.text()) ?? html
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The website's curated side menu (collections, sangharakshita, themes, people, places, languages…).
+    func fetchSiteMenu() async throws -> [MenuNode] {
+        let html = try await fetchHtml("\(Self.baseUrl)/")
+        guard let json = extractFbaJson(html, key: "sidebar_menu") else { return [] }
+        return SiteMenuParser.parse(json: json)
+    }
+
+    /// `document.__FBA__.user` from the homepage — present only when the session is logged in.
+    func fetchLoggedInUser() async throws -> [String: Any]? {
+        let html = try await fetchHtml("\(Self.baseUrl)/")
+        return extractFbaJson(html, key: "user")
+    }
+
+    /// One page of an API collection (latest, introductions, speakers, all_series…).
+    /// `limit` is the only page-size parameter the server honours.
+    func fetchApiCollectionPage(type: String, page: Int, title: String = "") async throws -> ListPage {
+        let encoded = type.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? type
+        let json = try await fetchJson("\(Self.baseUrl)/api/v1/collections/\(encoded)?page=\(page)&limit=\(ListPage.pageSize)")
+        guard let coll = json["collection"] as? [String: Any] else { return ListPage(items: [], totalItems: 0, page: page, title: title) }
+        return ListPage(
+            items: parseListItems(coll["items"] as? [[String: Any]]),
+            totalItems: int(coll, "total_items") ?? 0,
+            page: page,
+            title: title.isEmpty ? unescape(str(coll, "label") ?? type) : title
+        )
+    }
+
+    /// One page of a `/browse?…` listing (a speaker, place, year or genre).
+    func fetchBrowsePage(path: String, page: Int, apiUrl: String = "", apiQuery: String = "") async throws -> ListPage {
+        if page > 1, !apiUrl.isEmpty {
+            let json = try await fetchJson("\(apiUrl)?\(apiQuery)&page=\(page)&limit=\(ListPage.pageSize)")
+            guard let coll = json["collection"] as? [String: Any] else { return ListPage(items: [], totalItems: 0, page: page) }
+            return ListPage(items: parseListItems(coll["items"] as? [[String: Any]]),
+                            totalItems: int(coll, "total_items") ?? 0, page: page,
+                            apiUrl: apiUrl, apiQuery: apiQuery)
+        }
+        let resolved = resolveUrl(path)
+        let html = try await fetchHtml(resolved)
+        guard let coll = extractFbaJson(html, key: "collection") else { return ListPage(items: [], totalItems: 0, page: 1) }
+        let query = resolved.split(separator: "?", maxSplits: 1).dropFirst().first.map(String.init) ?? ""
+        return ListPage(
+            items: parseListItems(coll["items"] as? [[String: Any]]),
+            totalItems: int(coll, "total_items") ?? 0,
+            page: 1,
+            title: browseTitle(query: query, label: unescape(str(coll, "label") ?? "")),
+            apiUrl: (str(coll, "url")).map(resolveUrl) ?? "",
+            apiQuery: query
+        )
+    }
+
+    /// "s=Subhuti&t=audio" → "Subhuti"; falls back to the collection label.
+    private func browseTitle(query: String, label: String) -> String {
+        for key in ["s", "p", "th", "ser", "y"] {
+            if let v = ContentSource.queryValue(key, in: "?" + query) {
+                let decoded = v.replacingOccurrences(of: "+", with: "%2B").removingPercentEncoding ?? v
+                return decoded.replacingOccurrences(of: "_", with: " ")
+            }
+        }
+        return label
+    }
+
+    /// One page of a curated `/collection/<slug>` page. Pages with `pageNo`.
+    func fetchNamedCollectionPage(slug: String, page: Int) async throws -> ListPage {
+        let encoded = slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? slug
+        let html = try await fetchHtml("\(Self.baseUrl)/collection/\(encoded)?pageNo=\(page)")
+        guard let data = extractFbaJson(html, key: "collectionData") else { return ListPage(items: [], totalItems: 0, page: page) }
+        return ListPage(
+            items: parseListItems(data["items"] as? [[String: Any]]),
+            totalItems: int(data, "totalItems") ?? 0,
+            page: int(data, "pageNo") ?? page,
+            title: unescape(str(data, "title") ?? slug),
+            description: (str(data, "description")).map(htmlToText) ?? "",
+            imageUrl: resolveUrl(str(data, "marquee_image") ?? str(data, "image") ?? "")
+        )
+    }
+
+    /// A series page: title, blurb, image, remaster flag and all member talks.
+    func fetchSeriesPage(path: String) async throws -> ListPage {
+        let html = try await fetchHtml(resolveUrl(path))
+        guard let series = extractFbaJson(html, key: "series") else { return ListPage(items: [], totalItems: 0, page: 1) }
+        var items: [SearchResult] = []
+        var seen = Set<String>()
+        for obj in series["members"] as? [[String: Any]] ?? [] {
+            let catNum = str(obj, "cat_num") ?? str(obj, "member_cat_num") ?? ""
+            guard !catNum.isEmpty, seen.insert(catNum).inserted else { continue }
+            let link = str(obj, "link") ?? str(obj, "url") ?? "/audio/details?num=\(catNum)"
+            items.append(makeResult(obj, catNum: catNum, path: link))
+        }
+        return ListPage(
+            items: items,
+            totalItems: items.count,
+            page: 1,
+            title: unescape(str(series, "title") ?? ""),
+            description: (str(series, "blurb")).map(htmlToText) ?? "",
+            imageUrl: resolveUrl(str(series, "marquee_image") ?? str(series, "image") ?? str(series, "speaker_image") ?? ""),
+            hasRemaster: bool(series, "hasRemasteredTalk"),
+            omOnly: (int(series, "om") ?? 0) != 0
+        )
+    }
+
+    /// Copy and sample talk of the Digital Legacy page.
+    func fetchDigitalLegacy() async throws -> DigitalLegacy? {
+        let html = try await fetchHtml("\(Self.baseUrl)/digital-legacy")
+        guard let page = extractFbaJson(html, key: "digitalLegacyPage") else { return nil }
+        let descriptionHtml = str(page, "descriptionHtml") ?? ""
+        let sample = page["sampleTalk"] as? [String: Any]
+        let seriesPath = descriptionHtml.firstMatch(of: /\/series\/details\?num=[A-Za-z0-9]+/).map { String($0.output) } ?? "/series/details?num=X16"
+        return DigitalLegacy(
+            title: unescape(str(page, "title") ?? "The Digital Legacy"),
+            description: htmlToText(descriptionHtml),
+            sampleCatNum: (sample.flatMap { str($0, "catNum") ?? str($0, "cat_num") }) ?? "",
+            seriesPath: seriesPath
+        )
     }
 
     // MARK: - Errors

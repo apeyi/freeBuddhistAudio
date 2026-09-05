@@ -1,46 +1,85 @@
 import SwiftUI
 
-struct HomeScreen: View {
-    // ObservedObject, not StateObject: these are app-wide singletons owned
-    // elsewhere. (An unused player reference here also re-rendered Home twice a
-    // second during playback — only observe what the view actually reads.)
-    @ObservedObject private var downloadManager = DownloadManager.shared
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var recentlyListened: [PersistenceManager.RecentlyListened] = []
+/// External "Connect" links shown as a row of chips on Home.
+private struct ConnectLink: Identifiable {
+    let label: String
+    let url: String
+    let icon: String
+    var id: String { label }
+}
 
-    let onTalkClick: (String) -> Void
+private let connectLinks: [ConnectLink] = [
+    ConnectLink(label: "FBA podcast", url: "https://www.freebuddhistaudio.com/community/podcasts", icon: "antenna.radiowaves.left.and.right"),
+    ConnectLink(label: "Dharmabytes", url: "https://www.freebuddhistaudio.com/community/podcasts", icon: "headphones"),
+    ConnectLink(label: "YouTube", url: "https://youtube.com/freebuddhistaudio1967", icon: "play.rectangle"),
+    ConnectLink(label: "Facebook", url: "https://www.facebook.com/pages/Free-Buddhist-Audio/79854346331", icon: "globe"),
+    ConnectLink(label: "Instagram", url: "https://www.instagram.com/freebuddhistaudio/", icon: "camera"),
+    ConnectLink(label: "SoundCloud", url: "https://soundcloud.com/freebuddhistaudio", icon: "waveform"),
+    ConnectLink(label: "The Buddhist Centre", url: "https://thebuddhistcentre.com/", icon: "network"),
+]
+
+struct HomeScreen: View {
+    @ObservedObject private var auth = AuthRepository.shared
+    @State private var digitalLegacy: DigitalLegacy?
+
     let onSangharakshitaByYearClick: () -> Void
     let onSangharakshitaSeriesClick: () -> Void
+    let onDigitalLegacyClick: () -> Void
+    let onCollectionsClick: () -> Void
+    let onSourceClick: (ContentSource, String) -> Void
+    let onMenuClick: ([String], String) -> Void
     let onDonateClick: () -> Void
+    let onLoginClick: () -> Void
+    let onOpenUrl: (String) -> Void
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 8) {
-                // Sangharakshita section
+            LazyVStack(spacing: 12) {
+                header
                 sangharakshitaSection
-
-                // Donate
-                donateCard
-
-                // Recently Listened
-                if !recentlyListened.isEmpty {
-                    recentlyListenedSection
+                digitalLegacyCard
+                collectionsCard
+                browseRows
+                Button(action: onDonateClick) {
+                    Text("Support FBA").frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(.saffronOrange)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                connectRow
             }
-            .padding(.bottom, 16)
+            .padding(.bottom, 24)
         }
         .miniPlayerClearance()
-        .onAppear { recentlyListened = PersistenceManager.shared.getRecentlyListened() }
-        // Also refresh when returning from background — progress made while the
-        // screen sat behind the lock screen/another app would otherwise be stale.
-        .onChange(of: scenePhase) { phase in
-            if phase == .active {
-                recentlyListened = PersistenceManager.shared.getRecentlyListened()
-            }
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            // Warm the menu cache so Collections/Themes/People/Places open instantly.
+            _ = try? await ContentRepository.shared.getMenu()
+            digitalLegacy = await ContentRepository.shared.getDigitalLegacy()
         }
     }
 
-    // MARK: - Sangharakshita Section
+    // MARK: - Header: logo + name + log in/out
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            BundleImage(name: "fba_wordmark")
+                .aspectRatio(contentMode: .fit)
+                .frame(height: 32)
+            Text("Free Buddhist Audio").font(.headline)
+            Spacer()
+            if FeatureFlags.auth {
+                Button(auth.state.loggedIn ? (auth.state.username.isEmpty ? "My account" : auth.state.username) : "Log in",
+                       action: onLoginClick)
+                    .font(.subheadline)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
+    // MARK: - Sangharakshita
 
     private var sangharakshitaSection: some View {
         VStack(spacing: 0) {
@@ -51,133 +90,142 @@ struct HomeScreen: View {
                 .clipped()
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Sangharakshita")
-                    .font(.title2).bold()
+                Text("Sangharakshita").font(.title2).bold()
                 Text("\(SharedDataLoader.sangharakshitaTalks.count) talks · \(SharedDataLoader.sangharakshitaSeries.count) series")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
+                    .font(.caption).foregroundStyle(.secondary)
                 Divider().padding(.vertical, 8)
-
-                Button(action: onSangharakshitaByYearClick) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("By Year").font(.body)
-                            Text("Browse all talks by decade and year")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
+                linkRow("Year", action: onSangharakshitaByYearClick)
                 Divider().padding(.vertical, 4)
-
-                Button(action: onSangharakshitaSeriesClick) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Series").font(.body)
-                            Text("\(SharedDataLoader.sangharakshitaSeries.count) lecture series")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                linkRow("Series", action: onSangharakshitaSeriesClick)
             }
             .padding(16)
         }
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 16)
-        .padding(.top, 16)
     }
 
-    // MARK: - Donate Card
-
-    private var donateCard: some View {
-        Button(action: onDonateClick) {
-            HStack(spacing: 12) {
-                BundleImage(name: "fba_wordmark")
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: 28)
+    private func linkRow(_ title: String, subtitle: String? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
                 VStack(alignment: .leading) {
-                    Text("Support Free Buddhist Audio").font(.subheadline)
-                    Text("Donate to help keep FBA free for everyone")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Text(title).font(.body).foregroundStyle(.primary)
+                    if let subtitle {
+                        Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Digital Legacy
+
+    private var digitalLegacyCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("The Digital Legacy")
+                .font(.headline)
+                .foregroundStyle(Color(red: 219/255, green: 175/255, blue: 85/255))
+            Text(digitalLegacy?.description
+                 ?? "Digitally remastered talks — hear the Dharma renewed for future generations.")
+                .font(.caption)
+                .foregroundStyle(Color(red: 237/255, green: 224/255, blue: 216/255))
+                .lineLimit(4)
+            HStack {
+                Button(action: onDonateClick) { Text("Support the Digital Legacy") }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.saffronOrange)
+                Spacer()
+                Button("Learn more", action: onDigitalLegacyClick)
+                    .foregroundStyle(Color(red: 219/255, green: 175/255, blue: 85/255))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(red: 43/255, green: 33/255, blue: 23/255))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 16)
+        .onTapGesture(perform: onDigitalLegacyClick)
+    }
+
+    // MARK: - Collections
+
+    private var collectionsCard: some View {
+        Button(action: onCollectionsClick) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.grid.2x2.fill").font(.title).foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Collections").font(.headline).foregroundStyle(.white)
+                    Text("The Buddha · Meditation & Mindfulness · Living a Buddhist Life · Ethics · Wisdom…")
+                        .font(.caption).foregroundStyle(.white.opacity(0.9)).lineLimit(2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(.white)
+            }
+            .padding(16)
+            .background(LinearGradient(colors: [.saffronOrange, .deepSaffron], startPoint: .leading, endPoint: .trailing))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Recently Listened
+    // MARK: - Browse rows
 
-    private var recentlyListenedSection: some View {
+    private var browseRows: some View {
+        VStack(spacing: 0) {
+            homeRow("Introductions", "Get started with Buddhism and meditation") {
+                onSourceClick(.apiCollection("introductions", title: "Introductions"), "Introductions")
+            }
+            homeRow("Meditations", "Guided meditations to practise with") {
+                onSourceClick(.namedCollection("guided-meditations"), "Meditations")
+            }
+            homeRow("Latest", "Newly added talks") {
+                onSourceClick(.apiCollection("latest", title: "Latest"), "Latest")
+            }
+            homeRow("Themes", "Curated collections by topic") { onMenuClick(["themes"], "Themes") }
+            homeRow("Series", "Talks that belong together") {
+                onSourceClick(.apiCollection("all_series", title: "Series"), "Series")
+            }
+            homeRow("People", "Browse by speaker") { onMenuClick(["people"], "People") }
+            homeRow("Places", "Browse by centre and retreat centre") { onMenuClick(["places"], "Places") }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func homeRow(_ title: String, _ subtitle: String, action: @escaping () -> Void) -> some View {
+        VStack(spacing: 0) {
+            linkRow(title, subtitle: subtitle, action: action)
+                .padding(.vertical, 12)
+            Divider()
+        }
+    }
+
+    // MARK: - Connect
+
+    private var connectRow: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recently Listened")
-                .font(.headline)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-
-            ForEach(recentlyListened) { entry in
-                let totalMs = Int64(entry.totalDurationSeconds) * 1000
-                let progress = totalMs > 0 ? Float(entry.positionMs) / Float(totalMs) : 0
-                let isCompleted = progress > 0.95
-                let subtitle = isCompleted
-                    ? "Completed · \(formatDuration(entry.totalDurationSeconds))"
-                    : (entry.totalDurationSeconds > 0
-                        ? "\(formatDuration(Int(entry.positionMs / 1000))) / \(formatDuration(entry.totalDurationSeconds))"
-                        : nil)
-                let isDownloaded = downloadManager.isDownloaded(entry.catNum)
-
-                VStack(spacing: 0) {
-                    TalkCard(
-                        title: entry.title,
-                        speaker: entry.speaker,
-                        imageUrl: entry.imageUrl,
-                        subtitle: subtitle,
-                        onClick: { onTalkClick(entry.catNum) },
-                        trailing: trailingIcons(isCompleted: isCompleted, isDownloaded: isDownloaded)
-                    )
-
-                    if progress > 0 && !isCompleted {
-                        ProgressView(value: progress.safeFraction())
-                            .tint(.saffronOrange)
-                            .padding(.horizontal, 12)
-                            .padding(.top, 2)
+            Text("Connect").font(.subheadline).bold().padding(.horizontal, 16)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(connectLinks) { link in
+                        Button(action: { onOpenUrl(link.url) }) {
+                            Label(link.label, systemImage: link.icon)
+                                .font(.caption)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(.secondarySystemGroupedBackground))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
             }
         }
-    }
-
-    private func trailingIcons(isCompleted: Bool, isDownloaded: Bool) -> AnyView? {
-        guard isCompleted || isDownloaded else { return nil }
-        return AnyView(
-            HStack(spacing: 4) {
-                if isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.saffronOrange)
-                        .font(.caption)
-                }
-                if isDownloaded {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .foregroundStyle(Color.saffronOrange)
-                        .font(.caption)
-                }
-            }
-        )
+        .padding(.top, 12)
     }
 }

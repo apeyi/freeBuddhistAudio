@@ -53,4 +53,14 @@ class PlaybackMathTest {
     fun `total duration is zero only when nothing is known`() {
         assertEquals(0, PlaybackMath.totalDurationSeconds(0, emptyList(), 0L))
     }
+
+    @Test
+    fun clampPositionKeepsTimeWithinNewVersion() {
+        assertEquals(120_000L, PlaybackMath.clampPosition(120_000L, 760_000L))
+        // Remastered track is 9 s shorter than where we were → land just before its end
+        assertEquals(759_000L, PlaybackMath.clampPosition(768_000L, 760_000L))
+        assertEquals(50_000L, PlaybackMath.clampPosition(50_000L, null))
+        assertEquals(50_000L, PlaybackMath.clampPosition(50_000L, 0L))
+        assertEquals(0L, PlaybackMath.clampPosition(-5L, 10_000L))
+    }
 }

@@ -45,3 +45,9 @@ func friendlyError(_ error: Error) -> String {
     }
     return error.localizedDescription
 }
+
+/// "bodhisattva ideal" → "Bodhisattva ideal" (menu labels are lower-case on the website).
+func capitalizedFirst(_ s: String) -> String {
+    guard let first = s.first else { return s }
+    return String(first).uppercased() + s.dropFirst()
+}

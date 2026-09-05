@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -36,7 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fba.app.ui.components.EmptyState
 import com.fba.app.ui.components.ErrorMessage
 import com.fba.app.ui.components.LoadingIndicator
-import com.fba.app.ui.components.TalkCard
+import com.fba.app.ui.list.ListItemCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,9 +50,7 @@ fun SearchScreen(
 
     // Dismiss keyboard when search results arrive
     LaunchedEffect(state.hasSearched, state.isLoading) {
-        if (state.hasSearched && !state.isLoading) {
-            focusManager.clearFocus()
-        }
+        if (state.hasSearched && !state.isLoading) focusManager.clearFocus()
     }
 
     LaunchedEffect(state.navigateToCatNum) {
@@ -83,13 +80,12 @@ fun SearchScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Search field
             item {
                 OutlinedTextField(
                     value = state.query,
                     onValueChange = { viewModel.onQueryChanged(it) },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search or paste URL") },
+                    placeholder = { Text("Search talks and series") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = {
                         if (state.query.isNotEmpty()) {
@@ -107,96 +103,57 @@ fun SearchScreen(
                 )
             }
 
-            // Mode toggle chips
+            // All | Audio  (Text arrives with server-side transcript search)
             item {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = state.searchMode == SearchMode.ALL,
                         onClick = { viewModel.setSearchMode(SearchMode.ALL) },
                         label = { Text("All") },
                     )
                     FilterChip(
-                        selected = state.searchMode == SearchMode.BY_SPEAKER,
-                        onClick = { viewModel.setSearchMode(SearchMode.BY_SPEAKER) },
-                        label = { Text("By speaker") },
+                        selected = state.searchMode == SearchMode.AUDIO,
+                        onClick = { viewModel.setSearchMode(SearchMode.AUDIO) },
+                        label = { Text("Audio") },
                     )
                 }
             }
 
-            // Keyword filter (only in speaker mode after results load)
-            if (state.searchMode == SearchMode.BY_SPEAKER && state.hasSearched && state.results.isNotEmpty()) {
-                item {
-                    OutlinedTextField(
-                        value = state.keywordFilter,
-                        onValueChange = { viewModel.onKeywordFilterChanged(it) },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Filter by keyword") },
-                        leadingIcon = { Icon(Icons.Default.FilterList, contentDescription = null) },
-                        trailingIcon = {
-                            if (state.keywordFilter.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.onKeywordFilterChanged("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear")
-                                }
-                            }
-                        },
-                        singleLine = true,
-                    )
-                }
-                // Show count
-                if (state.keywordFilter.isNotBlank() || state.totalSpeakerTalks > 0) {
-                    item {
-                        val countText = if (state.keywordFilter.isNotBlank())
-                            "${state.filteredResults.size} of ${state.results.size} talks"
-                        else if (state.isLoadingMore)
-                            "${state.results.size} of ${state.totalSpeakerTalks} talks (loading...)"
-                        else
-                            "${state.results.size} talks"
-                        Text(
-                            text = countText,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            // Results
             when {
                 state.isLoading -> item { LoadingIndicator() }
                 state.error != null -> item {
-                    ErrorMessage(
-                        message = state.error!!,
-                        onRetry = { viewModel.search() },
-                    )
+                    ErrorMessage(message = state.error!!, onRetry = { viewModel.search() })
                 }
-                state.hasSearched && state.filteredResults.isEmpty() -> item {
-                    EmptyState(
-                        if (state.keywordFilter.isNotBlank())
-                            "No talks matching \"${state.keywordFilter}\""
-                        else
-                            "No results found for \"${state.query}\""
-                    )
+                state.hasSearched && state.talks.isEmpty() && state.series.isEmpty() -> item {
+                    EmptyState("No results found for \"${state.query}\"")
                 }
                 else -> {
-                    // Key includes the path: a series and a talk can share a catNum
-                    // (separate namespaces on FBA) and duplicate LazyColumn keys crash.
-                    items(state.filteredResults, key = { "${it.path}|${it.catNum}" }) { result ->
-                        val isSeries = result.path.contains("/series/")
-                        TalkCard(
-                            title = result.title,
-                            speaker = if (isSeries) "Series · ${result.speaker}" else result.speaker,
-                            imageUrl = result.imageUrl,
-                            subtitle = if (result.year > 0) result.year.toString() else null,
-                            onClick = {
-                                if (isSeries) onSeriesClick(result.path)
-                                else onTalkClick(result.catNum)
-                            },
-                        )
+                    val series = state.series
+                    val talks = state.talks
+                    if (series.isNotEmpty()) {
+                        item { SectionHeader("Series", series.size) }
+                        items(series, key = { "${it.path}|${it.catNum}" }) { result ->
+                            ListItemCard(result, onClick = { onSeriesClick(result.path) })
+                        }
+                    }
+                    if (talks.isNotEmpty()) {
+                        if (series.isNotEmpty()) item { SectionHeader("Talks", talks.size) }
+                        items(talks, key = { "${it.path}|${it.catNum}" }) { result ->
+                            ListItemCard(result, onClick = { onTalkClick(result.catNum) })
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(title: String, count: Int) {
+    Text(
+        text = "$title ($count)",
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 8.dp),
+    )
 }

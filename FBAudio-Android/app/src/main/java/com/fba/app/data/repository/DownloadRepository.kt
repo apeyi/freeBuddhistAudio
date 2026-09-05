@@ -38,6 +38,8 @@ class DownloadRepository @Inject constructor(
         audioUrl: String,
         trackUrls: List<String> = emptyList(),
         transcriptUrl: String = "",
+        /** "remastered" / "original" — shown in the Downloads list. */
+        audioVersion: String = "original",
     ) {
         val entity = DownloadEntity(
             catNum = catNum,
@@ -46,18 +48,48 @@ class DownloadRepository @Inject constructor(
             imageUrl = imageUrl,
             filePath = "",
             status = DownloadStatus.PENDING,
+            audioVersion = audioVersion,
         )
         downloadDao.insert(entity)
 
         // Pass all track URLs (or just the main audioUrl if single-track)
         val urls = if (trackUrls.isNotEmpty()) trackUrls else listOf(audioUrl)
-        val workData = Data.Builder()
+        enqueue(catNum, Data.Builder()
             .putString(DownloadWorker.KEY_CAT_NUM, catNum)
             .putString(DownloadWorker.KEY_AUDIO_URL, audioUrl)
             .putString(DownloadWorker.KEY_TITLE, title)
             .putStringArray(DownloadWorker.KEY_TRACK_URLS, urls.toTypedArray())
             .putString(DownloadWorker.KEY_TRANSCRIPT_URL, transcriptUrl)
-            .build()
+            .build())
+    }
+
+    /** Save just the transcript for offline reading (small; useful on retreat). */
+    suspend fun startTranscriptDownload(
+        catNum: String,
+        title: String,
+        speaker: String,
+        imageUrl: String,
+        transcriptUrl: String,
+    ) {
+        if (transcriptUrl.isBlank()) return
+        // Don't replace an audio download row with a transcript-only one.
+        val existing = downloadDao.getDownload(catNum)
+        if (existing != null && !existing.isTranscriptOnly && existing.status != DownloadStatus.FAILED) return
+        downloadDao.insert(
+            DownloadEntity(
+                catNum = catNum, title = title, speaker = speaker, imageUrl = imageUrl,
+                filePath = "", status = DownloadStatus.PENDING, audioVersion = "",
+            )
+        )
+        enqueue(catNum, Data.Builder()
+            .putString(DownloadWorker.KEY_CAT_NUM, catNum)
+            .putString(DownloadWorker.KEY_TITLE, title)
+            .putString(DownloadWorker.KEY_TRANSCRIPT_URL, transcriptUrl)
+            .putBoolean(DownloadWorker.KEY_TRANSCRIPT_ONLY, true)
+            .build())
+    }
+
+    private fun enqueue(catNum: String, workData: Data) {
 
         val request = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(workData)

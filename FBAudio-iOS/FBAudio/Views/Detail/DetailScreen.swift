@@ -6,6 +6,10 @@ struct DetailScreen: View {
     let onSpeakerClick: (String) -> Void
     let onSeriesClick: (String) -> Void
     let onTranscriptClick: (String, String) -> Void
+    var onDonateClick: () -> Void = {}
+    var onJoinClick: () -> Void = {}
+    /// False when downloads are member-only and the user isn't a member.
+    var canDownload: Bool = true
 
     @ObservedObject private var player = AudioPlayer.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
@@ -44,7 +48,8 @@ struct DetailScreen: View {
         isLoading = true
         error = nil
         Task {
-            if let result = await TalkRepository.shared.getTalkDetail(catNum) {
+            // Logged in: fetch fresh so the page carries the account's saved position.
+            if let result = await TalkRepository.shared.getTalkDetailForPlayback(catNum) {
                 talk = result
             } else {
                 error = "Could not load talk"
@@ -70,6 +75,7 @@ struct DetailScreen: View {
                 }
 
                 Text(talk.title).font(.title2).bold()
+                if talk.hasRemaster { RemasterBadge() }
 
                 // Speaker
                 Button(action: { onSpeakerClick(talk.speaker) }) {
@@ -117,14 +123,35 @@ struct DetailScreen: View {
                 // Download button
                 downloadButton(talk: talk)
 
-                // Transcript
+                // Transcript: view, and save on its own (small — handy on retreat)
                 if !talk.transcriptUrl.isEmpty {
-                    Button(action: { onTranscriptClick(talk.transcriptUrl, catNum) }) {
-                        Text("View Transcript")
-                            .frame(maxWidth: .infinity)
+                    HStack(spacing: 8) {
+                        Button(action: { onTranscriptClick(talk.transcriptUrl, catNum) }) {
+                            Text("View Transcript")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+
+                        let entry = downloadManager.downloads[talk.catNum]
+                        let transcriptSaved = entry?.status == .complete
+                        if entry == nil || entry?.transcriptOnly == true {
+                            Button(action: {
+                                if canDownload { downloadManager.startTranscriptDownload(talk: talk) } else { onJoinClick() }
+                            }) {
+                                Text(transcriptSaved ? "Transcript saved" : "Save transcript")
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(transcriptSaved)
+                        }
                     }
-                    .buttonStyle(.bordered)
                 }
+
+                // Donate — on every talk page, directly under the transcript
+                Button(action: onDonateClick) {
+                    Text("Donate").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.saffronOrange)
 
                 // Description
                 if !talk.description.isEmpty {
@@ -145,7 +172,8 @@ struct DetailScreen: View {
 
     @ViewBuilder
     private func downloadButton(talk: Talk) -> some View {
-        let state = downloadManager.downloads[talk.catNum]
+        // A transcript-only download doesn't count as the audio being saved.
+        let state = downloadManager.downloads[talk.catNum].flatMap { $0.transcriptOnly ? nil : $0 }
         switch state?.status {
         case .complete:
             HStack {
@@ -171,8 +199,9 @@ struct DetailScreen: View {
             }
             .buttonStyle(.bordered)
         default:
-            Button(action: { downloadManager.startDownload(talk: talk) }) {
-                Label("Download for offline", systemImage: "arrow.down.circle")
+            // Downloads are a membership benefit when gating is on
+            Button(action: { if canDownload { downloadManager.startDownload(talk: talk) } else { onJoinClick() } }) {
+                Label(canDownload ? "Download for offline" : "Join to download", systemImage: "arrow.down.circle")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)

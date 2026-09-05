@@ -40,6 +40,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -196,6 +199,31 @@ fun PlayerScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            // Remastered | Original — only for talks that have a remastered version
+            if (talk?.hasRemaster == true) {
+                Spacer(Modifier.height(8.dp))
+                SingleChoiceSegmentedButtonRow {
+                    SegmentedButton(
+                        selected = state.useRemaster,
+                        onClick = { playerViewModel.setUseRemaster(true) },
+                        enabled = !state.versionLocked,
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) { Text("Remastered") }
+                    SegmentedButton(
+                        selected = !state.useRemaster,
+                        onClick = { playerViewModel.setUseRemaster(false) },
+                        enabled = !state.versionLocked,
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) { Text("Original") }
+                }
+                if (state.versionLocked) {
+                    Text(
+                        text = "Playing the downloaded version",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             // Reconnecting feedback during auto-retry (otherwise the player looks
             // dead while it waits out the retry backoff)

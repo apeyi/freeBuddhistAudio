@@ -29,4 +29,13 @@ enum PlaybackMath {
         if summed > 0 { return summed }
         return max(0, Int(playerDurationMs / 1000))
     }
+
+    /// Position to resume at after switching between the remastered and original
+    /// recording: the same absolute time, clamped to the new track's duration
+    /// (the two versions differ by a few seconds). Unknown duration → unchanged.
+    static func clampPosition(positionMs: Int64, newDurationMs: Int64?) -> Int64 {
+        let pos = max(positionMs, 0)
+        guard let d = newDurationMs, d > 0 else { return pos }
+        return min(pos, max(d - 1000, 0))
+    }
 }

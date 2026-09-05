@@ -78,6 +78,14 @@ class PersistenceManager {
         return (try? JSONDecoder().decode([RecentlyListened].self, from: data)) ?? []
     }
 
+    /// Overwrite the whole list (used by the account history sync).
+    func replaceRecentlyListened(_ list: [RecentlyListened]) {
+        let trimmed = Array(list.prefix(maxRecentlyListened))
+        if let data = try? JSONEncoder().encode(trimmed) {
+            defaults.set(data, forKey: recentlyListenedKey)
+        }
+    }
+
     func updateRecentlyListened(_ entry: RecentlyListened) {
         var list = getRecentlyListened()
         list.removeAll { $0.catNum == entry.catNum }

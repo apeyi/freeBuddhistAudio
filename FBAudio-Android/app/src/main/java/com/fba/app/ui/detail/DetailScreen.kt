@@ -64,6 +64,10 @@ fun DetailScreen(
     onSpeakerClick: (String) -> Unit = {},
     onSeriesClick: (String) -> Unit = {},
     onTranscriptClick: (String) -> Unit = {},
+    onDonateClick: () -> Unit = {},
+    onJoinClick: () -> Unit = {},
+    /** False when downloads are member-only and the user isn't a member. */
+    canDownload: Boolean = true,
     playerViewModel: PlayerViewModel,
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
@@ -124,6 +128,10 @@ fun DetailScreen(
                     }
 
                     Text(talk.title, style = MaterialTheme.typography.headlineSmall)
+                    if (talk.hasRemaster) {
+                        Spacer(Modifier.height(4.dp))
+                        com.fba.app.ui.components.RemasterBadge()
+                    }
                     Spacer(Modifier.height(4.dp))
                     // Speaker is clickable — navigates to browse-for-speaker screen
                     Text(
@@ -189,8 +197,9 @@ fun DetailScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    // Download row — download button on left, delete icon on right only when complete
-                    val download = state.download
+                    // Download row — download button on left, delete icon on right only when complete.
+                    // A transcript-only download doesn't count as the audio being saved.
+                    val download = state.download?.takeUnless { it.isTranscriptOnly }
                     when (download?.status) {
                         DownloadStatus.COMPLETE -> {
                             Row(
@@ -230,24 +239,51 @@ fun DetailScreen(
                         }
                         else -> {
                             OutlinedButton(
-                                onClick = { viewModel.startDownload() },
+                                // Downloads are a membership benefit when gating is on
+                                onClick = { if (canDownload) viewModel.startDownload() else onJoinClick() },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Icon(Icons.Default.Download, contentDescription = null)
-                                Text("Download for offline", modifier = Modifier.padding(start = 8.dp))
+                                Text(
+                                    if (canDownload) "Download for offline" else "Join to download",
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
                             }
                         }
                     }
 
-                    // Transcript button — only shown when a transcript URL is available
+                    // Transcript: view, and save on its own (small — handy on retreat)
                     if (talk.transcriptUrl.isNotBlank()) {
                         Spacer(Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = { onTranscriptClick(talk.transcriptUrl) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("View Transcript")
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { onTranscriptClick(talk.transcriptUrl) },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("View Transcript")
+                            }
+                            val transcriptSaved = state.download?.isTranscriptOnly == true ||
+                                state.download?.status == DownloadStatus.COMPLETE
+                            if (download == null) {
+                                Spacer(Modifier.width(8.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        if (!transcriptSaved) {
+                                            if (canDownload) viewModel.startTranscriptDownload() else onJoinClick()
+                                        }
+                                    },
+                                    enabled = !transcriptSaved,
+                                ) {
+                                    Text(if (transcriptSaved) "Transcript saved" else "Save transcript")
+                                }
+                            }
                         }
+                    }
+
+                    // Donate — on every talk page, directly under the transcript
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = onDonateClick, modifier = Modifier.fillMaxWidth()) {
+                        Text("Donate")
                     }
 
                     // Description — strip HTML tags and decode entities.

@@ -1,5 +1,6 @@
 package com.fba.app.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.fba.app.domain.model.Talk
@@ -23,13 +24,26 @@ data class TalkEntity(
     val series: String = "",
     val seriesHref: String = "",
     val cachedAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "0") val omOnly: Boolean = false,
 ) {
     fun toDomain(): Talk {
-        val trackType = object : TypeToken<List<Track>>() {}.type
+        // Decode through a nullable mirror type: Gson bypasses Kotlin defaults, so
+        // tracks cached before a field existed (e.g. remasterAudioUrl) would come
+        // back with nulls in non-null Strings and crash on first use.
+        val trackType = object : TypeToken<List<RawTrack>>() {}.type
         val tracks: List<Track> = if (tracksJson.isNotBlank()) {
             try {
-                val raw: List<Track> = Gson().fromJson(tracksJson, trackType)
-                raw.map { it.copy(durationSeconds = it.durationSeconds.coerceAtLeast(0)) }
+                val raw: List<RawTrack> = Gson().fromJson(tracksJson, trackType)
+                raw.map {
+                    Track(
+                        title = it.title ?: "",
+                        durationSeconds = (it.durationSeconds ?: 0).coerceAtLeast(0),
+                        audioUrl = it.audioUrl ?: "",
+                        trackId = it.trackId ?: "",
+                        remasterAudioUrl = it.remasterAudioUrl ?: "",
+                        remasterDurationSeconds = (it.remasterDurationSeconds ?: 0).coerceAtLeast(0),
+                    )
+                }
             } catch (_: Exception) { emptyList() }
         } else emptyList()
         // Text fields are stored already-unescaped (the scraper unescapes before
@@ -49,8 +63,18 @@ data class TalkEntity(
             transcriptUrl = transcriptUrl,
             series = series,
             seriesHref = seriesHref,
+            omOnly = omOnly,
         )
     }
+
+    private data class RawTrack(
+        val title: String?,
+        val durationSeconds: Int?,
+        val audioUrl: String?,
+        val trackId: String?,
+        val remasterAudioUrl: String?,
+        val remasterDurationSeconds: Int?,
+    )
 
     companion object {
         fun fromDomain(talk: Talk) = TalkEntity(
@@ -67,6 +91,7 @@ data class TalkEntity(
             transcriptUrl = talk.transcriptUrl,
             series = talk.series,
             seriesHref = talk.seriesHref,
+            omOnly = talk.omOnly,
         )
     }
 }

@@ -1,6 +1,10 @@
 package com.fba.app.data.remote
 
 import com.fba.app.domain.model.BrowseCategory
+import com.fba.app.domain.model.Checkpoint
+import com.fba.app.domain.model.DigitalLegacy
+import com.fba.app.domain.model.ListPage
+import com.fba.app.domain.model.MenuNode
 import com.fba.app.domain.model.CategoryType
 import com.fba.app.domain.model.SearchResult
 import com.fba.app.domain.model.Talk
@@ -190,6 +194,13 @@ class FBAScraper @Inject constructor(
             else -> { seriesTitle = ""; seriesHref = "" }
         }
 
+        // Saved position from the FBA account — only present on logged-in page loads.
+        val checkpoint = json.get("checkpoint")?.takeIf { it.isJsonObject }?.asJsonObject?.let { cp ->
+            val trackId = cp.getStr("track_id") ?: return@let null
+            val seconds = cp.getStr("time_seconds")?.toIntOrNull() ?: cp.getInt("time_seconds") ?: return@let null
+            Checkpoint(trackId, seconds)
+        }
+
         return Talk(
             catNum = catNum,
             title = title,
@@ -204,6 +215,8 @@ class FBAScraper @Inject constructor(
             transcriptUrl = transcriptUrl,
             series = seriesTitle,
             seriesHref = seriesHref,
+            omOnly = (json.getInt("om") ?: 0) != 0,
+            checkpoint = checkpoint,
         )
     }
 
@@ -214,11 +227,15 @@ class FBAScraper @Inject constructor(
             val t = trackEl.asJsonObject
             val audio = t.getAsJsonObject("audio") ?: continue
             val mp3 = audio.getStr("mp3") ?: continue
+            val remaster = t.get("remasterAudio")?.takeIf { it.isJsonObject }?.asJsonObject?.getStr("mp3") ?: ""
             result.add(
                 Track(
                     title = unescape(t.getStr("title") ?: ""),
                     durationSeconds = (t.getInt("durationSeconds") ?: 0).coerceAtLeast(0),
                     audioUrl = resolveUrl(mp3),
+                    trackId = t.getStr("trackId") ?: "",
+                    remasterAudioUrl = resolveUrl(remaster),
+                    remasterDurationSeconds = (t.getInt("remasterDurationSeconds") ?: 0).coerceAtLeast(0),
                 )
             )
         }
@@ -444,6 +461,200 @@ class FBAScraper @Inject constructor(
         return BrowsePage(results, results.size, "", "", title = seriesTitle)
     }
 
+    // ------------------------------------------------------------------
+    // Website content: menu, collections, series, Digital Legacy
+    // ------------------------------------------------------------------
+
+    /** Fetch a URL that returns JSON (the /api/v1 endpoints). */
+    private suspend fun fetchJson(url: String): JsonObject = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).header("Accept", "application/json").build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw Exception("HTTP ${response.code}: $url")
+            val body = response.body?.string() ?: throw Exception("Empty response: $url")
+            JsonParser.parseString(body).asJsonObject
+        }
+    }
+
+    /** Raw `document.__FBA__.<key>` JSON text (object or array) from a page, or null. */
+    private fun extractFbaRaw(html: String, key: String): String? {
+        val doc = Jsoup.parse(html)
+        for (script in doc.select("script")) {
+            val data = script.data()
+            val marker = "document.__FBA__.$key"
+            var idx = data.indexOf(marker)
+            while (idx >= 0) {
+                // Skip "document.__FBA__.<key>Something" — match the exact key
+                val after = idx + marker.length
+                val nextChar = data.getOrNull(after)
+                if (nextChar == null || nextChar == ' ' || nextChar == '=') {
+                    val eqIdx = data.indexOf('=', idx)
+                    if (eqIdx >= 0) {
+                        val start = (eqIdx + 1 until data.length).firstOrNull { !data[it].isWhitespace() } ?: return null
+                        return when (data[start]) {
+                            '{' -> extractBalanced(data, start, '{', '}')
+                            '[' -> extractBalanced(data, start, '[', ']')
+                            else -> null
+                        }
+                    }
+                }
+                idx = data.indexOf(marker, idx + 1)
+            }
+        }
+        return null
+    }
+
+    /** The website's curated side menu (collections, sangharakshita, themes, people, places, languages…). */
+    suspend fun fetchSiteMenu(): List<MenuNode> {
+        val html = fetchHtml("$BASE_URL/")
+        val raw = extractFbaRaw(html, "sidebar_menu") ?: return emptyList()
+        return SiteMenuParser.parse(raw)
+    }
+
+    /** Whether the site considers the current session logged in, and the user object if so. */
+    fun parseLoggedInUser(html: String): JsonObject? {
+        val raw = extractFbaRaw(html, "user") ?: return null
+        return try { JsonParser.parseString(raw).asJsonObject } catch (_: Exception) { null }
+    }
+
+    suspend fun fetchHomepageHtml(): String = fetchHtml("$BASE_URL/")
+
+    /**
+     * One page of an API collection: latest, introductions, guided_introductions,
+     * speakers, places, years, themes, series_latest, all_series, series_sangharakshita…
+     * `limit` is the only page-size parameter the server honours.
+     */
+    suspend fun fetchApiCollectionPage(type: String, page: Int, title: String = ""): ListPage {
+        val url = "$BASE_URL/api/v1/collections/${java.net.URLEncoder.encode(type, "UTF-8")}?page=$page&limit=${ListPage.PAGE_SIZE}"
+        val coll = fetchJson(url).getAsJsonObject("collection") ?: return ListPage(emptyList(), 0, page, title)
+        return ListPage(
+            items = parseListItems(coll.getAsJsonArray("items")),
+            totalItems = coll.getInt("total_items") ?: coll.getStr("total_items")?.toIntOrNull() ?: 0,
+            page = page,
+            title = title.ifBlank { unescape(coll.getStr("label") ?: type) },
+        )
+    }
+
+    /** One page of a `/browse?…` listing (a speaker, place, year or genre). */
+    suspend fun fetchBrowsePage(path: String, page: Int, apiUrl: String = "", apiQuery: String = ""): ListPage {
+        if (page > 1 && apiUrl.isNotBlank()) {
+            val coll = fetchJson("$apiUrl?$apiQuery&page=$page&limit=${ListPage.PAGE_SIZE}")
+                .getAsJsonObject("collection") ?: return ListPage(emptyList(), 0, page)
+            return ListPage(
+                items = parseListItems(coll.getAsJsonArray("items")),
+                totalItems = coll.getInt("total_items") ?: coll.getStr("total_items")?.toIntOrNull() ?: 0,
+                page = page, apiUrl = apiUrl, apiQuery = apiQuery,
+            )
+        }
+        val resolved = resolveUrl(path)
+        val html = fetchHtml(resolved)
+        val coll = extractFbaJson(html, "collection") ?: return ListPage(emptyList(), 0, 1)
+        val query = resolved.substringAfter('?', "")
+        val label = unescape(coll.getStr("label") ?: "")
+        return ListPage(
+            items = parseListItems(coll.getAsJsonArray("items")),
+            totalItems = coll.getInt("total_items") ?: coll.getStr("total_items")?.toIntOrNull() ?: 0,
+            page = 1,
+            title = browseTitle(query, label),
+            apiUrl = coll.getStr("url")?.let { resolveUrl(it) } ?: "",
+            apiQuery = query,
+        )
+    }
+
+    /** "s=Subhuti&t=audio" → "Subhuti"; falls back to the collection label. */
+    private fun browseTitle(query: String, label: String): String {
+        for (key in listOf("s", "p", "th", "ser", "y")) {
+            val v = Regex("(?:^|&)$key=([^&]+)").find(query)?.groupValues?.get(1) ?: continue
+            return java.net.URLDecoder.decode(v.replace("+", "%2B"), "UTF-8").replace('_', ' ')
+        }
+        return label
+    }
+
+    /** One page of a curated `/collection/<slug>` page. Pages with `pageNo`. */
+    suspend fun fetchNamedCollectionPage(slug: String, page: Int): ListPage {
+        val html = fetchHtml("$BASE_URL/collection/${java.net.URLEncoder.encode(slug, "UTF-8")}?pageNo=$page")
+        val data = extractFbaJson(html, "collectionData") ?: return ListPage(emptyList(), 0, page)
+        val description = data.getStr("description")?.let { htmlToText(it) } ?: ""
+        return ListPage(
+            items = parseListItems(data.getAsJsonArray("items")),
+            totalItems = data.getInt("totalItems") ?: 0,
+            page = data.getInt("pageNo") ?: page,
+            title = unescape(data.getStr("title") ?: slug),
+            description = description,
+            imageUrl = resolveUrl(data.getStr("marquee_image") ?: data.getStr("image") ?: ""),
+        )
+    }
+
+    /** A series page: title, blurb, image, remaster flag and all member talks. */
+    suspend fun fetchSeriesPage(path: String): ListPage {
+        val html = fetchHtml(resolveUrl(path))
+        val series = extractFbaJson(html, "series") ?: return ListPage(emptyList(), 0, 1)
+        val members = series.getAsJsonArray("members")
+        val items = mutableListOf<SearchResult>()
+        members?.forEach { el ->
+            val obj = el.asJsonObject
+            val catNum = obj.getStr("cat_num") ?: obj.getStr("member_cat_num") ?: return@forEach
+            if (catNum.isBlank()) return@forEach
+            val link = obj.getStr("link") ?: obj.getStr("url") ?: "/audio/details?num=$catNum"
+            items.add(obj.toSearchResult(catNum, link))
+        }
+        val hasRemaster = series.get("hasRemasteredTalk")?.takeIf { it.isJsonPrimitive }?.asJsonPrimitive
+            ?.let { if (it.isBoolean) it.asBoolean else it.asString == "1" || it.asString == "true" } ?: false
+        return ListPage(
+            items = items,
+            totalItems = items.size,
+            page = 1,
+            title = unescape(series.getStr("title") ?: ""),
+            description = series.getStr("blurb")?.let { htmlToText(it) } ?: "",
+            imageUrl = resolveUrl(series.getStr("marquee_image") ?: series.getStr("image") ?: series.getStr("speaker_image") ?: ""),
+            hasRemaster = hasRemaster,
+            omOnly = (series.getInt("om") ?: 0) != 0,
+        )
+    }
+
+    /** Copy and sample talk of the Digital Legacy page. */
+    suspend fun fetchDigitalLegacy(): DigitalLegacy? {
+        val html = fetchHtml("$BASE_URL/digital-legacy")
+        val page = extractFbaJson(html, "digitalLegacyPage") ?: return null
+        val description = page.getStr("descriptionHtml")?.let { htmlToText(it) } ?: ""
+        val sample = page.get("sampleTalk")?.takeIf { it.isJsonObject }?.asJsonObject
+        val sampleCatNum = sample?.getStr("catNum") ?: sample?.getStr("cat_num") ?: ""
+        val seriesPath = Regex("/series/details\\?num=([A-Za-z0-9]+)").find(description + (page.getStr("descriptionHtml") ?: ""))
+            ?.value ?: "/series/details?num=X16"
+        return DigitalLegacy(
+            title = unescape(page.getStr("title") ?: "The Digital Legacy"),
+            description = description,
+            sampleCatNum = sampleCatNum,
+            seriesPath = seriesPath,
+        )
+    }
+
+    /** Items of any collection/browse listing: talks, series, and speaker/place/year links. */
+    private fun parseListItems(items: com.google.gson.JsonArray?): List<SearchResult> {
+        if (items == null) return emptyList()
+        val out = mutableListOf<SearchResult>()
+        val seen = mutableSetOf<String>()
+        for (el in items) {
+            val obj = el.asJsonObject
+            val path = obj.getStr("url") ?: obj.getStr("link") ?: continue
+            val catNum = obj.getStr("cat_num") ?: obj.getStr("catNum")
+                ?: path.substringAfter("num=", "").substringBefore("&").ifBlank { path }
+            if (catNum.isBlank() || !seen.add("$path|$catNum")) continue
+            // Speaker/place/year tiles carry a count in the title: "Abayanandi (1)"
+            val result = obj.toSearchResult(catNum, path)
+            out.add(if (path.contains("/browse")) result.copy(title = result.title.replace(Regex("\\s*\\(\\d+\\)$"), "")) else result)
+        }
+        return out
+    }
+
+    /** HTML blurb → readable plain text with paragraph breaks. */
+    fun htmlToText(html: String): String {
+        if (!html.contains('<')) return unescape(html).trim()
+        val doc = Jsoup.parse(html)
+        doc.select("p").prepend("\n\n")
+        doc.select("br").append("\n")
+        return doc.text().replace(Regex("[ \\t]+\\n"), "\n").trim()
+    }
+
     private fun JsonObject.getStr(key: String): String? {
         return if (has(key) && !get(key).isJsonNull && get(key).isJsonPrimitive) get(key).asString else null
     }
@@ -457,6 +668,10 @@ class FBAScraper @Inject constructor(
             imageUrl = resolveUrl(getStr("image_url") ?: getStr("image") ?: ""),
             path = resolveUrl(path),
             year = getStr("year")?.toIntOrNull() ?: 0,
+            centre = unescape(getStr("centre") ?: ""),
+            omOnly = (get("om_only")?.takeIf { it.isJsonPrimitive }?.asJsonPrimitive?.let { p ->
+                if (p.isBoolean) p.asBoolean else p.asString == "1"
+            } ?: false) || (getStr("om") == "1"),
         )
 
     private fun JsonObject.getInt(key: String): Int? {

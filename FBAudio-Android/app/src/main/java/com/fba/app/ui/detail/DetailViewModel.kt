@@ -3,6 +3,8 @@ package com.fba.app.ui.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fba.app.data.auth.AuthRepository
+import com.fba.app.data.local.AppSettings
 import com.fba.app.data.local.DownloadEntity
 import com.fba.app.data.repository.DownloadRepository
 import com.fba.app.data.repository.TalkRepository
@@ -27,6 +29,8 @@ class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val talkRepository: TalkRepository,
     private val downloadRepository: DownloadRepository,
+    private val settings: AppSettings,
+    private val auth: AuthRepository,
 ) : ViewModel() {
 
     private val catNum: String = savedStateHandle["catNum"] ?: ""
@@ -45,7 +49,9 @@ class DetailViewModel @Inject constructor(
             try {
                 // Throwing variant: a network failure shows the error + Retry UI
                 // instead of being conflated with "talk not found" (null).
-                val talk = talkRepository.fetchTalkDetail(catNum)
+                // Logged in: always fetch fresh so the page carries the account's saved
+                // position and Order-only visibility.
+                val talk = talkRepository.fetchTalkDetail(catNum, forceRefresh = auth.isLoggedIn)
                 _uiState.value = _uiState.value.copy(
                     talk = talk,
                     isLoading = false,
@@ -70,6 +76,7 @@ class DetailViewModel @Inject constructor(
 
     fun startDownload() {
         val talk = _uiState.value.talk ?: return
+        val useRemaster = talk.hasRemaster && settings.useRemaster(talk.catNum)
         viewModelScope.launch {
             downloadRepository.startDownload(
                 catNum = talk.catNum,
@@ -77,8 +84,19 @@ class DetailViewModel @Inject constructor(
                 speaker = talk.speaker,
                 imageUrl = talk.imageUrl,
                 audioUrl = talk.audioUrl,
-                trackUrls = talk.tracks.map { it.audioUrl },
+                trackUrls = talk.tracks.map { if (useRemaster && it.hasRemaster) it.remasterAudioUrl else it.audioUrl },
                 transcriptUrl = talk.transcriptUrl,
+                audioVersion = if (useRemaster) "remastered" else "original",
+            )
+        }
+    }
+
+    fun startTranscriptDownload() {
+        val talk = _uiState.value.talk ?: return
+        viewModelScope.launch {
+            downloadRepository.startTranscriptDownload(
+                catNum = talk.catNum, title = talk.title, speaker = talk.speaker,
+                imageUrl = talk.imageUrl, transcriptUrl = talk.transcriptUrl,
             )
         }
     }
