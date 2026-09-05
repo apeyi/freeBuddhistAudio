@@ -32,11 +32,20 @@ object PlaybackMath {
      * duration instead of reporting 0.
      */
     fun totalDurationSeconds(talkDurationSeconds: Int, tracks: List<Track>, playerDurationMs: Long): Int {
-        if (talkDurationSeconds > 0) return talkDurationSeconds
-        val summed = tracks.sumOf { it.durationSeconds }
-        if (summed > 0) return summed
+        if (isPlausibleDuration(talkDurationSeconds)) return talkDurationSeconds
+        val summed = tracks.sumOf { it.durationSeconds.coerceAtLeast(0) }
+        if (isPlausibleDuration(summed)) return summed
         return (playerDurationMs / 1000L).toInt().coerceAtLeast(0)
     }
+
+    /**
+     * The website's duration field is sometimes garbage (e.g. 717,860,544 s ≈ 22
+     * years for LOC3883). Anything longer than the longest audiobook on the site
+     * is treated as missing and derived from the tracks / player instead.
+     */
+    const val MAX_PLAUSIBLE_SECONDS = 100 * 3600
+
+    fun isPlausibleDuration(seconds: Int): Boolean = seconds in 1..MAX_PLAUSIBLE_SECONDS
 
     /**
      * Position to resume at after switching between the remastered and original

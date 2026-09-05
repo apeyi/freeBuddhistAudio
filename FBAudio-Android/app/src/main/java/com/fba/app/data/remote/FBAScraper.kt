@@ -43,6 +43,10 @@ class FBAScraper @Inject constructor(
 ) {
     companion object {
         private const val BASE_URL = "https://www.freebuddhistaudio.com"
+
+        /** "https://www.freebuddhistaudio.com/browse?p=Adhisthana " → "/browse?p=adhisthana" */
+        fun normalizeBrowsePathStatic(link: String): String =
+            link.trim().removePrefix(BASE_URL).lowercase()
     }
 
     private suspend fun fetchHtml(url: String): String = withContext(Dispatchers.IO) {
@@ -151,7 +155,10 @@ class FBAScraper @Inject constructor(
         )
         val year = json.getInt("year") ?: 0
         val genre = json.getStr("genre") ?: json.getStr("genre1") ?: ""
-        val duration = (json.getInt("durationSeconds") ?: json.getInt("duration") ?: 0).coerceAtLeast(0)
+        // Negative or absurd durations (a known data problem on the site) → 0, so the
+        // UI derives the length from the tracks instead.
+        val duration = (json.getInt("durationSeconds") ?: json.getInt("duration") ?: 0)
+            .let { if (com.fba.app.ui.player.PlaybackMath.isPlausibleDuration(it)) it else 0 }
         val imageUrl = json.getStr("image") ?: json.getStr("imageUrl") ?: json.getStr("image_url") ?: ""
         val rawDesc = json.getStr("blurb") ?: json.getStr("description") ?: ""
         val description = if (rawDesc.contains('<')) {
@@ -231,7 +238,8 @@ class FBAScraper @Inject constructor(
             result.add(
                 Track(
                     title = unescape(t.getStr("title") ?: ""),
-                    durationSeconds = (t.getInt("durationSeconds") ?: 0).coerceAtLeast(0),
+                    durationSeconds = (t.getInt("durationSeconds") ?: 0)
+                        .let { if (com.fba.app.ui.player.PlaybackMath.isPlausibleDuration(it)) it else 0 },
                     audioUrl = resolveUrl(mp3),
                     trackId = t.getStr("trackId") ?: "",
                     remasterAudioUrl = resolveUrl(remaster),
@@ -533,6 +541,27 @@ class FBAScraper @Inject constructor(
             title = title.ifBlank { unescape(coll.getStr("label") ?: type) },
         )
     }
+
+    /**
+     * Images for a whole index collection (speakers, places): browse path →
+     * image URL, skipping the site's placeholder images. One request; the
+     * server honours limit=1000.
+     */
+    suspend fun fetchIndexImages(type: String): Map<String, String> {
+        val url = "$BASE_URL/api/v1/collections/${java.net.URLEncoder.encode(type, "UTF-8")}?page=1&limit=1000"
+        val coll = fetchJson(url).getAsJsonObject("collection") ?: return emptyMap()
+        val out = mutableMapOf<String, String>()
+        coll.getAsJsonArray("items")?.forEach { el ->
+            val obj = el.asJsonObject
+            val path = obj.getStr("url") ?: return@forEach
+            val image = obj.getStr("image_url") ?: return@forEach
+            if (image.isBlank() || image.contains("/default")) return@forEach
+            out[normalizeBrowsePath(path)] = resolveUrl(image)
+        }
+        return out
+    }
+
+    private fun normalizeBrowsePath(link: String): String = normalizeBrowsePathStatic(link)
 
     /** One page of a `/browse?…` listing (a speaker, place, year or genre). */
     suspend fun fetchBrowsePage(path: String, page: Int, apiUrl: String = "", apiQuery: String = ""): ListPage {

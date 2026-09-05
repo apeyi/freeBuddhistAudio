@@ -27,6 +27,7 @@ struct ContentView: View {
                     onMenuClick: { path, title in navigate(.menu(path, title)) },
                     onDonateClick: openDonate,
                     onLoginClick: { showLogin = true },
+                    onAccountClick: { selectedTab = 4 },
                     onOpenUrl: { url in if let u = URL(string: url) { UIApplication.shared.open(u) } }
                 )
                 .navigationDestination(for: Route.self) { route in
@@ -285,7 +286,11 @@ struct ContentView: View {
         case .join:
             JoinScreen(onDonateClick: openDonate)
         case .collections:
-            CollectionsScreen(onCollectionClick: { openMenuNode($0, parentPath: ["collections"]) })
+            CollectionsScreen(
+                onCollectionClick: { openMenuNode($0, parentPath: ["collections"]) },
+                onSourceClick: { source, title in navigate(.list(source, title)) },
+                onMenuClick: { path, title in navigate(.menu(path, title)) }
+            )
         case .digitalLegacy:
             DigitalLegacyScreen(
                 onPlaySample: { catNum in

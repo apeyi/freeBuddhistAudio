@@ -98,7 +98,7 @@ final class HistoryRepository {
         guard let u = URL(string: url) else { return nil }
         var request = URLRequest(url: u)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
+        guard let (data, response) = try? await FbaSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
@@ -110,6 +110,6 @@ final class HistoryRepository {
         request.httpBody = data
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        _ = try? await URLSession.shared.data(for: request) // offline or session gone — silent
+        _ = try? await FbaSession.shared.data(for: request) // offline or session gone — silent
     }
 }

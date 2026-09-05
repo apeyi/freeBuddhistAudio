@@ -125,6 +125,23 @@ class ContentRepository @Inject constructor(
         )
     }
 
+    private class ImageMap(val images: Map<String, String> = emptyMap())
+
+    /**
+     * Images for the curated People / Places lists, taken from FBA's speaker and
+     * place indexes (keyed by normalized browse path). Cached; empty on failure.
+     */
+    suspend fun getIndexImages(type: String): Map<String, String> {
+        val key = "images:$type"
+        val cached = cache.get(key, ImageMap::class.java)
+        if (cached != null && cached.second) return cached.first.images
+        return try {
+            scraper.fetchIndexImages(type).also { cache.put(key, ImageMap(it)) }
+        } catch (_: Exception) {
+            cached?.first?.images ?: emptyMap()
+        }
+    }
+
     suspend fun getDigitalLegacy(): DigitalLegacy? {
         val cached = cache.get("digital_legacy", DigitalLegacy::class.java)
         if (cached != null && cached.second) return cached.first

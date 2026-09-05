@@ -90,11 +90,11 @@ Everything applies to both Android and iOS.
 | Sangharakshita card with *By Year* and *Series* links. | Keep. Series list gains images. |
 | "Support Free Buddhist Audio" card. | Keep as the **Support FBA** button, positioned as in the spec. |
 | Recently listened. | Moves to My FBA. |
-| No logo/header, no login. | Header: logo + "Free Buddhist Audio" + **Log in / out**. |
+| No logo/header, no login. | Header: logo + "Free Buddhist Audio" + **Log in** (shows the account name and opens My FBA once logged in). |
 | — | **Digital Legacy** card with the support ask and a button; opens an in-app page with the FBA copy, the original-vs-remastered sample, and a link to the *Buddhism for Today – and Tomorrow* series. |
 | — | **Collections** image grid (see 3.4). |
 | — | **Order talks** link, only for logged-in Order members (3.11). |
-| — | Text-link rows, each opening a titled list of talks/series with images: **Introductions, Meditations, Latest, Themes, Series, People, Places**. All fed from the website's existing lists; Themes/People/Places use FBA's curated named lists (the ones in the website's side menu), not the raw tag database. |
+| — | **Introductions, Meditations, Latest, Themes, Series, People, Places** live inside Collections (tiles), each opening a titled list of talks/series with images. All fed from the website's existing lists; Themes/People/Places use FBA's curated named lists (the ones in the website's side menu), not the raw tag database; People and Places entries carry FBA's own images. |
 | — | **Connect** row: FBA podcast, Dharmabytes, YouTube, Facebook, Instagram, SoundCloud, The Buddhist Centre Online — logos linking out. |
 | Home needs the network for the lists. | Home and Collections are cached so they open instantly and work offline after first use. |
 
@@ -106,7 +106,7 @@ release. Recommend yes.
 
 | Today | Change |
 |---|---|
-| No collections; a fixed list of 12 topics exists in code but isn't reachable from the UI. Mitra Study data is bundled but no longer reachable either. | A **Collections** screen showing FBA's curated collections as image tiles (The Buddha, Meditation & Mindfulness and its sub-collections, Introducing Buddhism, Living a Buddhist Life, Buddhist Ethics, Buddhist Wisdom). Tiles use FBA's cover image when one exists, otherwise **auto-generated colour artwork** (stable per collection, Apple Music style). Tapping opens a titled, paginated talk list in the same style as search results. |
+| No collections; a fixed list of 12 topics exists in code but isn't reachable from the UI. Mitra Study data is bundled but no longer reachable either. | A **Collections** screen: tiles for Introductions, Meditations, Latest, Themes, Series, People and Places, followed by FBA's own curated collections (The Buddha, Meditation & Mindfulness and its sub-collections, Introducing Buddhism, Living a Buddhist Life, Buddhist Ethics, Buddhist Wisdom). Tiles use FBA's cover image when one exists, otherwise **auto-generated colour artwork** (stable per collection, Apple Music style). Tapping opens a titled, paginated talk list in the same style as search results. |
 
 ### 3.5 English | All languages — **Now, switched off** → refine with **FBA** markers
 

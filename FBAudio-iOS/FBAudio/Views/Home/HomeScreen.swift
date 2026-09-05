@@ -30,6 +30,8 @@ struct HomeScreen: View {
     let onMenuClick: ([String], String) -> Void
     let onDonateClick: () -> Void
     let onLoginClick: () -> Void
+    /// Logged in: the header shows the account name and opens My FBA.
+    let onAccountClick: () -> Void
     let onOpenUrl: (String) -> Void
 
     var body: some View {
@@ -39,7 +41,6 @@ struct HomeScreen: View {
                 sangharakshitaSection
                 digitalLegacyCard
                 collectionsCard
-                browseRows
                 Button(action: onDonateClick) {
                     Text("Support FBA").frame(maxWidth: .infinity)
                 }
@@ -71,7 +72,7 @@ struct HomeScreen: View {
             Spacer()
             if FeatureFlags.auth {
                 Button(auth.state.loggedIn ? (auth.state.username.isEmpty ? "My account" : auth.state.username) : "Log in",
-                       action: onLoginClick)
+                       action: { if auth.state.loggedIn { onAccountClick() } else { onLoginClick() } })
                     .font(.subheadline)
             }
         }
@@ -159,7 +160,7 @@ struct HomeScreen: View {
                 Image(systemName: "square.grid.2x2.fill").font(.title).foregroundStyle(.white)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Collections").font(.headline).foregroundStyle(.white)
-                    Text("The Buddha · Meditation & Mindfulness · Living a Buddhist Life · Ethics · Wisdom…")
+                    Text("Introductions · Meditations · Latest · Themes · Series · People · Places")
                         .font(.caption).foregroundStyle(.white.opacity(0.9)).lineLimit(2)
                 }
                 Spacer()
@@ -171,37 +172,6 @@ struct HomeScreen: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
-    }
-
-    // MARK: - Browse rows
-
-    private var browseRows: some View {
-        VStack(spacing: 0) {
-            homeRow("Introductions", "Get started with Buddhism and meditation") {
-                onSourceClick(.apiCollection("introductions", title: "Introductions"), "Introductions")
-            }
-            homeRow("Meditations", "Guided meditations to practise with") {
-                onSourceClick(.namedCollection("guided-meditations"), "Meditations")
-            }
-            homeRow("Latest", "Newly added talks") {
-                onSourceClick(.apiCollection("latest", title: "Latest"), "Latest")
-            }
-            homeRow("Themes", "Curated collections by topic") { onMenuClick(["themes"], "Themes") }
-            homeRow("Series", "Talks that belong together") {
-                onSourceClick(.apiCollection("all_series", title: "Series"), "Series")
-            }
-            homeRow("People", "Browse by speaker") { onMenuClick(["people"], "People") }
-            homeRow("Places", "Browse by centre and retreat centre") { onMenuClick(["places"], "Places") }
-        }
-        .padding(.horizontal, 16)
-    }
-
-    private func homeRow(_ title: String, _ subtitle: String, action: @escaping () -> Void) -> some View {
-        VStack(spacing: 0) {
-            linkRow(title, subtitle: subtitle, action: action)
-                .padding(.vertical, 12)
-            Divider()
-        }
     }
 
     // MARK: - Connect

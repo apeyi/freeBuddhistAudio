@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.StateFlow
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
+import okhttp3.Interceptor
+import java.util.concurrent.Semaphore
 
 /**
  * The FBA website session: the three cookies the site sets after the Triratna
@@ -43,7 +45,7 @@ class SessionCookieStore(context: Context) : CookieJar {
     // --- OkHttp CookieJar: attach the session to every website request, follow rotations ---
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
-        if (!_loggedIn.value || !url.host.endsWith(HOST_SUFFIX)) return emptyList()
+        if (!_loggedIn.value || !needsSession(url)) return emptyList()
         return cookies().map { (name, value) ->
             Cookie.Builder().name(name).value(value).domain(HOST).path("/").build()
         }
@@ -51,10 +53,35 @@ class SessionCookieStore(context: Context) : CookieJar {
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
         // Only track rotations of an existing login; anonymous sessions are not kept.
-        if (!_loggedIn.value || !url.host.endsWith(HOST_SUFFIX)) return
+        if (!_loggedIn.value || !needsSession(url)) return
         val updates = cookies.filter { it.name in SESSION_COOKIES }.associate { it.name to it.value }
         if (updates.isNotEmpty()) setCookies(updates)
     }
+
+    /**
+     * Requests the session is attached to: website pages and the JSON API. Audio
+     * files (`/talks/…`) are public and are fetched without cookies — so downloads
+     * don't rotate the session and can run alongside other requests.
+     */
+    fun needsSession(url: HttpUrl): Boolean =
+        url.host.endsWith(HOST_SUFFIX) && !url.encodedPath.startsWith("/talks/")
+
+    /**
+     * The site issues a new `fba` cookie on EVERY response, so two requests sent
+     * at the same time carry the same, about-to-be-stale cookie and the second
+     * is bounced to the SSO. While logged in, session-carrying requests are
+     * therefore sent one at a time.
+     */
+    val serializingInterceptor = Interceptor { chain ->
+        val request = chain.request()
+        if (_loggedIn.value && needsSession(request.url)) {
+            sessionLock.acquire()
+            try { chain.proceed(request) } finally { sessionLock.release() }
+        } else {
+            chain.proceed(request)
+        }
+    }
+    private val sessionLock = Semaphore(1, true)
 
     companion object {
         const val HOST = "www.freebuddhistaudio.com"

@@ -12,8 +12,8 @@ struct AuthState: Equatable {
 
 /// Login with the existing FBA (Triratna single sign-on) account. `SsoLogin`
 /// runs the website's sign-on natively; the resulting session cookies are
-/// stored and installed into the shared cookie storage so every website
-/// request (scraper, downloads) carries them.
+/// stored and installed into FbaSession's private cookie storage so website
+/// requests (scraper, history) carry them — and nothing else does.
 ///
 /// To be replaced by a token-based login when the FBA API provides one.
 @MainActor
@@ -39,6 +39,7 @@ final class AuthRepository: ObservableObject {
         state = AuthState(loggedIn: loggedIn, checking: loggedIn)
         if loggedIn {
             installStoredCookies()
+            FbaSession.shared.isLoggedIn = true
             Task { await refresh() }
         }
     }
@@ -70,6 +71,7 @@ final class AuthRepository: ObservableObject {
         defaults.set(session, forKey: cookiesKey)
         defaults.set(true, forKey: loggedInKey)
         installStoredCookies()
+        FbaSession.shared.isLoggedIn = true
         state = AuthState(loggedIn: true, checking: true)
         return await refresh()
     }
@@ -114,11 +116,12 @@ final class AuthRepository: ObservableObject {
     /// Forget the session. `clearRemote` also ends the website session.
     func logout(clearRemote: Bool = true) async {
         if clearRemote, defaults.bool(forKey: loggedInKey) {
-            _ = try? await URLSession.shared.data(from: Self.logoutURL)
+            _ = try? await FbaSession.shared.data(from: Self.logoutURL)
         }
         defaults.removeObject(forKey: loggedInKey)
         defaults.removeObject(forKey: cookiesKey)
         removeSiteCookies()
+        FbaSession.shared.isLoggedIn = false
         state = AuthState()
     }
 
@@ -134,28 +137,28 @@ final class AuthRepository: ObservableObject {
             var props: [HTTPCookiePropertyKey: Any] = [.domain: Self.host, .path: "/", .name: name, .value: value]
             if name == "fba" { props[.secure] = "TRUE" } // presence of the key marks the cookie secure
             if let cookie = HTTPCookie(properties: props) {
-                HTTPCookieStorage.shared.setCookie(cookie)
+                FbaSession.shared.cookieStorage.setCookie(cookie)
             }
         }
     }
 
     /// The site rotates session ids; keep the stored copy in step with the cookie jar.
     private func captureRotatedCookies() {
-        guard let cookies = HTTPCookieStorage.shared.cookies(for: URL(string: "https://\(Self.host)/")!) else { return }
+        guard let cookies = FbaSession.shared.cookieStorage.cookies(for: URL(string: "https://\(Self.host)/")!) else { return }
         var stored = storedCookies()
         for c in cookies where Self.sessionCookies.contains(c.name) { stored[c.name] = c.value }
         defaults.set(stored, forKey: cookiesKey)
     }
 
     private func removeSiteCookies() {
-        guard let cookies = HTTPCookieStorage.shared.cookies(for: URL(string: "https://\(Self.host)/")!) else { return }
-        for c in cookies { HTTPCookieStorage.shared.deleteCookie(c) }
+        guard let cookies = FbaSession.shared.cookieStorage.cookies(for: URL(string: "https://\(Self.host)/")!) else { return }
+        for c in cookies { FbaSession.shared.cookieStorage.deleteCookie(c) }
     }
 
     private func fetchSiteLoggedIn() async throws -> Bool {
         var request = URLRequest(url: Self.myDetailsURL)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await FbaSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode == 401 || http.statusCode == 403 { return false }
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
         return obj["loggedIn"] as? Bool ?? false

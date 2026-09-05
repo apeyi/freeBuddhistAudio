@@ -4,26 +4,18 @@ import SwiftSoup
 actor FBAScraper {
     private static let baseUrl = "https://www.freebuddhistaudio.com"
 
-    private let session: URLSession
-
-    init() {
-        let config = URLSessionConfiguration.default
-        config.httpAdditionalHeaders = [
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": Self.baseUrl + "/",
-        ]
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
-        session = URLSession(configuration: config)
-    }
+    init() {}
 
     // MARK: - HTML Fetching
 
+    /// All website requests go through the login session (serialized while logged in).
+    private func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        try await FbaSession.shared.data(for: request)
+    }
+
     private func fetchHtml(_ urlString: String) async throws -> String {
         guard let url = URL(string: urlString) else { throw ScraperError.invalidUrl(urlString) }
-        let (data, response) = try await session.data(from: url)
+        let (data, response) = try await fetch(URLRequest(url: url))
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw ScraperError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0)
         }
@@ -112,7 +104,10 @@ actor FBAScraper {
         }
         let year = int(json, "year") ?? 0
         let genre = str(json, "genre") ?? str(json, "genre1") ?? ""
-        let duration = max(int(json, "durationSeconds") ?? int(json, "duration") ?? 0, 0)
+        // Negative or absurd durations (a known data problem on the site) → 0, so the
+        // UI derives the length from the tracks instead.
+        let rawDuration = int(json, "durationSeconds") ?? int(json, "duration") ?? 0
+        let duration = PlaybackMath.isPlausibleDuration(rawDuration) ? rawDuration : 0
         let imageUrl = str(json, "image") ?? str(json, "imageUrl") ?? str(json, "image_url") ?? ""
 
         let rawDesc = str(json, "blurb") ?? str(json, "description") ?? ""
@@ -179,7 +174,7 @@ actor FBAScraper {
             let remaster = (t["remasterAudio"] as? [String: Any])?["mp3"] as? String ?? ""
             return Track(
                 title: unescape(str(t, "title") ?? ""),
-                durationSeconds: max(int(t, "durationSeconds") ?? 0, 0),
+                durationSeconds: { let d = int(t, "durationSeconds") ?? 0; return PlaybackMath.isPlausibleDuration(d) ? d : 0 }(),
                 audioUrl: resolveUrl(mp3),
                 trackId: str(t, "trackId") ?? "",
                 remasterAudioUrl: resolveUrl(remaster),
@@ -353,7 +348,7 @@ actor FBAScraper {
                     do {
                         let url = "\(apiBaseUrl)?\(browseQueryString)&page=\(idx)"
                         guard let urlObj = URL(string: url) else { return nil }
-                        let (data, _) = try await self.session.data(from: urlObj)
+                        let (data, _) = try await FbaSession.shared.data(from: urlObj)
                         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                               let coll = json["collection"] as? [String: Any],
                               let items = coll["items"] as? [[String: Any]],
@@ -397,7 +392,7 @@ actor FBAScraper {
         guard let url = URL(string: urlString) else { throw ScraperError.invalidUrl(urlString) }
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await fetch(request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw ScraperError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0)
         }
@@ -488,6 +483,27 @@ actor FBAScraper {
             page: page,
             title: title.isEmpty ? unescape(str(coll, "label") ?? type) : title
         )
+    }
+
+    /// Images for a whole index collection (speakers, places): browse path →
+    /// image URL, skipping the site's placeholder images. One request (limit=1000).
+    func fetchIndexImages(type: String) async throws -> [String: String] {
+        let encoded = type.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? type
+        let json = try await fetchJson("\(Self.baseUrl)/api/v1/collections/\(encoded)?page=1&limit=1000")
+        var out: [String: String] = [:]
+        for obj in (json["collection"] as? [String: Any])?["items"] as? [[String: Any]] ?? [] {
+            guard let path = str(obj, "url"), let image = str(obj, "image_url"),
+                  !image.isEmpty, !image.contains("/default") else { continue }
+            out[Self.normalizeBrowsePath(path)] = resolveUrl(image)
+        }
+        return out
+    }
+
+    /// "https://www.freebuddhistaudio.com/browse?p=Adhisthana " → "/browse?p=adhisthana"
+    nonisolated static func normalizeBrowsePath(_ link: String) -> String {
+        var l = link.trimmingCharacters(in: .whitespaces)
+        if l.hasPrefix(baseUrl) { l = String(l.dropFirst(baseUrl.count)) }
+        return l.lowercased()
     }
 
     /// One page of a `/browse?…` listing (a speaker, place, year or genre).

@@ -35,6 +35,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.fba.app.data.remote.FBAScraper
 import com.fba.app.data.repository.ContentRepository
 import com.fba.app.domain.model.MenuNode
 import com.fba.app.ui.components.CollectionTile
@@ -51,6 +52,8 @@ import javax.inject.Inject
 data class MenuListUiState(
     val title: String = "",
     val nodes: List<MenuNode> = emptyList(),
+    /** normalized browse path → image URL (People / Places only) */
+    val images: Map<String, String> = emptyMap(),
     val isLoading: Boolean = true,
     val error: String? = null,
 )
@@ -74,9 +77,17 @@ class MenuListViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val nodes = content.getNodeChildren(path)
-                    // "all themes" / "all speakers" index entries first, then the rest as listed
                     .filterNot { it.isPlaceholder && !it.hasChildren }
                 _uiState.value = _uiState.value.copy(nodes = nodes, isLoading = false)
+                // People and Places entries get the images FBA shows in its own indexes
+                val indexType = when (path.firstOrNull()?.lowercase()) {
+                    "people" -> "speakers"
+                    "places" -> "places"
+                    else -> null
+                }
+                if (indexType != null) {
+                    _uiState.value = _uiState.value.copy(images = content.getIndexImages(indexType))
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = friendlyError(e))
             }
@@ -130,7 +141,7 @@ fun MenuListScreen(
                             CollectionTile(
                                 title = "",
                                 slug = node.collectionSlug ?: node.label,
-                                imageUrl = "",
+                                imageUrl = state.images[FBAScraper.normalizeBrowsePathStatic(node.link)] ?: "",
                                 onClick = { onNodeClick(node) },
                                 modifier = Modifier
                                     .size(48.dp)

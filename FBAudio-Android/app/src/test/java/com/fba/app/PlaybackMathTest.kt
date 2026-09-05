@@ -63,4 +63,15 @@ class PlaybackMathTest {
         assertEquals(50_000L, PlaybackMath.clampPosition(50_000L, 0L))
         assertEquals(0L, PlaybackMath.clampPosition(-5L, 10_000L))
     }
+
+    @Test
+    fun absurdTalkDurationFallsBackToTracks() {
+        val tracks = listOf(Track("", 1200, ""), Track("", 1800, ""))
+        // LOC3883 on the website: 717,860,544 seconds
+        assertEquals(3000, PlaybackMath.totalDurationSeconds(717_860_544, tracks, 0))
+        assertEquals(0, PlaybackMath.totalDurationSeconds(717_860_544, emptyList(), 0))
+        assertEquals(42, PlaybackMath.totalDurationSeconds(-5, emptyList(), 42_000))
+        assertTrue(PlaybackMath.isPlausibleDuration(20 * 3600))
+        assertFalse(PlaybackMath.isPlausibleDuration(0))
+    }
 }

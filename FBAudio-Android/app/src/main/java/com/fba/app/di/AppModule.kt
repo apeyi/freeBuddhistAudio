@@ -54,8 +54,10 @@ object AppModule {
         return OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
-            // Attaches the FBA login session (when logged in) to website requests.
+            // Attaches the FBA login session (when logged in) to website requests,
+            // one request at a time (the site rotates the session cookie per response).
             .cookieJar(sessionCookieStore)
+            .addInterceptor(sessionCookieStore.serializingInterceptor)
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36")

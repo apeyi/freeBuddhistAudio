@@ -79,6 +79,14 @@ fun NavGraph(
                 onMenuClick = { path, title -> navController.navigate(Routes.menu(path, title)) },
                 onDonateClick = onDonate,
                 onLoginClick = { navController.navigate(Routes.LOGIN) },
+                onAccountClick = {
+                    // Switch to the My FBA tab (same navigation the tab bar uses)
+                    navController.navigate(Routes.MY_FBA) {
+                        popUpTo(Routes.HOME) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
                 onOpenUrl = openUrl,
             )
         }
@@ -137,6 +145,8 @@ fun NavGraph(
         composable(Routes.COLLECTIONS) {
             CollectionsScreen(
                 onCollectionClick = { node -> onMenuNodeClick(listOf("collections"), node) },
+                onSourceClick = { source, title -> navController.navigate(Routes.list(source, title)) },
+                onMenuClick = { path, title -> navController.navigate(Routes.menu(path, title)) },
                 onBack = { navController.popBackStack() },
             )
         }

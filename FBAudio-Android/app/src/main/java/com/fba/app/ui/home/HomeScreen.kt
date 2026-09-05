@@ -77,6 +77,8 @@ fun HomeScreen(
     onMenuClick: (List<String>, String) -> Unit = { _, _ -> },
     onDonateClick: () -> Unit = {},
     onLoginClick: () -> Unit = {},
+    /** Logged in: the header shows the account name and opens My FBA. */
+    onAccountClick: () -> Unit = {},
     onOpenUrl: (String) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -112,7 +114,7 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                     )
                     if (FeatureFlags.AUTH) {
-                        TextButton(onClick = onLoginClick) {
+                        TextButton(onClick = { if (auth.loggedIn) onAccountClick() else onLoginClick() }) {
                             Text(if (auth.loggedIn) auth.username.ifBlank { "My account" } else "Log in")
                         }
                     }
@@ -144,28 +146,6 @@ fun HomeScreen(
             item {
                 Spacer(Modifier.height(12.dp))
                 CollectionsCard(onClick = onCollectionsClick)
-            }
-
-            // --- Browse rows ---
-            item {
-                Spacer(Modifier.height(12.dp))
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    HomeRow("Introductions", "Get started with Buddhism and meditation") {
-                        onSourceClick(ContentSource.ApiCollection("introductions", "Introductions"), "Introductions")
-                    }
-                    HomeRow("Meditations", "Guided meditations to practise with") {
-                        onSourceClick(ContentSource.NamedCollection("guided-meditations"), "Meditations")
-                    }
-                    HomeRow("Latest", "Newly added talks") {
-                        onSourceClick(ContentSource.ApiCollection("latest", "Latest"), "Latest")
-                    }
-                    HomeRow("Themes", "Curated collections by topic") { onMenuClick(listOf("themes"), "Themes") }
-                    HomeRow("Series", "Talks that belong together") {
-                        onSourceClick(ContentSource.ApiCollection("all_series", "Series"), "Series")
-                    }
-                    HomeRow("People", "Browse by speaker") { onMenuClick(listOf("people"), "People") }
-                    HomeRow("Places", "Browse by centre and retreat centre") { onMenuClick(listOf("places"), "Places") }
-                }
             }
 
             // --- Support FBA ---
@@ -203,24 +183,6 @@ fun HomeScreen(
             }
         }
     }
-}
-
-@Composable
-private fun HomeRow(title: String, subtitle: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    HorizontalDivider()
 }
 
 @Composable
@@ -339,7 +301,7 @@ private fun CollectionsCard(onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Collections", style = MaterialTheme.typography.titleMedium, color = Color.White)
                 Text(
-                    "The Buddha · Meditation & Mindfulness · Living a Buddhist Life · Ethics · Wisdom…",
+                    "Introductions · Meditations · Latest · Themes · Series · People · Places",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.9f),
                     maxLines = 2,

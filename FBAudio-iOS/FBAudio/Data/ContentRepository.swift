@@ -114,6 +114,21 @@ final class ContentRepository {
                                           nonEnglishCentres: LanguageFilter.nonEnglishCentres(menu))
     }
 
+    private struct ImageMap: Codable { let images: [String: String] }
+
+    /// Images for the curated People / Places lists, from FBA's speaker and place
+    /// indexes (keyed by normalized browse path). Cached; empty on failure.
+    func getIndexImages(_ type: String) async -> [String: String] {
+        let key = "images:\(type)"
+        let cached: (ImageMap, Bool)? = await cache.get(key, ImageMap.self)
+        if let cached, cached.1 { return cached.0.images }
+        if let fresh = try? await scraper.fetchIndexImages(type: type) {
+            await cache.put(key, ImageMap(images: fresh))
+            return fresh
+        }
+        return cached?.0.images ?? [:]
+    }
+
     func getDigitalLegacy() async -> DigitalLegacy? {
         let cached: (DigitalLegacy, Bool)? = await cache.get("digital_legacy", DigitalLegacy.self)
         if let cached, cached.1 { return cached.0 }

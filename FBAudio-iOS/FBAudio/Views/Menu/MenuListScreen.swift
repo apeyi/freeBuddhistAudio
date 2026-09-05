@@ -7,6 +7,8 @@ struct MenuListScreen: View {
     let onNodeClick: (MenuNode) -> Void
 
     @State private var nodes: [MenuNode] = []
+    /// normalized browse path → image URL (People / Places only)
+    @State private var images: [String: String] = [:]
     @State private var isLoading = true
     @State private var error: String?
 
@@ -25,7 +27,8 @@ struct MenuListScreen: View {
                 List(nodes) { node in
                     Button(action: { onNodeClick(node) }) {
                         HStack(spacing: 12) {
-                            CollectionTile(title: "", slug: node.collectionSlug ?? node.label, imageUrl: "", showTitle: false)
+                            CollectionTile(title: "", slug: node.collectionSlug ?? node.label,
+                                           imageUrl: images[FBAScraper.normalizeBrowsePath(node.link)] ?? "", showTitle: false)
                                 .frame(width: 48, height: 48)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(capitalizedFirst(node.label))
@@ -64,5 +67,14 @@ struct MenuListScreen: View {
             self.error = friendlyError(error)
         }
         isLoading = false
+        // People and Places entries get the images FBA shows in its own indexes
+        let indexType: String? = switch path.first?.lowercased() {
+            case "people": "speakers"
+            case "places": "places"
+            default: nil
+        }
+        if let indexType {
+            images = await ContentRepository.shared.getIndexImages(indexType)
+        }
     }
 }

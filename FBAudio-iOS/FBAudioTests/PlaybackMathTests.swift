@@ -54,4 +54,14 @@ final class PlaybackMathTests: XCTestCase {
         XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 50_000, newDurationMs: 0), 50_000)
         XCTAssertEqual(PlaybackMath.clampPosition(positionMs: -5, newDurationMs: 10_000), 0)
     }
+
+    func testAbsurdTalkDurationFallsBackToTracks() {
+        let tracks = [track(1200), track(1800)]
+        // LOC3883 on the website: 717,860,544 seconds
+        XCTAssertEqual(PlaybackMath.totalDurationSeconds(talkDurationSeconds: 717_860_544, tracks: tracks, playerDurationMs: 0), 3000)
+        XCTAssertEqual(PlaybackMath.totalDurationSeconds(talkDurationSeconds: 717_860_544, tracks: [], playerDurationMs: 0), 0)
+        XCTAssertEqual(PlaybackMath.totalDurationSeconds(talkDurationSeconds: -5, tracks: [], playerDurationMs: 42_000), 42)
+        XCTAssertTrue(PlaybackMath.isPlausibleDuration(20 * 3600))
+        XCTAssertFalse(PlaybackMath.isPlausibleDuration(0))
+    }
 }
