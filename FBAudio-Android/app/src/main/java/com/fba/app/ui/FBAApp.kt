@@ -1,5 +1,7 @@
 package com.fba.app.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,6 +32,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.fba.app.FeatureFlags
 import com.fba.app.domain.model.ContentSource
+import com.fba.app.ui.navigation.DONATE_URL
 import com.fba.app.ui.navigation.NavGraph
 import com.fba.app.ui.navigation.Routes
 import com.fba.app.ui.player.MiniPlayer
@@ -47,6 +51,7 @@ fun FBAApp(
     onDeepLinkConsumed: () -> Unit = {},
 ) {
     FBATheme {
+        val context = LocalContext.current
         val navController = rememberNavController()
         val playerViewModel: PlayerViewModel = hiltViewModel()
         val appViewModel: AppViewModel = hiltViewModel()
@@ -141,7 +146,14 @@ fun FBAApp(
                             tab(Routes.DOWNLOADS, "Downloads", Icons.Default.Download) {
                                 navigateToTab(if (canDownload) Routes.DOWNLOADS else Routes.JOIN)
                             }
-                            tab(Routes.JOIN, "Join", Icons.Default.Favorite)
+                            // Donate opens the FBA donation page directly; it is never "selected".
+                            // (Join stays reachable from download gating / My FBA for later.)
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Default.Favorite, contentDescription = "Donate") },
+                                label = { Text("Donate", maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelSmall) },
+                                selected = false,
+                                onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL))) },
+                            )
                             tab(Routes.MY_FBA, "My FBA", Icons.Default.Person)
                         }
                     }

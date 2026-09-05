@@ -57,7 +57,7 @@ Everything applies to both Android and iOS.
 
 | # | Decision | Recommendation | Why |
 |---|---|---|---|
-| D1 | Nav bar with 6 tabs (Home · Search · Downloads · Donate · Join · My FBA) | **5 tabs** — Donate is a button on Home, My FBA and every talk/series page instead of a tab. *Agreed.* | iOS only shows 5 tabs; a 6th is hidden under "More", so Donate would vanish. |
+| D1 | Nav bar with 6 tabs (Home · Search · Downloads · Donate · Join · My FBA) | **5 tabs: Home · Search · Downloads · Donate · My FBA.** Join is not a tab for now (pointless until subscriptions exist); it is reached from download gating and can move into My FBA later. Donate also stays a button on Home, My FBA and talk/series pages. *Agreed.* | iOS only shows 5 tabs; a 6th is hidden under "More". |
 | D2 | Gating downloads on membership | Build the gate, ship it **switched off** until Join actually works. | Testers currently download freely; gating with no way to join gains nothing. |
 | D3 | Which version plays when a talk has a remastered version | **Remastered** by default, toggle to Original in the player, choice remembered per talk. | Matches FBA's Digital Legacy push. |
 | D4 | English \| All languages toggle | Ship as a setting, default **English**, using the language markers available today; refine when FBA supplies proper tags. | Best effort now beats nothing. |
@@ -73,7 +73,7 @@ Everything applies to both Android and iOS.
 
 | Today | Change |
 |---|---|
-| Three tabs: **Home · Search · Downloads**. | Five tabs: **Home · Search · Downloads · Join · My FBA** (per D1). |
+| Three tabs: **Home · Search · Downloads**. | Five tabs: **Home · Search · Downloads · Donate · My FBA**. Donate opens the donation page directly. The Join page is built but not a tab for now — it is reached from download gating (and can be added to My FBA later). |
 | Downloads open for everyone. | When gating is switched on and the user isn't a member, Downloads and the *Download* buttons lead to **Join**. Existing downloads stay playable. |
 | Recently listened lives on Home. | Moves to **My FBA**, unchanged, with a Donate button beside it. |
 

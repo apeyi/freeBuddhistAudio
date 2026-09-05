@@ -70,12 +70,11 @@ struct ContentView: View {
             .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
             .tag(2)
 
-            NavigationStack {
-                JoinScreen(onDonateClick: openDonate)
-            }
-            .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
-            .tabItem { Label("Join", systemImage: "heart") }
-            .tag(3)
+            // Donate opens the FBA donation page directly (see tabSelection); the tab
+            // is never actually shown. Join stays reachable from download gating for later.
+            Color.clear
+                .tabItem { Label("Donate", systemImage: "heart") }
+                .tag(3)
 
             NavigationStack {
                 MyFbaScreen(
@@ -127,6 +126,11 @@ struct ContentView: View {
         Binding(
             get: { selectedTab },
             set: { newTab in
+                if newTab == 3 {
+                    // Donate: open the web page, stay on the current tab
+                    openDonate()
+                    return
+                }
                 if newTab == selectedTab && newTab == 0 {
                     navigationPath = NavigationPath()
                 }
@@ -147,6 +151,7 @@ struct ContentView: View {
         case menu([String], String)
         case collections
         case digitalLegacy
+        case join
 
         /// Series links from talk pages / search are hrefs; resolve them to the series list.
         static func seriesFromHref(_ href: String) -> Route {
@@ -262,7 +267,7 @@ struct ContentView: View {
                     navigationPath.append(Route.transcript(url, catNum))
                 },
                 onDonateClick: openDonate,
-                onJoinClick: { selectedTab = 3 },
+                onJoinClick: { navigate(.join) },
                 canDownload: canDownload
             )
         case .browse(let mode):
@@ -277,6 +282,8 @@ struct ContentView: View {
             ListScreen(source: source, initialTitle: title, onItemClick: openItem, onDonateClick: openDonate)
         case .menu(let path, let title):
             MenuListScreen(path: path, title: title, onNodeClick: { openMenuNode($0, parentPath: path) })
+        case .join:
+            JoinScreen(onDonateClick: openDonate)
         case .collections:
             CollectionsScreen(onCollectionClick: { openMenuNode($0, parentPath: ["collections"]) })
         case .digitalLegacy:
