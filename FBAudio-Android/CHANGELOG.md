@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — spec v1.0 (pre-API)
+## v0.7.0 — spec v1.0 (pre-API)
 
 <details>
 <summary>Changes</summary>

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -125,7 +126,8 @@ fun FBAApp(
                             fun tab(route: String, label: String, icon: ImageVector, onClick: () -> Unit = { navigateToTab(route) }) {
                                 NavigationBarItem(
                                     icon = { Icon(icon, contentDescription = label) },
-                                    label = { Text(label) },
+                                    // Five tabs: keep labels on one line on narrow phones / large fonts
+                                    label = { Text(label, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelSmall) },
                                     selected = currentRoute == route,
                                     onClick = onClick,
                                 )

@@ -123,6 +123,7 @@ fun MyFbaScreen(
                             }
                         }
                         if (FeatureFlags.AUTH) {
+                            Spacer(Modifier.width(12.dp))
                             if (auth.loggedIn) {
                                 OutlinedButton(onClick = { viewModel.logout() }) { Text("Log out") }
                             } else {
