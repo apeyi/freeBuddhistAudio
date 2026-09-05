@@ -131,28 +131,51 @@ final class ContentRepository {
 
     private struct EntryList: Codable { let items: [SearchResult] }
 
-    /// All speakers or places as browse links (cached daily), language-filtered.
+    /// All speakers or places as browse links (cached daily). Not language-filtered:
+    /// these are navigation targets matched by name — someone typing "Valencia"
+    /// wants Valencia regardless of the English-only setting.
     func getIndexEntries(_ type: String) async -> [SearchResult] {
         let key = "index:\(type)"
         let cached: (EntryList, Bool)? = await cache.get(key, EntryList.self)
-        var items: [SearchResult]
-        if let cached, cached.1 {
-            items = cached.0.items
-        } else if let fresh = try? await scraper.fetchIndexEntries(type: type) {
+        if let cached, cached.1 { return cached.0.items }
+        if let fresh = try? await scraper.fetchIndexEntries(type: type) {
             await cache.put(key, EntryList(items: fresh))
-            items = fresh
-        } else {
-            items = cached?.0.items ?? []
+            return fresh
         }
-        // Index tiles carry the name in `title`; expose it as speaker/centre so the
-        // language filter can apply its lists, then strip it again for display.
-        let tagged = items.map { i in
-            SearchResult(catNum: i.catNum, title: i.title, speaker: type == "speakers" ? i.title : "", imageUrl: i.imageUrl,
-                         path: i.path, year: i.year, centre: type == "places" ? i.title : "", omOnly: i.omOnly)
+        return cached?.0.items ?? []
+    }
+
+    /// Index entries plus FBA's curated menu entries for the same section (People /
+    /// Places), so labels like "talks from east london (lbc)" are searchable too.
+    /// `centre` temporarily carries the curated label for index entries.
+    private func nameEntries(type: String, section: String) async -> [SearchResult] {
+        var byPath: [String: SearchResult] = [:]
+        for item in await getIndexEntries(type) { byPath[FBAScraper.normalizeBrowsePath(item.path)] = item }
+        let menu = (try? await getMenu()) ?? []
+        func visit(_ node: MenuNode) {
+            var path: String?
+            switch node.toSource() {
+            case .browse(let p): path = p
+            case .namedCollection(let slug): path = "/collection/\(slug)"
+            default: path = nil
+            }
+            if let path {
+                let key = FBAScraper.normalizeBrowsePath(path)
+                let label = capitalizedFirst(node.label)
+                if let existing = byPath[key] {
+                    if existing.title.caseInsensitiveCompare(label) != .orderedSame {
+                        byPath[key] = SearchResult(catNum: existing.catNum, title: existing.title, speaker: existing.speaker,
+                                                   imageUrl: existing.imageUrl, path: existing.path, year: existing.year,
+                                                   centre: label, omOnly: existing.omOnly)
+                    }
+                } else {
+                    byPath[key] = SearchResult(catNum: path, title: label, path: path)
+                }
+            }
+            node.children.forEach(visit)
         }
-        return await filterForLanguage(tagged).map { i in
-            SearchResult(catNum: i.catNum, title: i.title, speaker: "", imageUrl: i.imageUrl, path: i.path, year: i.year, centre: "", omOnly: i.omOnly)
-        }
+        (SiteMenuParser.section(menu, section)?.children ?? []).forEach(visit)
+        return Array(byPath.values)
     }
 
     /// Curated collections + themes as `/collection/` links (for search).
@@ -177,10 +200,16 @@ final class ContentRepository {
     func matchNames(_ query: String) async -> NameMatches {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard q.count >= 2 else { return NameMatches() }
-        func matching(_ items: [SearchResult]) -> [SearchResult] { Array(items.filter { $0.title.lowercased().contains(q) }.prefix(20)) }
+        func matching(_ items: [SearchResult]) -> [SearchResult] {
+            Array(items.filter { $0.title.lowercased().contains(q) || $0.centre.lowercased().contains(q) }
+                .map { SearchResult(catNum: $0.catNum, title: $0.title, speaker: $0.speaker, imageUrl: $0.imageUrl,
+                                    path: $0.path, year: $0.year, centre: "", omOnly: $0.omOnly) }
+                .sorted { $0.title.lowercased() < $1.title.lowercased() }
+                .prefix(20))
+        }
         return NameMatches(
-            speakers: matching(await getIndexEntries("speakers")),
-            places: matching(await getIndexEntries("places")),
+            speakers: matching(await nameEntries(type: "speakers", section: "people")),
+            places: matching(await nameEntries(type: "places", section: "places")),
             collections: matching(await getCollectionEntries())
         )
     }

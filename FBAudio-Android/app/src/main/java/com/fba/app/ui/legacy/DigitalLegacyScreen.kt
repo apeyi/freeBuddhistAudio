@@ -1,5 +1,6 @@
 package com.fba.app.ui.legacy
 
+import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,20 +18,22 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,23 +51,34 @@ import com.fba.app.ui.components.formatDuration
 import com.fba.app.ui.components.safeFraction
 import com.fba.app.ui.player.PlayerViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DigitalLegacyUiState(
     val page: DigitalLegacy? = null,
     val isLoading: Boolean = true,
-    /** Title/speaker of the sample talk, once known. */
+    /** Title/speaker/chapter of the sample, once known. */
     val sampleTitle: String = "",
     val sampleSpeaker: String = "",
-    /** Version chosen for the sample (before/while playing). */
-    val sampleUseRemaster: Boolean = true,
+    val sampleChapter: String = "",
+    /** Both versions of the sample chapter are prepared. */
+    val sampleReady: Boolean = false,
+    val useRemaster: Boolean = true,
+    val isPlaying: Boolean = false,
+    val isBuffering: Boolean = false,
+    val positionMs: Long = 0,
+    val durationMs: Long = 0,
 )
 
 @HiltViewModel
 class DigitalLegacyViewModel @Inject constructor(
+    @ApplicationContext context: Context,
     private val content: ContentRepository,
     private val talks: TalkRepository,
     private val settings: AppSettings,
@@ -73,30 +87,79 @@ class DigitalLegacyViewModel @Inject constructor(
     val uiState: StateFlow<DigitalLegacyUiState> = _uiState
     val preferRemastered: StateFlow<Boolean> = settings.preferRemastered
 
+    private val sample = SamplePlayer(context)
+    private var ticker: Job? = null
+
     init {
         viewModelScope.launch {
             val page = content.getDigitalLegacy()
+            _uiState.value = _uiState.value.copy(page = page, isLoading = false)
+            val catNum = page?.sampleCatNum?.takeIf { it.isNotBlank() } ?: return@launch
+            val talk = talks.getTalkDetail(catNum) ?: return@launch
+            // Use the first chapter that exists in both versions; prepare both right away.
+            val chapter = talk.tracks.firstOrNull { it.hasRemaster } ?: return@launch
+            val startRemastered = settings.preferRemastered.value
+            sample.load(chapter.audioUrl, chapter.remasterAudioUrl, startRemastered)
             _uiState.value = _uiState.value.copy(
-                page = page,
-                isLoading = false,
-                sampleUseRemaster = page?.sampleCatNum?.let { settings.useRemaster(it) } ?: true,
+                sampleTitle = talk.title,
+                sampleSpeaker = talk.speaker,
+                sampleChapter = chapter.title,
+                sampleReady = true,
+                useRemaster = startRemastered,
+                durationMs = chapter.durationSeconds * 1000L,
             )
-            page?.sampleCatNum?.takeIf { it.isNotBlank() }?.let { catNum ->
-                talks.getTalkDetail(catNum)?.let { talk ->
-                    _uiState.value = _uiState.value.copy(sampleTitle = talk.title, sampleSpeaker = talk.speaker)
-                }
+            startTicker()
+        }
+    }
+
+    /** Swap the audible version; instant because both are already playing/buffered. */
+    fun setVersion(useRemaster: Boolean) {
+        sample.setVersion(useRemaster)
+        _uiState.value = _uiState.value.copy(useRemaster = useRemaster)
+    }
+
+    fun togglePlayPause() {
+        sample.togglePlayPause()
+        tick()
+    }
+
+    fun seekToFraction(fraction: Float) {
+        val duration = _uiState.value.durationMs.takeIf { it > 0 } ?: return
+        sample.seekTo((fraction.safeFraction() * duration).toLong())
+        tick()
+    }
+
+    /** The sample is a demo: stop it when the screen goes away. */
+    fun stopSample() = sample.pause()
+
+    fun setPreferRemastered(value: Boolean) = settings.setPreferRemastered(value)
+
+    private fun startTicker() {
+        ticker?.cancel()
+        ticker = viewModelScope.launch {
+            var n = 0
+            while (isActive) {
+                tick()
+                if (++n % 10 == 0) sample.resync()
+                delay(500)
             }
         }
     }
 
-    /** Remember the version for the sample; the player picks it up when the sample starts. */
-    fun chooseVersion(useRemaster: Boolean) {
-        val catNum = _uiState.value.page?.sampleCatNum ?: return
-        settings.setRemasterChoice(catNum, useRemaster)
-        _uiState.value = _uiState.value.copy(sampleUseRemaster = useRemaster)
+    private fun tick() {
+        _uiState.value = _uiState.value.copy(
+            isPlaying = sample.isPlaying,
+            isBuffering = sample.isBuffering,
+            positionMs = sample.positionMs,
+            durationMs = sample.durationMs.takeIf { it > 0 } ?: _uiState.value.durationMs,
+        )
     }
 
-    fun setPreferRemastered(value: Boolean) = settings.setPreferRemastered(value)
+    override fun onCleared() {
+        ticker?.cancel()
+        sample.release()
+        super.onCleared()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,7 +173,9 @@ fun DigitalLegacyScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val preferRemastered by viewModel.preferRemastered.collectAsStateWithLifecycle()
-    val playerState by playerViewModel.uiState.collectAsStateWithLifecycle()
+
+    // The sample stops when the page is left
+    DisposableEffect(Unit) { onDispose { viewModel.stopSample() } }
 
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
@@ -130,7 +195,6 @@ fun DigitalLegacyScreen(
             return@Scaffold
         }
         val legacy = state.page
-        val sample = legacy?.sampleCatNum.orEmpty()
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -147,74 +211,70 @@ fun DigitalLegacyScreen(
             )
             Spacer(Modifier.height(20.dp))
 
-            // --- Hear the difference: inline A/B player on the sample talk ---
-            if (sample.isNotBlank()) {
-                val isSamplePlaying = playerState.currentTalk?.catNum == sample
-                val useRemaster = if (isSamplePlaying) playerState.useRemaster else state.sampleUseRemaster
+            // --- Hear the difference: A/B player with both versions preloaded ---
+            if (!legacy?.sampleCatNum.isNullOrBlank()) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Hear the difference", style = MaterialTheme.typography.titleMedium)
-                        if (state.sampleTitle.isNotBlank()) {
-                            Text(
-                                listOf(state.sampleTitle, state.sampleSpeaker).filter { it.isNotBlank() }.joinToString(" · "),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        val subtitle = listOf(state.sampleTitle, state.sampleChapter, state.sampleSpeaker)
+                            .filter { it.isNotBlank() }.joinToString(" · ")
+                        if (subtitle.isNotBlank()) {
+                            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Spacer(Modifier.height(12.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // Original first, then Remastered — the same order as the player.
-                            // Switching while the sample plays swaps the audio at the same position.
+                            // Both versions play in step, so this swaps the sound instantly.
                             SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
                                 SegmentedButton(
-                                    selected = !useRemaster,
-                                    onClick = {
-                                        viewModel.chooseVersion(false)
-                                        if (isSamplePlaying) playerViewModel.setUseRemaster(false)
-                                    },
-                                    enabled = !(isSamplePlaying && playerState.versionLocked),
+                                    selected = !state.useRemaster,
+                                    onClick = { viewModel.setVersion(false) },
+                                    enabled = state.sampleReady,
                                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                                 ) { Text("Original") }
                                 SegmentedButton(
-                                    selected = useRemaster,
-                                    onClick = {
-                                        viewModel.chooseVersion(true)
-                                        if (isSamplePlaying) playerViewModel.setUseRemaster(true)
-                                    },
-                                    enabled = !(isSamplePlaying && playerState.versionLocked),
+                                    selected = state.useRemaster,
+                                    onClick = { viewModel.setVersion(true) },
+                                    enabled = state.sampleReady,
                                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                                 ) { Text("Remastered") }
                             }
                             Spacer(Modifier.width(12.dp))
-                            IconButton(
-                                onClick = {
-                                    if (isSamplePlaying) playerViewModel.togglePlayPause()
-                                    else playerViewModel.playTalk(sample)
-                                },
-                                modifier = Modifier.size(48.dp),
-                            ) {
-                                Icon(
-                                    if (isSamplePlaying && playerState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isSamplePlaying && playerState.isPlaying) "Pause" else "Play sample",
-                                    modifier = Modifier.size(32.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                            androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                                IconButton(
+                                    onClick = {
+                                        // One thing at a time: the demo pauses the main player
+                                        if (!state.isPlaying) playerViewModel.pause()
+                                        viewModel.togglePlayPause()
+                                    },
+                                    enabled = state.sampleReady,
+                                    modifier = Modifier.size(48.dp),
+                                ) {
+                                    Icon(
+                                        if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (state.isPlaying) "Pause" else "Play sample",
+                                        modifier = Modifier.size(32.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                if (!state.sampleReady || state.isBuffering) {
+                                    CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 2.dp)
+                                }
                             }
                         }
-                        if (isSamplePlaying && playerState.duration > 0) {
-                            Spacer(Modifier.height(10.dp))
-                            LinearProgressIndicator(
-                                progress = { (playerState.currentPosition.toFloat() / playerState.duration).safeFraction() },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "${formatDuration((playerState.currentPosition / 1000).toInt())} / ${formatDuration((playerState.duration / 1000).toInt())}" +
-                                    "  ·  ${if (useRemaster) "remastered" else "original"}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Spacer(Modifier.height(8.dp))
+                        Slider(
+                            value = (if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f).safeFraction(),
+                            onValueChange = { viewModel.seekToFraction(it) },
+                            enabled = state.sampleReady,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "${formatDuration((state.positionMs / 1000).toInt())} / ${formatDuration((state.durationMs / 1000).toInt())}" +
+                                "  ·  ${if (state.useRemaster) "remastered" else "original"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 Spacer(Modifier.height(16.dp))

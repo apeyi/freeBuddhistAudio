@@ -144,19 +144,52 @@ class ContentRepository @Inject constructor(
 
     private class EntryList(val items: List<SearchResult> = emptyList())
 
-    /** All speakers or places as browse links (cached daily), language-filtered. */
+    /**
+     * All speakers or places as browse links (cached daily). Not language-filtered:
+     * these are navigation targets matched by name — someone typing "Valencia"
+     * wants Valencia regardless of the English-only setting.
+     */
     suspend fun getIndexEntries(type: String): List<SearchResult> {
         val key = "index:$type"
         val cached = cache.get(key, EntryList::class.java)
-        val items = if (cached != null && cached.second) cached.first.items else try {
+        return if (cached != null && cached.second) cached.first.items else try {
             scraper.fetchIndexEntries(type).also { cache.put(key, EntryList(it)) }
         } catch (_: Exception) {
             cached?.first?.items ?: emptyList()
         }
-        // Index tiles carry the name in `title`; expose it as speaker/centre so the
-        // language filter can apply its lists, then strip it again for display.
-        val tagged = items.map { if (type == "speakers") it.copy(speaker = it.title) else it.copy(centre = it.title) }
-        return filterForLanguage(tagged).map { if (type == "speakers") it.copy(speaker = "") else it.copy(centre = "") }
+    }
+
+    /**
+     * Index entries plus FBA's curated menu entries for the same section (People /
+     * Places), so labels like "talks from east london (lbc)" or "birmingham
+     * (england)" are searchable too. Deduplicated by browse path.
+     */
+    private suspend fun nameEntries(type: String, section: String): List<SearchResult> {
+        val index = getIndexEntries(type)
+        val byPath = index.associateBy { FBAScraper.normalizeBrowsePathStatic(it.path) }.toMutableMap()
+        val menu = try { getMenu() } catch (_: Exception) { emptyList() }
+        fun visit(node: MenuNode) {
+            val source = node.toSource()
+            val path = when (source) {
+                is ContentSource.Browse -> source.path
+                is ContentSource.NamedCollection -> "/collection/${source.slug}"
+                else -> null
+            }
+            if (path != null) {
+                val key = FBAScraper.normalizeBrowsePathStatic(path)
+                val existing = byPath[key]
+                val label = node.label.replaceFirstChar { it.uppercase() }
+                byPath[key] = if (existing != null) {
+                    // Keep the index entry (has the image) but make the curated label searchable too
+                    if (existing.title.equals(label, ignoreCase = true)) existing else existing.copy(centre = label)
+                } else {
+                    SearchResult(catNum = path, title = label, speaker = "", imageUrl = "", path = path)
+                }
+            }
+            node.children.forEach { visit(it) }
+        }
+        SiteMenuParser.section(menu, section)?.children?.forEach { visit(it) }
+        return byPath.values.toList()
     }
 
     /** Curated collections + themes as `/collection/` links (for search). */
@@ -175,10 +208,14 @@ class ContentRepository @Inject constructor(
     suspend fun matchNames(query: String): NameMatches {
         val q = query.trim().lowercase()
         if (q.length < 2) return NameMatches(emptyList(), emptyList(), emptyList())
-        fun List<SearchResult>.matching() = filter { it.title.lowercase().contains(q) }.take(20)
+        // `centre` temporarily carries the curated label for index entries (see nameEntries)
+        fun List<SearchResult>.matching() = filter { it.title.lowercase().contains(q) || it.centre.lowercase().contains(q) }
+            .map { it.copy(centre = "") }
+            .sortedBy { it.title.lowercase() }
+            .take(20)
         return NameMatches(
-            speakers = getIndexEntries("speakers").matching(),
-            places = getIndexEntries("places").matching(),
+            speakers = nameEntries("speakers", "people").matching(),
+            places = nameEntries("places", "places").matching(),
             collections = getCollectionEntries().matching(),
         )
     }

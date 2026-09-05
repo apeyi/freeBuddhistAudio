@@ -557,6 +557,11 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    /** Explicit pause (e.g. when the Digital Legacy sample starts playing). */
+    fun pause() {
+        mediaController?.takeIf { it.isPlaying }?.pause()
+    }
+
     /** Manual retry after a playback error (re-prepares the current media item). */
     fun retry() {
         autoRetryCount = 0
