@@ -2,6 +2,7 @@ package com.fba.app.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fba.app.data.repository.ContentRepository
 import com.fba.app.data.repository.TalkRepository
 import com.fba.app.domain.model.SangharakshitaData
 import com.fba.app.domain.model.SearchResult
@@ -16,39 +17,60 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class SearchMode { ALL, BY_SPEAKER }
+/** Result categories. Chips are shown for ALL plus every category that has results. */
+enum class SearchFilter(val label: String) {
+    ALL("All"), TALKS("Talks"), SERIES("Series"), SPEAKERS("Speakers"), PLACES("Places"), COLLECTIONS("Collections")
+}
+
+data class SearchResults(
+    val talks: List<SearchResult> = emptyList(),
+    val series: List<SearchResult> = emptyList(),
+    val speakers: List<SearchResult> = emptyList(),
+    val places: List<SearchResult> = emptyList(),
+    val collections: List<SearchResult> = emptyList(),
+) {
+    val isEmpty: Boolean get() = talks.isEmpty() && series.isEmpty() && speakers.isEmpty() && places.isEmpty() && collections.isEmpty()
+
+    fun of(filter: SearchFilter): List<SearchResult> = when (filter) {
+        SearchFilter.ALL -> emptyList()
+        SearchFilter.TALKS -> talks
+        SearchFilter.SERIES -> series
+        SearchFilter.SPEAKERS -> speakers
+        SearchFilter.PLACES -> places
+        SearchFilter.COLLECTIONS -> collections
+    }
+
+    /** Categories with results, in display order. */
+    val available: List<SearchFilter>
+        get() = listOf(SearchFilter.SPEAKERS, SearchFilter.PLACES, SearchFilter.COLLECTIONS, SearchFilter.SERIES, SearchFilter.TALKS)
+            .filter { of(it).isNotEmpty() }
+}
 
 data class SearchUiState(
     val query: String = "",
-    val keywordFilter: String = "",
-    val searchMode: SearchMode = SearchMode.ALL,
-    val results: List<SearchResult> = emptyList(),
-    val filteredResults: List<SearchResult> = emptyList(),
+    val filter: SearchFilter = SearchFilter.ALL,
+    val results: SearchResults = SearchResults(),
     val isLoading: Boolean = false,
-    val isLoadingMore: Boolean = false,
     val hasSearched: Boolean = false,
     val error: String? = null,
     val navigateToCatNum: String? = null,
-    val totalSpeakerTalks: Int = 0,
-)
+) {
+    /** Chips to show: All + categories with results; falls back to All when the chosen one vanished. */
+    val chips: List<SearchFilter> get() = if (results.available.size > 1) listOf(SearchFilter.ALL) + results.available else emptyList()
+    val effectiveFilter: SearchFilter get() = if (filter == SearchFilter.ALL || filter in results.available) filter else SearchFilter.ALL
+}
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val repository: TalkRepository,
+    private val content: ContentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState
 
     private var searchJob: Job? = null
-    private var autoLoadJob: Job? = null
-    private val searchCache = mutableMapOf<String, List<SearchResult>>()
-
-    // Pagination state for speaker browse
-    private var paginationApiUrl = ""
-    private var paginationQueryString = ""
-    private var nextFetchIndex = 1
-    private var allSpeakerItems = mutableListOf<SearchResult>()
+    private val searchCache = mutableMapOf<String, SearchResults>()
 
     fun onQueryChanged(query: String) {
         _uiState.value = _uiState.value.copy(query = query)
@@ -61,29 +83,8 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun onKeywordFilterChanged(filter: String) {
-        _uiState.value = _uiState.value.copy(keywordFilter = filter)
-        applyKeywordFilter()
-    }
-
-    fun setSearchMode(mode: SearchMode) {
-        if (mode == _uiState.value.searchMode) return
-        autoLoadJob?.cancel()
-        allSpeakerItems.clear()
-        _uiState.value = _uiState.value.copy(
-            searchMode = mode,
-            results = emptyList(),
-            filteredResults = emptyList(),
-            hasSearched = false,
-            keywordFilter = "",
-            totalSpeakerTalks = 0,
-            error = null,
-        )
-        val query = _uiState.value.query.trim()
-        if (query.length >= 3) {
-            searchJob?.cancel()
-            searchJob = viewModelScope.launch { performSearch(query) }
-        }
+    fun setFilter(filter: SearchFilter) {
+        _uiState.value = _uiState.value.copy(filter = filter)
     }
 
     fun search() {
@@ -101,183 +102,72 @@ class SearchViewModel @Inject constructor(
         if (!text.contains("num=")) return null
         val catNum = text.substringAfter("num=").substringBefore("&").substringBefore(" ").trim()
         if (catNum.isBlank()) return null
-        val isSeries = text.contains("/series/")
-        return catNum to isSeries
+        return catNum to text.contains("/series/")
     }
 
     private suspend fun performSearch(query: String) {
-        // URL detection
+        // Pasted URL → open the talk or series directly
         val urlMatch = extractCatNumFromUrl(query)
         if (urlMatch != null) {
             val (catNum, isSeries) = urlMatch
             if (!isSeries) {
                 _uiState.value = _uiState.value.copy(navigateToCatNum = catNum)
                 return
-            } else {
-                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-                try {
-                    val page = repository.getTalksByBrowseUrl(
-                        "https://www.freebuddhistaudio.com/series/details?num=$catNum"
-                    )
-                    _uiState.value = _uiState.value.copy(
-                        results = page.items,
-                        filteredResults = page.items,
-                        isLoading = false,
-                        hasSearched = true,
-                    )
-                } catch (e: Exception) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false, hasSearched = true,
-                        error = friendlyError(e),
-                    )
-                }
-                return
             }
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                val page = repository.getTalksByBrowseUrl("https://www.freebuddhistaudio.com/series/details?num=$catNum")
+                _uiState.value = _uiState.value.copy(results = SearchResults(talks = page.items), isLoading = false, hasSearched = true)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, hasSearched = true, error = friendlyError(e))
+            }
+            return
         }
 
-        when (_uiState.value.searchMode) {
-            SearchMode.ALL -> performGeneralSearch(query)
-            SearchMode.BY_SPEAKER -> performSpeakerBrowse(query)
-        }
-    }
-
-    private suspend fun performGeneralSearch(query: String) {
-        val cacheKey = "all:${query.lowercase()}"
-        val cached = searchCache[cacheKey]
-        if (cached != null) {
-            _uiState.value = _uiState.value.copy(
-                results = cached, filteredResults = cached,
-                isLoading = false, hasSearched = true, error = null,
-            )
+        val cacheKey = query.lowercase()
+        searchCache[cacheKey]?.let { cached ->
+            _uiState.value = _uiState.value.copy(results = cached, isLoading = false, hasSearched = true, error = null)
             return
         }
 
         _uiState.value = _uiState.value.copy(isLoading = true, error = null)
         try {
-            // Sangharakshita queries: use hardcoded + filter
-            if (query.startsWith("sangharakshita", ignoreCase = true)) {
-                val allTalks = SangharakshitaData.allTalksAsSearchResults()
-                val words = query.split(Regex("\\s+")).drop(1)
-                val results = if (words.isEmpty()) allTalks
-                else allTalks.filter { r ->
-                    words.all { w -> r.title.contains(w, ignoreCase = true) }
-                }
-                if (results.isNotEmpty()) searchCache[cacheKey] = results
-                _uiState.value = _uiState.value.copy(
-                    results = results, filteredResults = results,
-                    isLoading = false, hasSearched = true,
-                )
-                return
-            }
+            // Speakers / places / collections come from FBA's indexes and curated menu
+            // (the site's search only returns talks and series).
+            val namesDeferred = viewModelScope.async { content.matchNames(query) }
 
-            val audioDeferred = viewModelScope.async { repository.searchAudio(query) }
-            val seriesDeferred = viewModelScope.async {
-                try { repository.searchSeries(query) } catch (_: Exception) { emptyList() }
-            }
-            val audioResults = audioDeferred.await()
-            val seriesResults = seriesDeferred.await()
-            // Series first, then audio talks. Dedup key is type-prefixed: series and
-            // talk numbers are separate namespaces on FBA, so a bare-catNum dedup
-            // would hide a talk whose number collides with a series.
-            val seen = mutableSetOf<String>()
-            val results = (seriesResults + audioResults).filter {
-                val type = if (it.path.contains("/series/")) "s" else "a"
-                seen.add("$type:${it.catNum}")
-            }
-            if (results.isNotEmpty()) searchCache[cacheKey] = results
-            _uiState.value = _uiState.value.copy(
-                results = results, filteredResults = results,
-                isLoading = false, hasSearched = true,
+            val talksAndSeries: Pair<List<SearchResult>, List<SearchResult>> =
+                if (query.startsWith("sangharakshita", ignoreCase = true)) {
+                    // "sangharakshita …" queries: the bundled catalogue is instant and complete
+                    val allTalks = SangharakshitaData.allTalksAsSearchResults()
+                    val words = query.split(Regex("\\s+")).drop(1)
+                    val talks = if (words.isEmpty()) allTalks
+                    else allTalks.filter { r -> words.all { w -> r.title.contains(w, ignoreCase = true) } }
+                    talks to emptyList()
+                } else {
+                    // Sequential, not parallel: while logged in the site rotates the session
+                    // cookie per response, so concurrent calls would invalidate each other.
+                    val audio = repository.searchAudio(query)
+                    val series = try { repository.searchSeries(query) } catch (_: Exception) { emptyList() }
+                    val seen = mutableSetOf<String>()
+                    val merged = content.filterForLanguage((series + audio).filter {
+                        seen.add("${if (it.isSeries) "s" else "a"}:${it.catNum}")
+                    })
+                    merged.filter { !it.isSeries } to merged.filter { it.isSeries }
+                }
+            val names = namesDeferred.await()
+            val results = SearchResults(
+                talks = talksAndSeries.first,
+                series = talksAndSeries.second,
+                speakers = names.speakers,
+                places = names.places,
+                collections = names.collections,
             )
+            if (!results.isEmpty) searchCache[cacheKey] = results
+            _uiState.value = _uiState.value.copy(results = results, isLoading = false, hasSearched = true)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(
-                isLoading = false, hasSearched = true,
-                error = friendlyError(e),
-            )
+            _uiState.value = _uiState.value.copy(isLoading = false, hasSearched = true, error = friendlyError(e))
         }
-    }
-
-    private suspend fun performSpeakerBrowse(speakerName: String) {
-        autoLoadJob?.cancel()
-        allSpeakerItems.clear()
-
-        // Sangharakshita: hardcoded, instant
-        if (speakerName.equals("sangharakshita", ignoreCase = true)) {
-            val talks = SangharakshitaData.allTalksAsSearchResults()
-            allSpeakerItems = talks.toMutableList()
-            _uiState.value = _uiState.value.copy(
-                results = talks, filteredResults = talks,
-                totalSpeakerTalks = talks.size,
-                isLoading = false, hasSearched = true,
-            )
-            return
-        }
-
-        _uiState.value = _uiState.value.copy(isLoading = true, error = null, keywordFilter = "")
-        try {
-            val page = repository.browseBySpeaker(speakerName)
-            allSpeakerItems = page.items.toMutableList()
-            paginationApiUrl = page.apiBaseUrl
-            paginationQueryString = page.browseQueryString
-            nextFetchIndex = page.items.size + 1
-            _uiState.value = _uiState.value.copy(
-                results = page.items,
-                filteredResults = page.items,
-                totalSpeakerTalks = page.totalItems,
-                isLoading = false,
-                hasSearched = true,
-            )
-            // Auto-load remaining in background
-            if (page.hasMore && page.apiBaseUrl.isNotBlank()) {
-                autoLoadRemaining(page.totalItems)
-            }
-        } catch (e: CancellationException) { throw e }
-        catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(
-                isLoading = false, hasSearched = true,
-                error = friendlyError(e),
-            )
-        }
-    }
-
-    private fun autoLoadRemaining(total: Int) {
-        autoLoadJob = viewModelScope.launch {
-            try {
-                // Advance by the requested batch size, not the received count — the
-                // API skips non-audio pages and deriving the index from list size
-                // drifts, duplicating items (LazyColumn duplicate-key crash).
-                while (nextFetchIndex <= total) {
-                    val batchSize = minOf(24, total - nextFetchIndex + 1)
-                    val newItems = repository.fetchMoreItems(
-                        paginationApiUrl, paginationQueryString,
-                        nextFetchIndex, batchSize,
-                    )
-                    nextFetchIndex += batchSize
-                    val seen = allSpeakerItems.mapTo(HashSet()) { it.catNum }
-                    allSpeakerItems.addAll(newItems.filter { seen.add(it.catNum) })
-                    _uiState.value = _uiState.value.copy(
-                        results = allSpeakerItems.toList(),
-                        isLoadingMore = nextFetchIndex <= total,
-                    )
-                    applyKeywordFilter()
-                }
-            } catch (_: Exception) {
-                // Network failure mid-load — keep partial results, stop quietly.
-            }
-            _uiState.value = _uiState.value.copy(isLoadingMore = false)
-        }
-    }
-
-    private fun applyKeywordFilter() {
-        val filter = _uiState.value.keywordFilter.trim()
-        val base = if (_uiState.value.searchMode == SearchMode.BY_SPEAKER)
-            allSpeakerItems.toList() else _uiState.value.results
-        val filtered = if (filter.isBlank()) base
-        else {
-            val words = filter.split(Regex("\\s+"))
-            base.filter { r -> words.all { w -> r.title.contains(w, ignoreCase = true) } }
-        }
-        _uiState.value = _uiState.value.copy(filteredResults = filtered)
     }
 }

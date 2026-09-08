@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,13 +51,21 @@ fun DownloadsScreen(
     onBack: () -> Unit,
     viewModel: DownloadsViewModel = hiltViewModel(),
 ) {
-    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
+    val allRows by viewModel.downloads.collectAsStateWithLifecycle()
     var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
     var showDeleteAllConfirm by remember { mutableStateOf(false) }
+    var filter by remember { mutableStateOf(DownloadFilter.ALL) }
 
-    val totalBytes = downloads
-        .filter { it.status == DownloadStatus.COMPLETE }
-        .sumOf { it.totalBytes }
+    // All | Talks | Transcripts — a talk download that included its transcript counts as both
+    val downloads = when (filter) {
+        DownloadFilter.ALL -> allRows
+        DownloadFilter.TALKS -> allRows.filter { !it.download.isTranscriptOnly }
+        DownloadFilter.TRANSCRIPTS -> allRows.filter { it.hasTranscript }
+    }
+
+    val totalBytes = allRows
+        .filter { it.download.status == DownloadStatus.COMPLETE }
+        .sumOf { it.download.totalBytes }
 
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
@@ -80,7 +89,7 @@ fun DownloadsScreen(
                     }
                 },
                 actions = {
-                    if (downloads.isNotEmpty()) {
+                    if (allRows.isNotEmpty()) {
                         IconButton(onClick = { showDeleteAllConfirm = true }) {
                             Icon(
                                 Icons.Default.DeleteSweep,
@@ -93,7 +102,7 @@ fun DownloadsScreen(
             )
         }
     ) { padding ->
-        if (downloads.isEmpty()) {
+        if (allRows.isEmpty()) {
             EmptyState(
                 message = "No downloads yet",
                 modifier = Modifier.padding(padding),
@@ -106,10 +115,36 @@ fun DownloadsScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(downloads, key = { it.catNum }) { download ->
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.FilterChip(
+                            selected = filter == DownloadFilter.ALL,
+                            onClick = { filter = DownloadFilter.ALL }, label = { Text("All") })
+                        androidx.compose.material3.FilterChip(
+                            selected = filter == DownloadFilter.TALKS,
+                            onClick = { filter = DownloadFilter.TALKS }, label = { Text("Talks") })
+                        androidx.compose.material3.FilterChip(
+                            selected = filter == DownloadFilter.TRANSCRIPTS,
+                            onClick = { filter = DownloadFilter.TRANSCRIPTS }, label = { Text("Transcripts") })
+                    }
+                }
+                if (downloads.isEmpty()) {
+                    item { EmptyState("Nothing in this filter", Modifier.height(160.dp)) }
+                }
+                items(downloads, key = { it.catNum }) { row ->
+                    val download = row.download
+                    // What's stored: "Audio · Transcript · Remastered"
+                    val stored = buildList {
+                        if (row.hasAudio) add("Audio")
+                        if (row.hasTranscript) add("Transcript")
+                        if (row.hasAudio && download.audioVersion.isNotBlank()) add(download.audioVersion.replaceFirstChar { it.uppercase() })
+                    }.joinToString(" · ")
                     val subtitle = when (download.status) {
                         DownloadStatus.COMPLETE -> {
-                            if (download.totalBytes > 0) formatFileSize(download.totalBytes) else null
+                            listOfNotNull(
+                                stored.ifBlank { null },
+                                if (download.totalBytes > 0) formatFileSize(download.totalBytes) else null,
+                            ).joinToString(" · ").ifBlank { null }
                         }
                         DownloadStatus.FAILED -> {
                             if (download.progress > 0) "Failed at ${download.progress}%"

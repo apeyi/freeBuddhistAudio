@@ -32,9 +32,42 @@ object PlaybackMath {
      * duration instead of reporting 0.
      */
     fun totalDurationSeconds(talkDurationSeconds: Int, tracks: List<Track>, playerDurationMs: Long): Int {
-        if (talkDurationSeconds > 0) return talkDurationSeconds
-        val summed = tracks.sumOf { it.durationSeconds }
-        if (summed > 0) return summed
+        if (isPlausibleDuration(talkDurationSeconds)) return talkDurationSeconds
+        val summed = tracks.sumOf { it.durationSeconds.coerceAtLeast(0) }
+        if (isPlausibleDuration(summed)) return summed
         return (playerDurationMs / 1000L).toInt().coerceAtLeast(0)
+    }
+
+    /**
+     * The website's duration field is sometimes garbage (e.g. 717,860,544 s ≈ 22
+     * years for LOC3883). Anything longer than the longest audiobook on the site
+     * is treated as missing and derived from the tracks / player instead.
+     */
+    const val MAX_PLAUSIBLE_SECONDS = 100 * 3600
+
+    fun isPlausibleDuration(seconds: Int): Boolean = seconds in 1..MAX_PLAUSIBLE_SECONDS
+
+    /**
+     * Position to resume at after switching between the remastered and original
+     * recording: the same absolute time, clamped to the new track's duration
+     * (the two versions differ by a few seconds). Unknown duration → unchanged.
+     */
+    fun clampPosition(positionMs: Long, newDurationMs: Long?): Long {
+        val pos = positionMs.coerceAtLeast(0)
+        if (newDurationMs == null || newDurationMs <= 0) return pos
+        return pos.coerceAtMost((newDurationMs - 1000).coerceAtLeast(0))
+    }
+
+    /**
+     * Length of a chapter whose duration the website lacks, from its file size and
+     * a sibling chapter with a known length (bitrate is constant within a talk but
+     * varies between talks — 64 kbps originals, 256 kbps remasters). 0 when the
+     * inputs can't support an estimate.
+     */
+    fun estimateDurationSeconds(bytes: Long, refBytes: Long, refSeconds: Int): Int {
+        if (bytes <= 0 || refBytes <= 0 || refSeconds <= 0) return 0
+        val bytesPerSecond = refBytes.toDouble() / refSeconds
+        val estimate = (bytes / bytesPerSecond).toInt()
+        return if (isPlausibleDuration(estimate)) estimate else 0
     }
 }

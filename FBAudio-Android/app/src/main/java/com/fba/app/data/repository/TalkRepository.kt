@@ -52,16 +52,28 @@ class TalkRepository @Inject constructor(
         }
     }
 
-    /** Like [getTalkDetail] but propagates network/parse errors to the caller. */
-    suspend fun fetchTalkDetail(catNum: String): Talk? {
-        // Check cache first
-        val cached = talkDao.getTalk(catNum)
-        if (cached != null) return cached.toDomain()
+    /**
+     * Like [getTalkDetail] but propagates network/parse errors to the caller.
+     * [forceRefresh] bypasses the cache — used when logged in, so the page carries
+     * the account's saved position and Order-only visibility.
+     */
+    suspend fun fetchTalkDetail(catNum: String, forceRefresh: Boolean = false): Talk? {
+        if (!forceRefresh) {
+            // Entries cached before remastered audio / track ids were parsed are
+            // refetched once (cachedAt predates TALK_CACHE_EPOCH).
+            val cached = talkDao.getTalk(catNum)
+            if (cached != null && cached.cachedAt >= TALK_CACHE_EPOCH) return cached.toDomain()
+        }
 
-        // Fetch from web and cache
-        val talk = scraper.fetchTalkDetail(catNum) ?: return null
+        // Fetch from web, fill chapter lengths the site lacks, and cache
+        val talk = scraper.fetchTalkDetail(catNum)?.let { scraper.fillMissingTrackDurations(it) } ?: return null
         talkDao.insertTalk(TalkEntity.fromDomain(talk))
         return talk
+    }
+
+    companion object {
+        /** 2026-09-05 (evening): chapter lengths the site lacks are now estimated — older cache rows are stale. */
+        const val TALK_CACHE_EPOCH = 1_788_645_034_506L
     }
 
     /** General audio search via FBA API. */

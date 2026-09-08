@@ -24,9 +24,36 @@ enum PlaybackMath {
     /// chapter metadata lacks durations still fall back to the real player
     /// duration instead of reporting 0.
     static func totalDurationSeconds(talkDurationSeconds: Int, tracks: [Track], playerDurationMs: Int64) -> Int {
-        if talkDurationSeconds > 0 { return talkDurationSeconds }
-        let summed = tracks.reduce(0) { $0 + $1.durationSeconds }
-        if summed > 0 { return summed }
-        return max(0, Int(playerDurationMs / 1000))
+        if isPlausibleDuration(talkDurationSeconds) { return talkDurationSeconds }
+        let summed = tracks.reduce(0) { $0 + max($1.durationSeconds, 0) }
+        if isPlausibleDuration(summed) { return summed }
+        return max(Int(playerDurationMs / 1000), 0)
+    }
+
+    /// The website's duration field is sometimes garbage (e.g. 717,860,544 s ≈ 22
+    /// years for LOC3883). Anything longer than the longest audiobook on the site
+    /// is treated as missing and derived from the tracks / player instead.
+    static let maxPlausibleSeconds = 100 * 3600
+
+    static func isPlausibleDuration(_ seconds: Int) -> Bool { seconds >= 1 && seconds <= maxPlausibleSeconds }
+
+    /// Position to resume at after switching between the remastered and original
+    /// recording: the same absolute time, clamped to the new track's duration
+    /// (the two versions differ by a few seconds). Unknown duration → unchanged.
+    static func clampPosition(positionMs: Int64, newDurationMs: Int64?) -> Int64 {
+        let pos = max(positionMs, 0)
+        guard let d = newDurationMs, d > 0 else { return pos }
+        return min(pos, max(d - 1000, 0))
+    }
+
+    /// Length of a chapter whose duration the website lacks, from its file size and
+    /// a sibling chapter with a known length (bitrate is constant within a talk but
+    /// varies between talks — 64 kbps originals, 256 kbps remasters). 0 when the
+    /// inputs can't support an estimate.
+    static func estimateDurationSeconds(bytes: Int64, refBytes: Int64, refSeconds: Int) -> Int {
+        guard bytes > 0, refBytes > 0, refSeconds > 0 else { return 0 }
+        let bytesPerSecond = Double(refBytes) / Double(refSeconds)
+        let estimate = Int(Double(bytes) / bytesPerSecond)
+        return isPlausibleDuration(estimate) ? estimate : 0
     }
 }

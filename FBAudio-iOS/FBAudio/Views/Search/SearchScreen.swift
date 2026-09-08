@@ -1,39 +1,62 @@
 import SwiftUI
 
-enum SearchMode {
-    case all, bySpeaker
+/// Result categories. Chips are shown for All plus every category that has results.
+enum SearchFilter: String, CaseIterable {
+    case all = "All", talks = "Talks", series = "Series", speakers = "Speakers", places = "Places", collections = "Collections"
+}
+
+struct SearchResults {
+    var talks: [SearchResult] = []
+    var series: [SearchResult] = []
+    var speakers: [SearchResult] = []
+    var places: [SearchResult] = []
+    var collections: [SearchResult] = []
+
+    var isEmpty: Bool { talks.isEmpty && series.isEmpty && speakers.isEmpty && places.isEmpty && collections.isEmpty }
+
+    func of(_ filter: SearchFilter) -> [SearchResult] {
+        switch filter {
+        case .all: return []
+        case .talks: return talks
+        case .series: return series
+        case .speakers: return speakers
+        case .places: return places
+        case .collections: return collections
+        }
+    }
+
+    /// Categories with results, in display order.
+    var available: [SearchFilter] {
+        [.speakers, .places, .collections, .series, .talks].filter { !of($0).isEmpty }
+    }
 }
 
 struct SearchScreen: View {
     @State private var query = ""
-    @State private var keywordFilter = ""
-    @State private var results: [SearchResult] = []
+    @State private var results = SearchResults()
+    @State private var filter: SearchFilter = .all
     @State private var isLoading = false
     @State private var error: String?
     @State private var hasSearched = false
-    @State private var searchMode: SearchMode = .all
     @State private var debounceTask: Task<Void, Never>?
 
     let onTalkClick: (String) -> Void
-    var onSeriesClick: (String) -> Void = { _ in }
+    /// Series, speaker, place and collection results — routed by the caller.
+    var onItemClick: (SearchResult) -> Void = { _ in }
 
-    private var filteredResults: [SearchResult] {
-        if searchMode == .bySpeaker && !keywordFilter.isEmpty {
-            return results.filter { $0.title.localizedCaseInsensitiveContains(keywordFilter) }
-        }
-        return results
-    }
+    /// Chips to show: All + categories with results (none when there's only one category).
+    private var chips: [SearchFilter] { results.available.count > 1 ? [.all] + results.available : [] }
+    private var effectiveFilter: SearchFilter { filter == .all || results.available.contains(filter) ? filter : .all }
 
     var body: some View {
         List {
             Section {
-                TextField("Search or paste URL", text: $query)
+                TextField("Search talks, series, speakers, places", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { search() }
                     .autocorrectionDisabled()
                     // Live search after 3+ chars, debounced (parity with Android).
-                    // URL pastes still need an explicit submit — auto-navigating
-                    // away mid-paste would be jarring.
+                    // URL pastes still need an explicit submit.
                     .onChange(of: query) { newValue in
                         debounceTask?.cancel()
                         let trimmed = newValue.trimmingCharacters(in: .whitespaces)
@@ -46,27 +69,16 @@ struct SearchScreen: View {
                     }
             }
 
-            // Mode toggle
-            Section {
-                HStack(spacing: 8) {
-                    modeChip("All", selected: searchMode == .all) { setMode(.all) }
-                    modeChip("By speaker", selected: searchMode == .bySpeaker) { setMode(.bySpeaker) }
-                }
-            }
-
-            // Keyword filter (speaker mode only)
-            if searchMode == .bySpeaker && hasSearched && !results.isEmpty {
+            // Category chips: All + every category that has results
+            if !chips.isEmpty && !isLoading {
                 Section {
-                    TextField("Filter by keyword", text: $keywordFilter)
-                        .textFieldStyle(.roundedBorder)
-                }
-                if !keywordFilter.isEmpty || !results.isEmpty {
-                    let countText = keywordFilter.isEmpty
-                        ? "\(results.count) talks"
-                        : "\(filteredResults.count) of \(results.count) talks"
-                    Text(countText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(chips, id: \.self) { f in
+                                modeChip(f.rawValue, selected: effectiveFilter == f) { filter = f }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -77,32 +89,36 @@ struct SearchScreen: View {
                     Text(error).foregroundStyle(.secondary)
                     Button("Retry") { search() }
                 }
-            } else if hasSearched && filteredResults.isEmpty {
-                Text(keywordFilter.isEmpty
-                     ? "No results found for \"\(query)\""
-                     : "No talks matching \"\(keywordFilter)\"")
-                    .foregroundStyle(.secondary)
+            } else if hasSearched && results.isEmpty {
+                Text("No results found for \"\(query)\"").foregroundStyle(.secondary)
             } else {
-                ForEach(filteredResults) { result in
-                    let isSeries = result.path.contains("/series/")
-                    TalkCard(
-                        title: result.title,
-                        speaker: isSeries ? "Series · \(result.speaker)" : result.speaker,
-                        imageUrl: result.imageUrl,
-                        subtitle: result.year > 0 ? "\(result.year)" : nil,
-                        onClick: {
-                            if isSeries { onSeriesClick(result.path) }
-                            else { onTalkClick(result.catNum) }
-                        }
-                    )
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    .listRowSeparator(.hidden)
+                let sections = effectiveFilter == .all ? results.available : [effectiveFilter]
+                let showHeaders = sections.count > 1
+                ForEach(sections, id: \.self) { section in
+                    let items = results.of(section)
+                    if showHeaders { sectionHeader(section.rawValue, items.count) }
+                    ForEach(items) { result in
+                        ListItemCard(item: result, onClick: { open(result) })
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            .listRowSeparator(.hidden)
+                    }
                 }
             }
         }
         .listStyle(.plain)
         .miniPlayerClearance()
         .navigationTitle("Search")
+    }
+
+    private func open(_ result: SearchResult) {
+        if result.isTalk { onTalkClick(result.catNum) } else { onItemClick(result) }
+    }
+
+    private func sectionHeader(_ title: String, _ count: Int) -> some View {
+        Text("\(title) (\(count))")
+            .font(.subheadline).bold()
+            .foregroundStyle(.secondary)
+            .listRowSeparator(.hidden)
     }
 
     private func modeChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -116,18 +132,6 @@ struct SearchScreen: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-    }
-
-    private func setMode(_ mode: SearchMode) {
-        guard mode != searchMode else { return }
-        searchMode = mode
-        // Old-mode results don't fit the new mode's UI (counts, keyword filter) —
-        // clear rather than presenting them mislabelled.
-        results = []
-        hasSearched = false
-        keywordFilter = ""
-        error = nil
-        search()
     }
 
     /// Detect a pasted FBA URL ("…details?num=X"). Returns (catNum, isSeries).
@@ -148,7 +152,7 @@ struct SearchScreen: View {
         // URL paste: navigate straight to the talk or series
         if let (catNum, isSeries) = extractCatNumFromUrl(trimmed) {
             if isSeries {
-                onSeriesClick("https://www.freebuddhistaudio.com/series/details?num=\(catNum)")
+                onItemClick(SearchResult(catNum: catNum, path: "https://www.freebuddhistaudio.com/series/details?num=\(catNum)"))
             } else {
                 onTalkClick(catNum)
             }
@@ -157,38 +161,35 @@ struct SearchScreen: View {
 
         isLoading = true
         error = nil
-        keywordFilter = ""
         Task {
             do {
-                if searchMode == .bySpeaker {
-                    if trimmed.lowercased() == "sangharakshita" {
-                        // Offline-capable: the bundled catalogue
-                        results = SharedDataLoader.sangharakshitaTalks
-                    } else {
-                        let page = try await TalkRepository.shared.browseBySpeaker(trimmed)
-                        results = page.items
-                    }
-                } else if trimmed.lowercased().hasPrefix("sangharakshita") {
+                var found = SearchResults()
+                if trimmed.lowercased().hasPrefix("sangharakshita") {
                     // "sangharakshita <words>" answers from the bundled catalogue (works offline)
                     let words = trimmed.split(separator: " ").dropFirst().map(String.init)
                     let all = SharedDataLoader.sangharakshitaTalks
-                    results = words.isEmpty ? all : all.filter { r in
+                    found.talks = words.isEmpty ? all : all.filter { r in
                         words.allSatisfy { r.title.localizedCaseInsensitiveContains($0) }
                     }
                 } else {
-                    // Series first, then audio, deduped (parity with Android).
-                    // Type-prefixed key: series and talk numbers are separate
-                    // namespaces, a bare-catNum dedup could hide a talk.
-                    async let seriesTask = (try? TalkRepository.shared.searchSeries(trimmed)) ?? []
-                    async let audioTask = TalkRepository.shared.searchAudio(trimmed)
-                    let series = await seriesTask
-                    let audio = try await audioTask
+                    // Sequential, not parallel: while logged in the site rotates the session
+                    // cookie per response, so concurrent calls would invalidate each other.
+                    let audio = try await TalkRepository.shared.searchAudio(trimmed)
+                    let seriesResults = (try? await TalkRepository.shared.searchSeries(trimmed)) ?? []
                     var seen = Set<String>()
-                    results = (series + audio).filter {
-                        let type = $0.path.contains("/series/") ? "s" : "a"
-                        return seen.insert("\(type):\($0.catNum)").inserted
-                    }
+                    let merged = await ContentRepository.shared.filterForLanguage((seriesResults + audio).filter {
+                        seen.insert("\($0.isSeries ? "s" : "a"):\($0.catNum)").inserted
+                    })
+                    found.talks = merged.filter { !$0.isSeries }
+                    found.series = merged.filter(\.isSeries)
                 }
+                // Speakers / places / collections come from FBA's indexes and curated menu
+                // (the site's search only returns talks and series).
+                let names = await ContentRepository.shared.matchNames(trimmed)
+                found.speakers = names.speakers
+                found.places = names.places
+                found.collections = names.collections
+                results = found
                 hasSearched = true
             } catch {
                 self.error = friendlyError(error)

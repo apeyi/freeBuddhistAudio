@@ -39,6 +39,7 @@ class DownloadWorker @AssistedInject constructor(
         const val KEY_TITLE = "title"
         const val KEY_TRACK_URLS = "track_urls"
         const val KEY_TRANSCRIPT_URL = "transcript_url"
+        const val KEY_TRANSCRIPT_ONLY = "transcript_only"
         private const val MAX_RETRIES = 3
         private const val CHANNEL_ID = "downloads"
         private const val NOTIFICATION_ID = 2001
@@ -101,8 +102,10 @@ class DownloadWorker @AssistedInject constructor(
         val trackUrls = inputData.getStringArray(KEY_TRACK_URLS)?.toList()
         val fallbackUrl = inputData.getString(KEY_AUDIO_URL)
 
-        val urls = if (!trackUrls.isNullOrEmpty()) trackUrls else listOfNotNull(fallbackUrl)
-        if (urls.isEmpty()) return@withContext Result.failure()
+        val transcriptOnly = inputData.getBoolean(KEY_TRANSCRIPT_ONLY, false)
+        val urls = if (transcriptOnly) emptyList()
+            else if (!trackUrls.isNullOrEmpty()) trackUrls else listOfNotNull(fallbackUrl)
+        if (urls.isEmpty() && !transcriptOnly) return@withContext Result.failure()
 
         // Promote to a foreground service so long downloads survive backgrounding.
         // Best-effort: on Android 12+ this can throw if the app is background-restricted.
@@ -201,6 +204,14 @@ class DownloadWorker @AssistedInject constructor(
                     if (e is CancellationException) throw e
                     // Transcript download failure is non-fatal
                 }
+            }
+
+            if (transcriptOnly) {
+                val transcriptFile = File(transcriptFilePath(applicationContext, catNum))
+                if (!transcriptFile.exists()) throw IOException("Transcript not available")
+                // No audio: filePath stays blank, which is how a transcript-only row is recognised.
+                downloadDao.markComplete(catNum = catNum, filePath = "", totalBytes = transcriptFile.length())
+                return@withContext Result.success()
             }
 
             // Mark complete — filePath points to first track for backward compatibility

@@ -43,4 +43,33 @@ final class PlaybackMathTests: XCTestCase {
     func testTotalIsZeroOnlyWhenNothingKnown() {
         XCTAssertEqual(PlaybackMath.totalDurationSeconds(talkDurationSeconds: 0, tracks: [], playerDurationMs: 0), 0)
     }
+
+    // MARK: clampPosition
+
+    func testClampPositionKeepsTimeWithinNewVersion() {
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 120_000, newDurationMs: 760_000), 120_000)
+        // Remastered track is 9 s shorter than where we were → land just before its end
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 768_000, newDurationMs: 760_000), 759_000)
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 50_000, newDurationMs: nil), 50_000)
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: 50_000, newDurationMs: 0), 50_000)
+        XCTAssertEqual(PlaybackMath.clampPosition(positionMs: -5, newDurationMs: 10_000), 0)
+    }
+
+    func testAbsurdTalkDurationFallsBackToTracks() {
+        let tracks = [track(1200), track(1800)]
+        // LOC3883 on the website: 717,860,544 seconds
+        XCTAssertEqual(PlaybackMath.totalDurationSeconds(talkDurationSeconds: 717_860_544, tracks: tracks, playerDurationMs: 0), 3000)
+        XCTAssertEqual(PlaybackMath.totalDurationSeconds(talkDurationSeconds: 717_860_544, tracks: [], playerDurationMs: 0), 0)
+        XCTAssertEqual(PlaybackMath.totalDurationSeconds(talkDurationSeconds: -5, tracks: [], playerDurationMs: 42_000), 42)
+        XCTAssertTrue(PlaybackMath.isPlausibleDuration(20 * 3600))
+        XCTAssertFalse(PlaybackMath.isPlausibleDuration(0))
+    }
+
+    func testEstimateDurationFromSiblingBitrate() {
+        // LOC3883: chapter 4 is 27,933,382 bytes for 3491 s (64 kbps); chapter 5 has no duration on the site
+        XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 33_842_698, refBytes: 27_933_382, refSeconds: 3491), 4229)
+        XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 0, refBytes: 27_933_382, refSeconds: 3491), 0)
+        XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 1_000, refBytes: 0, refSeconds: 3491), 0)
+        XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 1_000, refBytes: 27_933_382, refSeconds: 0), 0)
+    }
 }

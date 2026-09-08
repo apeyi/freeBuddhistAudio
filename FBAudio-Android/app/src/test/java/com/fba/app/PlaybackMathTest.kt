@@ -53,4 +53,34 @@ class PlaybackMathTest {
     fun `total duration is zero only when nothing is known`() {
         assertEquals(0, PlaybackMath.totalDurationSeconds(0, emptyList(), 0L))
     }
+
+    @Test
+    fun clampPositionKeepsTimeWithinNewVersion() {
+        assertEquals(120_000L, PlaybackMath.clampPosition(120_000L, 760_000L))
+        // Remastered track is 9 s shorter than where we were → land just before its end
+        assertEquals(759_000L, PlaybackMath.clampPosition(768_000L, 760_000L))
+        assertEquals(50_000L, PlaybackMath.clampPosition(50_000L, null))
+        assertEquals(50_000L, PlaybackMath.clampPosition(50_000L, 0L))
+        assertEquals(0L, PlaybackMath.clampPosition(-5L, 10_000L))
+    }
+
+    @Test
+    fun absurdTalkDurationFallsBackToTracks() {
+        val tracks = listOf(Track("", 1200, ""), Track("", 1800, ""))
+        // LOC3883 on the website: 717,860,544 seconds
+        assertEquals(3000, PlaybackMath.totalDurationSeconds(717_860_544, tracks, 0))
+        assertEquals(0, PlaybackMath.totalDurationSeconds(717_860_544, emptyList(), 0))
+        assertEquals(42, PlaybackMath.totalDurationSeconds(-5, emptyList(), 42_000))
+        assertTrue(PlaybackMath.isPlausibleDuration(20 * 3600))
+        assertFalse(PlaybackMath.isPlausibleDuration(0))
+    }
+
+    @Test
+    fun estimateDurationFromSiblingBitrate() {
+        // LOC3883: chapter 4 is 27,933,382 bytes for 3491 s (64 kbps); chapter 5 has no duration on the site
+        assertEquals(4229, PlaybackMath.estimateDurationSeconds(33_842_698L, 27_933_382L, 3491))
+        assertEquals(0, PlaybackMath.estimateDurationSeconds(0L, 27_933_382L, 3491))
+        assertEquals(0, PlaybackMath.estimateDurationSeconds(1_000L, 0L, 3491))
+        assertEquals(0, PlaybackMath.estimateDurationSeconds(1_000L, 27_933_382L, 0))
+    }
 }

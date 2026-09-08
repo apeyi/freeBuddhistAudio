@@ -14,6 +14,9 @@ class DownloadManager: ObservableObject {
         var status: DownloadStatus
         var progress: Int // 0-100
         var totalBytes: Int64
+        /// "remastered" / "original" for audio downloads; "" for transcript-only downloads.
+        var audioVersion: String = "original"
+        var transcriptOnly: Bool = false
 
         var id: String { catNum }
     }
@@ -40,7 +43,7 @@ class DownloadManager: ObservableObject {
     private func cleanupOrphanedFiles() {
         let completePrefixes = Set(
             downloads.values
-                .filter { $0.status == .complete }
+                .filter { $0.status == .complete } // includes transcript-only downloads
                 .map { sanitize($0.catNum) + "_" }
         )
         guard let files = try? FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: nil) else { return }
@@ -69,8 +72,14 @@ class DownloadManager: ObservableObject {
         catNum.replacing(/[^a-zA-Z0-9_-]/, with: "")
     }
 
+    /// Audio is stored offline (transcript-only downloads don't count).
     func isDownloaded(_ catNum: String) -> Bool {
-        downloads[catNum]?.status == .complete
+        guard let d = downloads[catNum], d.status == .complete, !d.transcriptOnly else { return false }
+        return true
+    }
+
+    func hasTranscript(_ catNum: String) -> Bool {
+        FileManager.default.fileExists(atPath: transcriptFilePath(catNum: catNum).path)
     }
 
     func trackFileUrl(catNum: String, trackIndex: Int) -> URL? {
@@ -85,16 +94,37 @@ class DownloadManager: ObservableObject {
 
     func startDownload(talk: Talk) {
         let catNum = talk.catNum
+        // Remastered or original, per the user's choice for this talk / the setting
+        let useRemaster = talk.hasRemaster && AppSettings.shared.useRemaster(catNum)
         // Replace any existing run for this talk rather than racing it
         activeTasks[catNum]?.cancel()
         downloads[catNum] = DownloadState(
             catNum: catNum, title: talk.title, speaker: talk.speaker,
-            imageUrl: talk.imageUrl, status: .pending, progress: 0, totalBytes: 0
+            imageUrl: talk.imageUrl, status: .pending, progress: 0, totalBytes: 0,
+            audioVersion: useRemaster ? "remastered" : "original", transcriptOnly: false
         )
         saveDownloads()
 
         activeTasks[catNum] = Task {
-            await performDownload(talk: talk)
+            await performDownload(talk: talk, useRemaster: useRemaster, transcriptOnly: false)
+            activeTasks[catNum] = nil
+        }
+    }
+
+    /// Save just the transcript for offline reading (small; useful on retreat).
+    func startTranscriptDownload(talk: Talk) {
+        let catNum = talk.catNum
+        guard !talk.transcriptUrl.isEmpty else { return }
+        // Don't replace an audio download with a transcript-only one.
+        if let existing = downloads[catNum], !existing.transcriptOnly, existing.status != .failed { return }
+        activeTasks[catNum]?.cancel()
+        downloads[catNum] = DownloadState(
+            catNum: catNum, title: talk.title, speaker: talk.speaker,
+            imageUrl: talk.imageUrl, status: .pending, progress: 0, totalBytes: 0,
+            audioVersion: "", transcriptOnly: true
+        )
+        activeTasks[catNum] = Task {
+            await performDownload(talk: talk, useRemaster: false, transcriptOnly: true)
             activeTasks[catNum] = nil
         }
     }
@@ -109,7 +139,7 @@ class DownloadManager: ObservableObject {
         saveDownloads()
     }
 
-    private func performDownload(talk: Talk) async {
+    private func performDownload(talk: Talk, useRemaster: Bool, transcriptOnly: Bool) async {
         let catNum = talk.catNum
         downloads[catNum]?.status = .downloading
         downloads[catNum]?.progress = 0
@@ -117,7 +147,23 @@ class DownloadManager: ObservableObject {
         // Ensure downloads directory exists
         try? FileManager.default.createDirectory(at: downloadsDir, withIntermediateDirectories: true)
 
-        let urls = talk.tracks.isEmpty ? [talk.audioUrl] : talk.tracks.map(\.audioUrl)
+        if transcriptOnly {
+            do {
+                let text = try await FBAScraper().fetchTranscript(talk.transcriptUrl)
+                guard !text.isEmpty else { throw URLError(.cannotParseResponse) }
+                try text.write(to: transcriptFilePath(catNum: catNum), atomically: true, encoding: .utf8)
+                downloads[catNum]?.status = .complete
+                downloads[catNum]?.totalBytes = Int64(text.utf8.count)
+            } catch {
+                if error is CancellationError || (error as? URLError)?.code == .cancelled { return }
+                downloads[catNum]?.status = .failed
+            }
+            saveDownloads()
+            return
+        }
+
+        let urls = talk.tracks.isEmpty ? [talk.audioUrl]
+            : talk.tracks.map { useRemaster && $0.hasRemaster ? $0.remasterAudioUrl : $0.audioUrl }
         let validUrls = urls.filter { !$0.isEmpty }
         guard !validUrls.isEmpty else {
             print("DownloadManager: No audio URLs for \(catNum)")
@@ -229,12 +275,16 @@ class DownloadManager: ObservableObject {
         let imageUrl: String
         let status: DownloadStatus
         let totalBytes: Int64
+        // Optional: entries saved before these existed decode as nil
+        let audioVersion: String?
+        let transcriptOnly: Bool?
     }
 
     private func saveDownloads() {
         let saved = downloads.values.filter { $0.status == .complete || $0.status == .failed }.map {
             SavedDownload(catNum: $0.catNum, title: $0.title, speaker: $0.speaker,
-                         imageUrl: $0.imageUrl, status: $0.status, totalBytes: $0.totalBytes)
+                         imageUrl: $0.imageUrl, status: $0.status, totalBytes: $0.totalBytes,
+                         audioVersion: $0.audioVersion, transcriptOnly: $0.transcriptOnly)
         }
         if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: savedDownloadsKey)
@@ -248,7 +298,8 @@ class DownloadManager: ObservableObject {
             downloads[s.catNum] = DownloadState(
                 catNum: s.catNum, title: s.title, speaker: s.speaker,
                 imageUrl: s.imageUrl, status: s.status, progress: s.status == .complete ? 100 : 0,
-                totalBytes: s.totalBytes
+                totalBytes: s.totalBytes,
+                audioVersion: s.audioVersion ?? "original", transcriptOnly: s.transcriptOnly ?? false
             )
         }
     }

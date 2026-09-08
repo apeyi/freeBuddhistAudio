@@ -6,18 +6,40 @@ struct DownloadsScreen: View {
 
     @State private var deleteConfirmCatNum: String?
     @State private var showDeleteAllConfirm = false
+    @State private var filter: Filter = .all
 
-    private var downloads: [DownloadManager.DownloadState] {
+    enum Filter: String, CaseIterable { case all = "All", talks = "Talks", transcripts = "Transcripts" }
+
+    private var allDownloads: [DownloadManager.DownloadState] {
         Array(downloadManager.downloads.values).sorted { $0.catNum < $1.catNum }
     }
 
+    // All | Talks | Transcripts — a talk download that included its transcript counts as both
+    private var downloads: [DownloadManager.DownloadState] {
+        switch filter {
+        case .all: return allDownloads
+        case .talks: return allDownloads.filter { !$0.transcriptOnly }
+        case .transcripts: return allDownloads.filter { downloadManager.hasTranscript($0.catNum) }
+        }
+    }
+
     private var totalBytes: Int64 {
-        downloads.filter { $0.status == .complete }.reduce(0) { $0 + $1.totalBytes }
+        allDownloads.filter { $0.status == .complete }.reduce(0) { $0 + $1.totalBytes }
+    }
+
+    /// What's stored: "Audio · Transcript · Remastered"
+    private func storedDescription(_ download: DownloadManager.DownloadState) -> String {
+        var parts: [String] = []
+        let hasAudio = download.status == .complete && !download.transcriptOnly
+        if hasAudio { parts.append("Audio") }
+        if downloadManager.hasTranscript(download.catNum) { parts.append("Transcript") }
+        if hasAudio, !download.audioVersion.isEmpty { parts.append(download.audioVersion.capitalized) }
+        return parts.joined(separator: " · ")
     }
 
     var body: some View {
         Group {
-            if downloads.isEmpty {
+            if allDownloads.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "arrow.down.circle")
                         .font(.largeTitle)
@@ -27,10 +49,25 @@ struct DownloadsScreen: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(downloads) { download in
+                List {
+                    Picker("Filter", selection: $filter) {
+                        ForEach(Filter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                    if downloads.isEmpty {
+                        Text("Nothing in this filter").foregroundStyle(.secondary)
+                            .listRowSeparator(.hidden)
+                    }
+                    ForEach(downloads) { download in
                     let subtitle: String? = {
                         switch download.status {
-                        case .complete: return download.totalBytes > 0 ? formatFileSize(download.totalBytes) : nil
+                        case .complete:
+                            let stored = storedDescription(download)
+                            let size = download.totalBytes > 0 ? formatFileSize(download.totalBytes) : ""
+                            let joined = [stored, size].filter { !$0.isEmpty }.joined(separator: " · ")
+                            return joined.isEmpty ? nil : joined
                         case .failed: return download.progress > 0 ? "Failed at \(download.progress)%" : "Failed"
                         case .downloading: return "Downloading... \(download.progress)%"
                         case .pending: return "Waiting..."
@@ -47,6 +84,7 @@ struct DownloadsScreen: View {
                     )
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowSeparator(.hidden)
+                    }
                 }
                 .listStyle(.plain)
             }
@@ -60,7 +98,7 @@ struct DownloadsScreen: View {
                         Text("Total: \(formatFileSize(totalBytes))")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    if !downloads.isEmpty {
+                    if !allDownloads.isEmpty {
                         Button(action: { showDeleteAllConfirm = true }) {
                             Image(systemName: "trash.circle")
                         }

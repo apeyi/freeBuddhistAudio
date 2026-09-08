@@ -22,7 +22,7 @@ targets:
         buildPhase: resources
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.dharmachakra.fba
-      MARKETING_VERSION: "0.6.5"
+      MARKETING_VERSION: "0.7.0"
       CURRENT_PROJECT_VERSION: 1
       # Required for `agvtool new-version` to set the build number in CI.
       VERSIONING_SYSTEM: "apple-generic"

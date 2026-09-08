@@ -74,6 +74,25 @@ struct PlayerScreen: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                // Remastered | Original — only for talks that have a remastered version
+                if talk?.hasRemaster == true {
+                    Picker("Version", selection: Binding(
+                        get: { player.useRemaster },
+                        set: { player.setUseRemaster($0) }
+                    )) {
+                        Text("Original").tag(false)
+                        Text("Remastered").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 260)
+                    .disabled(player.versionLocked)
+                    .padding(.top, 8)
+                    if player.versionLocked {
+                        Text("Playing the downloaded version")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 if player.isReconnecting && player.playbackError == nil {
                     Text("Reconnecting…")
                         .font(.caption)
