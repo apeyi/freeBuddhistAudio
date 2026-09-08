@@ -120,10 +120,20 @@ workflows:
           #    and failed on "no devices"; the fetched App Store profile needs none.
           xcode-project use-profiles
 
-          # 3. Unique, increasing build number from the latest TestFlight build.
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" \
-            --issuer-id "$ASC_ISSUER_ID" --key-id "$ASC_KEY_ID" --private-key @file:/tmp/asc_key.p8 2>/dev/null || echo 0)
-          agvtool new-version -all $(( ${LATEST:-0} + 1 )) || true
+          # 3. Unique, increasing build number. Ask App Store Connect for the
+          #    highest build it already has, but never trust that alone: when the
+          #    lookup returns nothing (it did, and the upload was then rejected
+          #    for reusing build 1) fall back to Codemagic's own ever-increasing
+          #    BUILD_NUMBER, and take whichever is higher.
+          LATEST=$(app-store-connect get-latest-build-number "$BUNDLE_ID" \
+            --issuer-id "$ASC_ISSUER_ID" --key-id "$ASC_KEY_ID" --private-key @file:/tmp/asc_key.p8 2>/dev/null || true)
+          LATEST=$(echo "$LATEST" | tr -cd '0-9')
+          NEXT=$(( ${LATEST:-0} + 1 ))
+          CM_BUILD=$(echo "${BUILD_NUMBER:-0}" | tr -cd '0-9')
+          # if/fi, not `[ ] && …` — under `set -e` a false test would end the script
+          if [ "${CM_BUILD:-0}" -gt "$NEXT" ]; then NEXT=$CM_BUILD; fi
+          echo "TestFlight build number: $NEXT (latest on ASC: ${LATEST:-none}, Codemagic: ${CM_BUILD:-none})"
+          agvtool new-version -all "$NEXT"
 
           # 4. Archive + export the App Store IPA using the fetched profile.
           xcode-project build-ipa --project FBAudio.xcodeproj --scheme FBAudio
