@@ -23,6 +23,7 @@ import com.dharmachakra.fba_android.ui.join.JoinScreen
 import com.dharmachakra.fba_android.ui.legacy.DigitalLegacyScreen
 import com.dharmachakra.fba_android.ui.list.ListScreen
 import com.dharmachakra.fba_android.ui.menu.MenuListScreen
+import com.dharmachakra.fba_android.ui.myfba.AccountScreen
 import com.dharmachakra.fba_android.ui.myfba.MyFbaScreen
 import com.dharmachakra.fba_android.ui.myfba.SettingsScreen
 import com.dharmachakra.fba_android.ui.player.PlayerScreen
@@ -31,6 +32,9 @@ import com.dharmachakra.fba_android.ui.search.SearchScreen
 import com.dharmachakra.fba_android.ui.transcript.TranscriptScreen
 
 const val DONATE_URL = "https://www.freebuddhistaudio.com/donate/"
+// Triratna accounts are managed on thebuddhistcentre.com (the SSO's own
+// "forgot password" link points here); the app can't change an SSO password itself.
+const val PASSWORD_URL = "https://thebuddhistcentre.com/user/password"
 
 @Composable
 fun NavGraph(
@@ -140,10 +144,17 @@ fun NavGraph(
                 onLoginClick = { navController.navigate(Routes.LOGIN) },
                 onJoinClick = { navController.navigate(Routes.JOIN) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
+                onAccountClick = { navController.navigate(Routes.ACCOUNT) },
             )
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ACCOUNT) {
+            AccountScreen(
+                onBack = { navController.popBackStack() },
+                onChangePassword = { openUrl(PASSWORD_URL) },
+            )
         }
         if (FeatureFlags.AUTH) {
             composable(Routes.LOGIN) {

@@ -4,6 +4,7 @@ import Combine
 struct AuthState: Equatable {
     var loggedIn = false
     var username = ""
+    var email = ""
     var avatarUrl = ""
     var isOrderMember = false
     /// True while the stored session is being verified at startup.
@@ -32,6 +33,7 @@ final class AuthRepository: ObservableObject {
     private let defaults = UserDefaults.standard
     private let loggedInKey = "fba_session_logged_in"
     private let cookiesKey = "fba_session_cookies"
+    private let usernameKey = "fba_session_username"
     private let scraper = FBAScraper()
 
     init() {
@@ -56,6 +58,7 @@ final class AuthRepository: ObservableObject {
         guard !user.isEmpty, !password.isEmpty else { return "Enter your username and password." }
         switch await SsoLogin().login(username: user, password: password) {
         case .success(let cookies):
+            defaults.set(user, forKey: usernameKey)
             return await installSession(cookies) ? nil : "Couldn't complete the login. Please try again."
         case .invalidCredentials:
             return "Username or password not recognised. Use your Triratna username, not your email address."
@@ -86,17 +89,29 @@ final class AuthRepository: ObservableObject {
         }
         state.checking = true
         do {
-            let siteLoggedIn = try await fetchSiteLoggedIn()
+            let details = try await fetchMyDetails()
+            let siteLoggedIn = details?["loggedIn"] as? Bool ?? false
             if !siteLoggedIn {
                 await logout(clearRemote: false)
                 return false
             }
             let user = try? await scraper.fetchLoggedInUser()
             captureRotatedCookies()
+            // The site's user object and my-details use inconsistent field names
+            // (and sometimes carry none), so try the likely ones and fall back to
+            // the username the person actually typed at login.
+            let display = firstString(user, "displayName", "name", "fullName", "username", "firstName", "screenName")
+                ?? firstString(details, "displayName", "name", "fullName", "username")
+                ?? storedUsername()
+                ?? (state.username.isEmpty ? nil : state.username)
+                ?? ""
+            let email = firstString(user, "email", "emailAddress")
+                ?? firstString(details, "email", "emailAddress") ?? ""
             state = AuthState(
                 loggedIn: true,
-                username: (user?["username"] as? String) ?? (user?["name"] as? String) ?? state.username,
-                avatarUrl: (user?["profileImageUrl"] as? String) ?? "",
+                username: display,
+                email: email,
+                avatarUrl: firstString(user, "profileImageUrl", "avatar", "image", "photo") ?? "",
                 isOrderMember: {
                     if let b = user?["isOrderMember"] as? Bool { return b }
                     if let n = user?["isOrderMember"] as? Int { return n != 0 }
@@ -120,6 +135,7 @@ final class AuthRepository: ObservableObject {
         }
         defaults.removeObject(forKey: loggedInKey)
         defaults.removeObject(forKey: cookiesKey)
+        defaults.removeObject(forKey: usernameKey)
         removeSiteCookies()
         FbaSession.shared.isLoggedIn = false
         state = AuthState()
@@ -155,13 +171,24 @@ final class AuthRepository: ObservableObject {
         for c in cookies { FbaSession.shared.cookieStorage.deleteCookie(c) }
     }
 
-    private func fetchSiteLoggedIn() async throws -> Bool {
+    private func fetchMyDetails() async throws -> [String: Any]? {
         var request = URLRequest(url: Self.myDetailsURL)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let (data, response) = try await FbaSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode == 401 || http.statusCode == 403 { return false }
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
-        return obj["loggedIn"] as? Bool ?? false
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 || http.statusCode == 403 { return ["loggedIn": false] }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    private func storedUsername() -> String? {
+        let s = defaults.string(forKey: usernameKey)
+        return (s?.isEmpty == false) ? s : nil
+    }
+
+    /// First of `keys` present as a non-empty string on the (optional) object.
+    private func firstString(_ dict: [String: Any]?, _ keys: String...) -> String? {
+        guard let dict else { return nil }
+        for k in keys { if let v = dict[k] as? String, !v.isEmpty { return v } }
+        return nil
     }
 }
 

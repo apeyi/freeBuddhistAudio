@@ -23,6 +23,12 @@ ended up in the duration field.
 | 2026-09-05 | Talk pages, collection/browse items | No language field at all. | As above. |
 | 2026-09-05 | `document.__FBA__.language_code` on every page | Is the *site UI* language (`en`), not the talk's. | Ignored. |
 
+## Duplicate talks
+
+| Observed | Where | Problem | Handling |
+|---|---|---|---|
+| 2026-09-13 | Website listings (reported) | The same talk appears more than once in a list. Likely a talk that belongs to several series/collections being emitted per membership, or repeated rows in a paged list. Exact page/catNum to be pinned down. | To confirm with a specific example, then de-duplicate by catNum in the affected list. |
+
 ## Search API (`/api/v1/search`)
 
 | Observed | Problem | Handling |

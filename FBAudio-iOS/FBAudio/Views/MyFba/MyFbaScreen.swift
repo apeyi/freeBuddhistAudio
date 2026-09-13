@@ -65,31 +65,14 @@ struct MyFbaScreen: View {
 
     private var accountCard: some View {
         HStack(spacing: 12) {
-            if auth.state.loggedIn, !auth.state.avatarUrl.isEmpty, let url = URL(string: auth.state.avatarUrl) {
-                AsyncImage(url: url) { image in
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: { Color.gray.opacity(0.2) }
-                .frame(width: 48, height: 48)
-                .clipShape(Circle())
+            // When logged in, the avatar + name/email tap through to the full
+            // account details; the Log out button stays separate so it isn't
+            // swallowed by the navigation link.
+            if auth.state.loggedIn {
+                NavigationLink(destination: AccountView()) { accountInfo }
+                    .buttonStyle(.plain)
             } else {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 44))
-                    .foregroundStyle(.secondary)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                if auth.state.loggedIn {
-                    Text(auth.state.username.isEmpty ? "Logged in" : auth.state.username).font(.headline)
-                    Text(auth.state.isOrderMember ? "Order member" : "FBA account")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if FeatureFlags.auth {
-                    Text("Not logged in").font(.headline)
-                    Text("Log in with your FBA account to sync your listening history.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Text("Your FBA").font(.headline)
-                    Text("Account login arrives with the new FBA service.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+                accountInfo
             }
             Spacer()
             if FeatureFlags.auth {
@@ -104,6 +87,44 @@ struct MyFbaScreen: View {
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(16)
+    }
+
+    private var accountInfo: some View {
+        HStack(spacing: 12) {
+            if auth.state.loggedIn, !auth.state.avatarUrl.isEmpty, let url = URL(string: auth.state.avatarUrl) {
+                AsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: { Color.gray.opacity(0.2) }
+                .frame(width: 48, height: 48)
+                .clipShape(Circle())
+            } else {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.secondary)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                if auth.state.loggedIn {
+                    Text(auth.state.username.isEmpty ? "Logged in" : auth.state.username)
+                        .font(.headline).lineLimit(1)
+                    if !auth.state.email.isEmpty {
+                        Text(auth.state.email)
+                            .font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    Text(auth.state.isOrderMember ? "Order member" : "FBA account")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if FeatureFlags.auth {
+                    Text("Not logged in").font(.headline)
+                    Text("Log in with your FBA account to sync your listening history.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Your FBA").font(.headline)
+                    Text("Account login arrives with the new FBA service.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .contentShape(Rectangle())
     }
 
     // MARK: - Recently listened row (moved from Home)

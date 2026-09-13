@@ -1,5 +1,6 @@
 package com.dharmachakra.fba_android.ui.myfba
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -54,6 +55,7 @@ fun MyFbaScreen(
     onLoginClick: () -> Unit,
     onJoinClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
     viewModel: MyFbaViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -83,7 +85,12 @@ fun MyFbaScreen(
         ) {
             // --- Account ---
             item {
-                Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .let { if (auth.loggedIn) it.clickable(onClick = onAccountClick) else it },
+                ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
