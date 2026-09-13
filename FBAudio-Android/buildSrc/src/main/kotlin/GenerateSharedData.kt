@@ -49,7 +49,7 @@ open class GenerateSharedData : DefaultTask() {
         }
 
         File(outDir, "SangharakshitaData.kt").writeText("""
-package com.fba.app.domain.model
+package com.dharmachakra.fba_android.domain.model
 
 object SangharakshitaData {
 

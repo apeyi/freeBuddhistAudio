@@ -14,12 +14,12 @@ val generateSharedData by tasks.registering(GenerateSharedData::class) {
 }
 
 android {
-    namespace = "com.fba.app"
+    namespace = "com.dharmachakra.fba_android"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "com.fba.app"
+        applicationId = "com.dharmachakra.fba_android"
         minSdk = 26
         targetSdk = 36
         versionCode = 13

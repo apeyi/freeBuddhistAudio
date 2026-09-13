@@ -1,8 +1,8 @@
 -keepattributes *Annotation*
 
 # Room entities and models
--keep class com.fba.app.data.local.** { *; }
--keep class com.fba.app.domain.model.** { *; }
+-keep class com.dharmachakra.fba_android.data.local.** { *; }
+-keep class com.dharmachakra.fba_android.domain.model.** { *; }
 
 # Gson
 -keep class com.google.gson.** { *; }
@@ -31,4 +31,4 @@
 -keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
 
 # Keep Track data class for Gson deserialization
--keep class com.fba.app.domain.model.Track { *; }
+-keep class com.dharmachakra.fba_android.domain.model.Track { *; }
