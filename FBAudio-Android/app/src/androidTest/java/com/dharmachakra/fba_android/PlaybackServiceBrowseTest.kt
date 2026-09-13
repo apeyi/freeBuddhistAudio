@@ -73,16 +73,16 @@ class PlaybackServiceBrowseTest {
             browser.setMediaItem(MediaItem.Builder().setMediaId(MediaIds.talk("01")).build())
             browser.prepare()
         }
+        // The controller masks the raw "talk/01" item until the session's player
+        // has the expanded queue, so wait for the first chapter id to appear.
         val deadline = System.currentTimeMillis() + 60_000
-        var count = 0
+        var first: MediaItem? = null
         while (System.currentTimeMillis() < deadline) {
-            count = onMain { browser.mediaItemCount }
-            if (count > 0) break
+            first = onMain { if (browser.mediaItemCount > 0) browser.getMediaItemAt(0) else null }
+            if (first?.mediaId?.startsWith("talk/01/") == true) break
             Thread.sleep(500)
         }
-        assertTrue("queue not built within 60 s", count >= 1)
-        val first = onMain { browser.getMediaItemAt(0) }
-        assertEquals("talk/01/0", first.mediaId)
-        assertEquals("Who is the Buddha?", first.mediaMetadata.title.toString())
+        assertEquals("talk/01/0", first?.mediaId)
+        assertEquals("Who is the Buddha?", first!!.mediaMetadata.title.toString())
     }
 }
