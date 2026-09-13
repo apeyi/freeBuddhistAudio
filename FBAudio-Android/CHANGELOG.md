@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.8.0 — Android Auto
+
+<details>
+<summary>Changes</summary>
+
+**New**
+- Android Auto: browse Recently listened, Downloads, Sangharakshita series and Latest talks from the car screen; "play <talk>" voice search; playback resumes where you left off
+- Play/pause on the media notification works again after Android has killed the app (playback resumption)
+
+**Changed**
+- Playback queue and progress saving moved into the media service, so the notification, Android Auto and the app all share one player state
+- Package name is now `com.dharmachakra.fba_android` (Google Play)
+
+</details>
+
 ## v0.7.0 — spec v1.0 (pre-API)
 
 <details>

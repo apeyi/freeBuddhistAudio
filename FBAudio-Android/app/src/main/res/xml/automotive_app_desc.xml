@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Declares the app to Android Auto as a media (audio) app; the browse tree
+     comes from PlaybackService (a MediaLibraryService). -->
+<automotiveApp>
+    <uses name="media" />
+</automotiveApp>

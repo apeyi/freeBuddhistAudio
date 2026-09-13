@@ -3,27 +3,20 @@ package com.dharmachakra.fba_android.ui.player
 import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
-import com.dharmachakra.fba_android.data.auth.AuthRepository
 import com.dharmachakra.fba_android.data.local.AppSettings
-import com.dharmachakra.fba_android.data.local.DownloadEntity
-import com.dharmachakra.fba_android.data.repository.HistoryRepository
 import com.dharmachakra.fba_android.data.local.DownloadStatus
-import com.dharmachakra.fba_android.data.local.RecentlyListenedDao
-import com.dharmachakra.fba_android.data.local.RecentlyListenedEntity
 import com.dharmachakra.fba_android.data.repository.DownloadRepository
 import com.dharmachakra.fba_android.data.repository.TalkRepository
 import com.dharmachakra.fba_android.domain.model.Talk
-import com.dharmachakra.fba_android.download.DownloadWorker
+import com.dharmachakra.fba_android.player.PlaybackResolver
 import com.dharmachakra.fba_android.player.PlaybackService
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
@@ -36,7 +29,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.File
 import javax.inject.Inject
 
 data class PlayerUiState(
@@ -58,19 +50,23 @@ data class PlayerUiState(
     val versionLocked: Boolean = false,
 )
 
+/**
+ * UI-side controller for playback. The queue itself is built by
+ * [PlaybackResolver] and progress is recorded by the service's
+ * PlaybackPersistence — both live in the media service so that Android Auto and
+ * the notification work without this ViewModel; here we only drive the
+ * MediaController and mirror its state for the screens.
+ */
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val talkRepository: TalkRepository,
     private val downloadRepository: DownloadRepository,
-    private val recentlyListenedDao: RecentlyListenedDao,
-    private val appScope: kotlinx.coroutines.CoroutineScope,
     private val settings: AppSettings,
-    private val auth: AuthRepository,
-    private val history: HistoryRepository,
+    private val resolver: PlaybackResolver,
 ) : ViewModel() {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("player_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = resolver.prefs
     private val savedSpeed = prefs.getFloat("playback_speed", 1.0f)
 
     private val _uiState = MutableStateFlow(PlayerUiState(playbackSpeed = savedSpeed))
@@ -83,8 +79,6 @@ class PlayerViewModel @Inject constructor(
     private val controllerReady = CompletableDeferred<MediaController>()
     private var downloadObservationJob: Job? = null
     private var positionUpdateJob: Job? = null
-    private var lastSaveTime: Long = 0
-    private var lastCheckpointTime: Long = 0
     private var pendingRestore: RestoreState? = null
     // Set as soon as the user explicitly starts playback; gates the passive
     // last-session restore so it can never clobber a user-initiated talk.
@@ -114,7 +108,6 @@ class PlayerViewModel @Inject constructor(
             } else {
                 stopPositionUpdates()
                 updatePosition() // one final update
-                savePlaybackState()
             }
         }
 
@@ -125,7 +118,11 @@ class PlayerViewModel @Inject constructor(
             val index = mediaController?.currentMediaItemIndex ?: return
             if (index != _uiState.value.currentTrackIndex) {
                 _uiState.value = _uiState.value.copy(currentTrackIndex = index)
-                savePlaybackState()
+            }
+            // Playback started elsewhere (Android Auto, resumption): show that talk.
+            val catNum = mediaItem?.mediaMetadata?.extras?.getString(PlaybackResolver.EXTRA_CAT_NUM)
+            if (catNum != null && catNum != _uiState.value.currentTalk?.catNum) {
+                viewModelScope.launch { showExternallyStartedTalk(catNum) }
             }
         }
 
@@ -166,16 +163,9 @@ class PlayerViewModel @Inject constructor(
                     mediaController?.playWhenReady == true,
             )
             if (playbackState == Player.STATE_ENDED) {
-                // Whole queue finished (chapter advance is handled by the player).
+                // Whole queue finished. (The resume point is cleared by the service.)
                 val state = _uiState.value
-                val talk = state.currentTalk ?: return
-                // Clear the saved resume point so replaying starts from the
-                // beginning instead of "resuming" the final 10 seconds.
-                prefs.edit()
-                    .remove("last_position_${talk.catNum}")
-                    .remove("last_track_index_${talk.catNum}")
-                    .commit()
-                if (state.downloadStatus == DownloadStatus.COMPLETE) {
+                if (state.currentTalk != null && state.downloadStatus == DownloadStatus.COMPLETE) {
                     _uiState.value = _uiState.value.copy(showDeleteDownloadPrompt = true)
                 }
             }
@@ -227,83 +217,45 @@ class PlayerViewModel @Inject constructor(
         val controller = mediaController ?: return
 
         viewModelScope.launch {
-            // Fetch talk (may already be cached in Room)
-            val talk = talkRepository.getTalkDetail(restore.catNum) ?: return@launch
-            val download = downloadRepository.getDownload(restore.catNum)
-            // Bail if the user started their own playback while we were fetching.
+            val prepared = resolver.prepare(restore.catNum) ?: return@launch
+            // Bail if the user started their own playback while we were fetching,
+            // or the service already has a queue (e.g. playing from the car).
             if (userInitiatedPlayback || controller.mediaItemCount > 0) return@launch
 
-            val useRemaster = talk.hasRemaster && settings.useRemaster(talk.catNum)
-            val items = buildMediaItems(talk, download, useRemaster)
-            if (items.isEmpty()) return@launch
-            val startIndex = restore.trackIndex.coerceIn(0, items.size - 1)
-            val startPos = (restore.position - 10_000).coerceAtLeast(0)
+            val startIndex = restore.trackIndex.coerceIn(0, prepared.items.size - 1)
+            val startPos = (restore.position - PlaybackResolver.RESUME_REWIND_MS).coerceAtLeast(0)
 
             // setMediaItems with an explicit start position — no seek-on-ready
             // listener needed (the old one leaked and could hijack later playback).
-            controller.setMediaItems(items, startIndex, startPos)
+            controller.setMediaItems(prepared.items, startIndex, startPos)
             controller.prepare()
             controller.pause()
 
             _uiState.value = _uiState.value.copy(
-                currentTalk = talk,
+                currentTalk = prepared.talk,
                 isVisible = true,
                 currentTrackIndex = startIndex,
-                downloadStatus = download?.status,
-                useRemaster = useRemaster,
-                versionLocked = hasOfflineAudio(talk.catNum, download),
+                downloadStatus = prepared.download?.status,
+                useRemaster = prepared.useRemaster,
+                versionLocked = prepared.versionLocked,
             )
             observeDownloadStatus(restore.catNum)
         }
     }
 
-    /**
-     * Resolve the playable URI for one track of a talk, preferring offline files:
-     * per-track download file, then (track 0 only) the whole-talk download file,
-     * then the stream URL.
-     */
-    private fun resolveTrackUri(
-        catNum: String,
-        trackIndex: Int,
-        streamUrl: String,
-        download: DownloadEntity?,
-    ): Uri? {
-        val trackFile = File(DownloadWorker.trackFilePath(context, catNum, trackIndex))
-        if (trackFile.exists()) return Uri.fromFile(trackFile)
-        if (trackIndex == 0 && download?.status == DownloadStatus.COMPLETE && download.filePath.isNotBlank()) {
-            val mainFile = File(download.filePath)
-            if (mainFile.exists()) return Uri.fromFile(mainFile)
-        }
-        return if (streamUrl.isNotBlank()) Uri.parse(streamUrl) else null
-    }
-
-    /** Is any audio for this talk stored offline? (Then the stored version is what plays.) */
-    private fun hasOfflineAudio(catNum: String, download: DownloadEntity?): Boolean =
-        File(DownloadWorker.trackFilePath(context, catNum, 0)).exists() ||
-            (download?.status == DownloadStatus.COMPLETE && download.filePath.isNotBlank() && File(download.filePath).exists())
-
-    /** Build the full playlist for a talk — one MediaItem per chapter (or one for single-track talks). */
-    private fun buildMediaItems(talk: Talk, download: DownloadEntity?, useRemaster: Boolean = false): List<MediaItem> {
-        fun item(uri: Uri, chapterTitle: String): MediaItem = MediaItem.Builder()
-            .setUri(uri)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(talk.title)
-                    .setSubtitle(chapterTitle.takeIf { it.isNotBlank() } ?: "")
-                    .setArtist(talk.speaker)
-                    .setArtworkUri(if (talk.imageUrl.isNotBlank()) Uri.parse(talk.imageUrl) else null)
-                    .build()
-            )
-            .build()
-
-        if (talk.tracks.isEmpty()) {
-            val uri = resolveTrackUri(talk.catNum, 0, talk.audioUrl, download) ?: return emptyList()
-            return listOf(item(uri, ""))
-        }
-        return talk.tracks.mapIndexedNotNull { index, track ->
-            val streamUrl = if (useRemaster && track.hasRemaster) track.remasterAudioUrl else track.audioUrl
-            resolveTrackUri(talk.catNum, index, streamUrl, download)?.let { item(it, track.title) }
-        }
+    /** The service started a talk we didn't (Android Auto, resumption): mirror it in the UI. */
+    private suspend fun showExternallyStartedTalk(catNum: String) {
+        val talk = talkRepository.getTalkDetail(catNum) ?: return
+        val download = downloadRepository.getDownload(catNum)
+        _uiState.value = _uiState.value.copy(
+            currentTalk = talk,
+            isVisible = true,
+            downloadStatus = download?.status,
+            useRemaster = talk.hasRemaster && settings.useRemaster(catNum),
+            versionLocked = resolver.hasOfflineAudio(catNum, download),
+            playbackError = null,
+        )
+        observeDownloadStatus(catNum)
     }
 
     /**
@@ -318,71 +270,17 @@ class PlayerViewModel @Inject constructor(
         settings.setRemasterChoice(talk.catNum, useRemaster)
         val controller = mediaController ?: return
         viewModelScope.launch {
-            val download = downloadRepository.getDownload(talk.catNum)
-            val items = buildMediaItems(talk, download, useRemaster)
-            if (items.isEmpty()) return@launch
-            val index = state.currentTrackIndex.coerceIn(0, items.size - 1)
+            val prepared = resolver.prepare(talk.catNum, useRemasterOverride = useRemaster) ?: return@launch
+            val index = state.currentTrackIndex.coerceIn(0, prepared.items.size - 1)
             val track = talk.tracks.getOrNull(index)
             val newDurationMs = (if (useRemaster) track?.remasterDurationSeconds else track?.durationSeconds)
                 ?.takeIf { it > 0 }?.let { it * 1000L }
             val wasPlaying = controller.playWhenReady
             val position = PlaybackMath.clampPosition(controller.currentPosition, newDurationMs)
-            controller.setMediaItems(items, index, position)
+            controller.setMediaItems(prepared.items, index, position)
             controller.prepare()
             if (wasPlaying) controller.play()
             _uiState.value = _uiState.value.copy(useRemaster = useRemaster)
-        }
-    }
-
-    /** Save current playback state immediately (uses commit for reliability). */
-    private fun savePlaybackState() {
-        val state = _uiState.value
-        val talk = state.currentTalk ?: return
-        val catNum = talk.catNum
-        val controller = mediaController
-        val pos = controller?.currentPosition?.coerceAtLeast(0) ?: state.currentPosition
-        val dur = controller?.duration?.coerceAtLeast(0) ?: state.duration
-        if (pos <= 0 && dur <= 0) return // don't overwrite good data with zeros
-        prefs.edit()
-            .putString("last_cat_num", catNum)
-            .putLong("last_position_$catNum", pos)
-            .putInt("last_track_index_$catNum", state.currentTrackIndex)
-            .putLong("last_duration_$catNum", dur)
-            .commit() // sync write — survives process death
-
-        // Save the position on the FBA account too (what the website does while
-        // playing): at most every 10 s while playing, always on pause/stop so the
-        // account holds the final position.
-        val now = System.currentTimeMillis()
-        val playing = controller?.isPlaying == true
-        if (auth.isLoggedIn && (!playing || now - lastCheckpointTime > 10_000)) {
-            lastCheckpointTime = now
-            val trackId = talk.tracks.getOrNull(state.currentTrackIndex)?.trackId ?: ""
-            appScope.launch { history.postCheckpoint(catNum, trackId, (pos / 1000).toInt()) }
-        }
-
-        // Update recently listened — compute cumulative position across all chapters.
-        // App scope, not viewModelScope: this is also called from onCleared, where
-        // viewModelScope is already cancelled and the write would be dropped.
-        appScope.launch {
-            val trackIndex = state.currentTrackIndex
-            val tracks = talk.tracks
-            val cumulativePos = PlaybackMath.cumulativePositionMs(tracks, trackIndex, pos)
-            val totalDur = PlaybackMath.totalDurationSeconds(talk.durationSeconds, tracks, dur)
-
-            recentlyListenedDao.upsert(
-                RecentlyListenedEntity(
-                    catNum = catNum,
-                    title = talk.title,
-                    speaker = talk.speaker,
-                    imageUrl = talk.imageUrl,
-                    positionMs = cumulativePos,
-                    durationMs = dur,
-                    trackIndex = trackIndex,
-                    totalDurationSeconds = totalDur,
-                )
-            )
-            recentlyListenedDao.pruneOld()
         }
     }
 
@@ -400,7 +298,17 @@ class PlayerViewModel @Inject constructor(
                     // Start polling only if already playing (e.g. after config change)
                     if (controller.isPlaying) startPositionUpdates()
                     controllerReady.complete(controller)
-                    applyPendingRestore()
+                    // Something is already queued (e.g. the car started a talk while
+                    // the UI was dead): show it rather than restoring the last session.
+                    val queued = controller.currentMediaItem?.mediaMetadata?.extras?.getString(PlaybackResolver.EXTRA_CAT_NUM)
+                    if (queued != null) {
+                        pendingRestore = null
+                        viewModelScope.launch { showExternallyStartedTalk(queued) }
+                        _uiState.value = _uiState.value.copy(currentTrackIndex = controller.currentMediaItemIndex)
+                        updatePosition()
+                    } else {
+                        applyPendingRestore()
+                    }
                 } catch (e: Exception) {
                     android.util.Log.e("PlayerViewModel", "Failed to connect to PlaybackService", e)
                 }
@@ -429,20 +337,11 @@ class PlayerViewModel @Inject constructor(
         val controller = mediaController ?: return
         // Don't overwrite restored state if nothing is loaded in the player
         if (controller.mediaItemCount == 0) return
-        val pos = controller.currentPosition.coerceAtLeast(0)
         _uiState.value = _uiState.value.copy(
-            currentPosition = pos,
+            currentPosition = controller.currentPosition.coerceAtLeast(0),
             duration = controller.duration.coerceAtLeast(0),
             isPlaying = controller.isPlayingForUi(),
         )
-        // Save position every 5 seconds for resume
-        if (controller.isPlaying) {
-            val now = System.currentTimeMillis()
-            if (now - lastSaveTime > 5000) {
-                lastSaveTime = now
-                savePlaybackState()
-            }
-        }
     }
 
     /**
@@ -456,70 +355,24 @@ class PlayerViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(playbackError = null, isReconnecting = false)
         viewModelScope.launch {
             val controller = controllerReady.await()
-            // Logged in: fetch fresh so the page carries the account's saved position.
-            val talk = if (auth.isLoggedIn) {
-                try { talkRepository.fetchTalkDetail(catNum, forceRefresh = true) } catch (_: Exception) { null }
-                    ?: talkRepository.getTalkDetail(catNum)
-            } else talkRepository.getTalkDetail(catNum)
-            val download = downloadRepository.getDownload(catNum)
+            val prepared = resolver.prepare(catNum) ?: return@launch
+            val (startIndex, startPos) = resolver.resumePoint(prepared.talk, prepared.items.size, trackIndex)
 
-            // Build a Talk for the UI/queue even if network fetch failed (offline, downloaded)
-            val effectiveTalk = talk ?: Talk(
-                catNum = catNum,
-                title = download?.title ?: "",
-                speaker = download?.speaker ?: "",
-                year = 0, genre = "", durationSeconds = 0,
-                imageUrl = download?.imageUrl ?: "",
-                audioUrl = "",
-                description = "",
-            )
-
-            val useRemaster = effectiveTalk.hasRemaster && settings.useRemaster(catNum)
-            val items = buildMediaItems(effectiveTalk, download, useRemaster)
-            if (items.isEmpty()) return@launch
-
-            // Resume point: the position saved on the FBA account (website or another
-            // device) always wins when logged in — the app keeps it current by posting
-            // its own checkpoints; otherwise the local position.
-            var savedTrackIndex = prefs.getInt("last_track_index_$catNum", 0)
-            var savedPos = prefs.getLong("last_position_$catNum", 0)
-            val checkpoint = effectiveTalk.checkpoint
-            if (checkpoint != null) {
-                val cpIndex = effectiveTalk.tracks.indexOfFirst { it.trackId == checkpoint.trackId }
-                if (cpIndex >= 0) {
-                    savedTrackIndex = cpIndex
-                    savedPos = checkpoint.timeSeconds * 1000L
-                }
-            }
-            val startIndex = (trackIndex ?: savedTrackIndex).coerceIn(0, items.size - 1)
-            // Resume position only applies to the track it was saved against.
-            // INTENTIONAL: resume 10s BEFORE the saved position — after time away
-            // from a talk, a short repeat re-establishes context. Don't "fix" this
-            // to resume exactly. (Same convention on iOS.)
-            val startPos = if (startIndex == savedTrackIndex && savedPos > 10_000) {
-                savedPos - 10_000
-            } else {
-                C.TIME_UNSET
-            }
-
-            controller.setMediaItems(items, startIndex, startPos)
+            controller.setMediaItems(prepared.items, startIndex, startPos)
             controller.prepare()
             controller.play()
 
             _uiState.value = _uiState.value.copy(
-                currentTalk = effectiveTalk,
+                currentTalk = prepared.talk,
                 isVisible = true,
-                downloadStatus = download?.status,
+                downloadStatus = prepared.download?.status,
                 currentTrackIndex = startIndex,
                 currentPosition = 0,
                 duration = 0,
-                useRemaster = useRemaster,
-                versionLocked = hasOfflineAudio(catNum, download),
+                useRemaster = prepared.useRemaster,
+                versionLocked = prepared.versionLocked,
             )
-
             observeDownloadStatus(catNum)
-            // Mirror the website's history so web and app listening stay in step.
-            appScope.launch { history.recordStreamStart(catNum) }
         }
     }
 
@@ -635,7 +488,6 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        savePlaybackState()
         mediaController?.removeListener(playerListener)
         // releaseFuture handles both the connected and the still-connecting case
         // (a controller that connects after clearing would otherwise leak and

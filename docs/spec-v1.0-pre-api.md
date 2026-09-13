@@ -170,7 +170,7 @@ transcripts **are** downloaded with a talk (since v0.3), and downloaded talks
 
 ### 3.12 Later (v1.1+)
 
-- **Android Auto / CarPlay** — feasible; Android is the cheaper half, CarPlay needs an Apple entitlement application. Best done together with the API work already deferred in `docs/TODO.md`.
+- **Android Auto** — done (v0.8.0): Recently listened, Downloads, Sangharakshita series and Latest talks browsable from the car screen, voice search, resume where you left off. **CarPlay** — needs Apple's CarPlay audio entitlement (requested by the Account Holder in the developer portal); the iOS work follows once granted.
 - **Transcripts for all talks** and **text search** — server side, when FBA provides them.
 - **Playlists** — as the spec says.
 
@@ -218,6 +218,6 @@ post-launch swap.
 | Are transcripts downloaded with the talk? | Already yes. |
 | Do downloaded talks always play offline? | Already yes, from any entry point. |
 | Can website history be merged into My FBA? | Yes, now — verified with the test account (3.11). |
-| CarPlay / Android Auto? | Feasible; v1.1 (3.12). |
+| CarPlay / Android Auto? | Android Auto done (v0.8.0); CarPlay waits for Apple's entitlement (3.12). |
 | Own analytics? | Recommend none in v1 (D7). |
 | Playlists? | v1.1+, as stated. |

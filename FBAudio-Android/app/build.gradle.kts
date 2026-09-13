@@ -22,8 +22,9 @@ android {
         applicationId = "com.dharmachakra.fba_android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.7.0"
+        versionCode = 14
+        versionName = "0.8.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -133,6 +134,11 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
+    // On-device tests (./gradlew connectedDebugAndroidTest with a phone attached):
+    // exercise the media browse tree the way Android Auto does.
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.10.0")

@@ -71,14 +71,24 @@
             </intent-filter>
         </activity>
 
+        <!-- Media session + browse tree. The legacy MediaBrowserService action is
+             what Android Auto (and Bluetooth/Assistant) connect through; Media3's
+             MediaLibraryService serves both. -->
         <service
             android:name=".player.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- Android Auto: this is a media app -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
 
         <!-- WorkManager's foreground service declares NO foregroundServiceType in
              its own manifest; on Android 14+ requesting dataSync from a service
