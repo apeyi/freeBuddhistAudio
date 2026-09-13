@@ -85,6 +85,17 @@
             </intent-filter>
         </service>
 
+        <!-- Lets the system restart playback from the media notification / a
+             Bluetooth play button after the process has been killed
+             (MediaSession.Callback.onPlaybackResumption). -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
         <!-- Android Auto: this is a media app -->
         <meta-data
             android:name="com.google.android.gms.car.application"
