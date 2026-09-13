@@ -27,7 +27,7 @@ ended up in the duration field.
 
 | Observed | Where | Problem | Handling |
 |---|---|---|---|
-| 2026-09-13 | Website listings (reported) | The same talk appears more than once in a list. Likely a talk that belongs to several series/collections being emitted per membership, or repeated rows in a paged list. Exact page/catNum to be pinned down. | To confirm with a specific example, then de-duplicate by catNum in the affected list. |
+| 2026-09-13 | Account **History** (website: account icon → history; API `/api/v1/history`) | The same talk appears multiple times — the feed is an event log with one row per play / "stream start" (each play POSTs a new `/api/v1/history` entry), not a de-duplicated "recently listened" list. So a talk listened to on several occasions is listed several times. | The app collapses the feed to one row per talk, keeping the most recent, keyed by `cat_num` (`HistoryRepository.syncFromServer`), so "Recently listened" shows each talk once. Suggest the website's History view do the same, or offer a de-duplicated "recently listened" alongside the full log. |
 
 ## Search API (`/api/v1/search`)
 
