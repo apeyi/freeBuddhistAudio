@@ -32,6 +32,10 @@ class SessionCookieStore(context: Context) : CookieJar {
         editor.apply()
     }
 
+    /** The Triratna username the person logged in with — a reliable label to show. */
+    fun setUsername(name: String) { prefs.edit().putString(KEY_USERNAME, name).apply() }
+    fun username(): String? = prefs.getString(KEY_USERNAME, null)?.takeIf { it.isNotBlank() }
+
     fun setLoggedIn(value: Boolean) {
         prefs.edit().putBoolean(KEY_LOGGED_IN, value).apply()
         _loggedIn.value = value
@@ -88,6 +92,7 @@ class SessionCookieStore(context: Context) : CookieJar {
         private const val HOST_SUFFIX = "freebuddhistaudio.com"
         val SESSION_COOKIES = setOf("PHPSESSID", "SimpleSAMLAuthToken", "fba")
         private const val KEY_LOGGED_IN = "logged_in"
+        private const val KEY_USERNAME = "username"
 
         /** Parse a WebView "k=v; k2=v2" cookie header into a map. */
         fun parseCookieHeader(header: String?): Map<String, String> =

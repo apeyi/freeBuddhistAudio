@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -105,7 +106,21 @@ fun MyFbaScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             when {
                                 auth.loggedIn -> {
-                                    Text(auth.username.ifBlank { "Logged in" }, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        auth.username.ifBlank { "Logged in" },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    if (auth.email.isNotBlank()) {
+                                        Text(
+                                            auth.email,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                     Text(
                                         if (auth.isOrderMember) "Order member" else "FBA account",
                                         style = MaterialTheme.typography.bodySmall,

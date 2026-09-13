@@ -12,6 +12,7 @@ import okhttp3.Request
 data class AuthState(
     val loggedIn: Boolean = false,
     val username: String = "",
+    val email: String = "",
     val avatarUrl: String = "",
     val isOrderMember: Boolean = false,
     /** True while the stored session is being verified at startup. */
@@ -50,8 +51,10 @@ class AuthRepository(
         val user = username.trim()
         if (user.isEmpty() || password.isEmpty()) return "Enter your username and password."
         return when (val result = SsoLogin(client).login(user, password)) {
-            is SsoLogin.Result.Success ->
+            is SsoLogin.Result.Success -> {
+                store.setUsername(user)
                 if (installSession(result.cookies)) null else "Couldn't complete the login. Please try again."
+            }
             SsoLogin.Result.InvalidCredentials -> "Username or password not recognised. Use your Triratna username, not your email address."
             is SsoLogin.Result.Failure -> "Couldn't reach the login service. Check your connection and try again."
         }
@@ -83,10 +86,21 @@ class AuthRepository(
                 false
             } else {
                 val user = try { scraper.parseLoggedInUser(scraper.fetchHomepageHtml()) } catch (_: Exception) { null }
+                // The site's user object and my-details use inconsistent field names
+                // (and sometimes carry none), so try the likely ones and fall back to
+                // the username the person actually typed at login.
+                val display = user.firstStr("displayName", "name", "fullName", "username", "firstName", "screenName")
+                    ?: details.firstStr("displayName", "name", "fullName", "username")
+                    ?: store.username()
+                    ?: _state.value.username.ifBlank { null }
+                    ?: ""
+                val email = user.firstStr("email", "emailAddress")
+                    ?: details.firstStr("email", "emailAddress") ?: ""
                 _state.value = AuthState(
                     loggedIn = true,
-                    username = user?.str("username") ?: user?.str("name") ?: _state.value.username,
-                    avatarUrl = user?.str("profileImageUrl") ?: "",
+                    username = display,
+                    email = email,
+                    avatarUrl = user?.str("profileImageUrl") ?: user.firstStr("avatar", "image", "photo") ?: "",
                     isOrderMember = user?.get("isOrderMember")?.let { it.isJsonPrimitive && it.asJsonPrimitive.let { p -> p.isBoolean && p.asBoolean || p.isNumber && p.asInt != 0 } } ?: false,
                 )
                 true
@@ -124,4 +138,11 @@ class AuthRepository(
 
     private fun JsonObject.str(key: String): String? =
         if (has(key) && !get(key).isJsonNull && get(key).isJsonPrimitive) get(key).asString else null
+
+    /** First of [keys] present as a non-blank string on this (possibly null) object. */
+    private fun JsonObject?.firstStr(vararg keys: String): String? {
+        val o = this ?: return null
+        for (k in keys) o.str(k)?.takeIf { it.isNotBlank() }?.let { return it }
+        return null
+    }
 }

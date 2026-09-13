@@ -8,6 +8,7 @@
 **New**
 - Android Auto: browse Recently listened, Downloads, Sangharakshita series and Latest talks from the car screen; "play <talk>" voice search; playback resumes where you left off
 - Play/pause on the media notification works again after Android has killed the app (playback resumption)
+- My FBA shows your account name and email when logged in, and re-checks your session on launch
 
 **Changed**
 - Playback queue and progress saving moved into the media service, so the notification, Android Auto and the app all share one player state
