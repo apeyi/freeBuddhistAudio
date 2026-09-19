@@ -106,5 +106,6 @@ APK is attached as a release asset.
 - **HTTP logging** disabled in release builds (Android).
 - **Crash logs** (debug builds only) saved to `filesDir/crash_logs/` — last 10 kept.
 - **Deep links**:
-  - `https://www.freebuddhistaudio.com/audio/details?num=…`
-  - `fbaudio://talk/CATNUM`, `fbaudio://series/ID`, `fbaudio://speaker/NAME`
+  - `https://www.freebuddhistaudio.com/audio/details?num=…` and `/series/details?num=…` (both hosts). Parsed by Android `MainActivity` / iOS `ContentView.onOpenURL`. They only open the app *automatically* once verified: Android has `autoVerify` on the filters and needs FBA to host `/.well-known/assetlinks.json`; iOS needs the Associated Domains entitlement + `/.well-known/apple-app-site-association`. Ready-to-host files and the remaining steps: `docs/well-known/`.
+  - `fbaudio://talk/CATNUM`, `fbaudio://series/ID`, `fbaudio://speaker/NAME`; `fbaudio://auth` is reserved for the v2 PKCE login redirect.
+- **FBA `/api/v2`** (in review, launch target 6 Dec 2026): `docs/openapi-v2.yaml` is the contract both clients will be *generated* from; `docs/APP_API_PLAN.md` maps every scrape to its v2 endpoint; `docs/api-v2-review.md` is our sign-off + asks.
