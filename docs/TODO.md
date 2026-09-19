@@ -23,7 +23,7 @@ press play on the notification → resumes at the saved position.
 two external steps; files are ready in `docs/well-known/`.
 
 1. **FBA** hosts `/.well-known/assetlinks.json` (both hosts) and
-   `/.well-known/apple-app-site-association` — asked in `docs/api-v2-review.md` §1.2.
+   `/.well-known/apple-app-site-association` (files prepared locally; asked of the FBA web team).
 2. **Play app-signing cert:** read its SHA-256 from Play Console → Setup → App
    signing and add it as a second fingerprint in `assetlinks.json` (Play
    installs are signed by Google, not by our upload key).

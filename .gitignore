@@ -53,3 +53,14 @@ __pycache__/
 /scripts/talk_metadata.json
 /scripts/talk_summaries.json
 /scripts/last_launch.json
+
+# iOS signing secrets (private key, p12) — never commit
+/ios-signing/
+
+# FBA /api/v2 planning docs — not for the public repo (contain auth + anti-scraping design)
+/docs/openapi-v2.yaml
+/docs/APP_API_PLAN.md
+/docs/generating-clients.md
+/docs/api-v2-review.md
+/docs/well-known/
+/docs/.~lock.*#

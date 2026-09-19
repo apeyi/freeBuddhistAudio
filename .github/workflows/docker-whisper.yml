@@ -1,0 +1,32 @@
+name: Build Whisper Docker Image
+
+on:
+  workflow_dispatch:  # Manual trigger only
+  push:
+    paths:
+      - 'scripts/Dockerfile.whisper'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: scripts
+          file: scripts/Dockerfile.whisper
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/whisper-turbo:latest

@@ -7,8 +7,7 @@ for the API migration. Dates are when the issue was observed.
 > **Status 2026-09-19.** FBA fixed the root causes of most of the entries
 > below in their Phase 0 work (14 Sep 2026); rows marked ✅ say what changed.
 > A purpose-built `/api/v2` replacing every HTML/`__FBA__` fetch is in
-> review — see `docs/openapi-v2.yaml`, `docs/APP_API_PLAN.md` and the app
-> team's response in `docs/api-v2-review.md`.
+> progress with the FBA web team.
 
 ## Durations
 
