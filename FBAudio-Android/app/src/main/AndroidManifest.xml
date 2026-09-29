@@ -44,23 +44,6 @@
                     android:host="www.freebuddhistaudio.com"
                     android:pathPrefix="/browse" />
             </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="freebuddhistaudio.com"
-                    android:pathPrefix="/audio/details" />
-                <data
-                    android:scheme="https"
-                    android:host="freebuddhistaudio.com"
-                    android:pathPrefix="/series/details" />
-                <data
-                    android:scheme="https"
-                    android:host="freebuddhistaudio.com"
-                    android:pathPrefix="/browse" />
-            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
