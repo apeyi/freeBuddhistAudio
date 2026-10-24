@@ -104,9 +104,10 @@ object AppModule {
     @Singleton
     fun provideTalkRepository(
         scraper: FBAScraper,
+        v2: com.dharmachakra.fba_android.data.remote.api.V2Catalogue,
         talkDao: TalkDao,
     ): TalkRepository {
-        return TalkRepository(scraper, talkDao)
+        return TalkRepository(scraper, v2, talkDao)
     }
 
     @Provides

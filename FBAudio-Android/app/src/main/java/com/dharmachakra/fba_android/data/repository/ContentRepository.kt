@@ -41,7 +41,7 @@ class ContentRepository @Inject constructor(
             return cached.first.nodes
         }
         try {
-            val fresh = scraper.fetchSiteMenu()
+            val fresh = v2.getMenu()
             if (fresh.isNotEmpty()) {
                 menuMemo = fresh
                 cache.put("menu", MenuEnvelope(fresh))
@@ -132,7 +132,7 @@ class ContentRepository @Inject constructor(
         val cached = cache.get(key, ImageMap::class.java)
         if (cached != null && cached.second) return cached.first.images
         return try {
-            scraper.fetchIndexImages(type).also { cache.put(key, ImageMap(it)) }
+            v2.getIndexImages(type).also { cache.put(key, ImageMap(it)) }
         } catch (_: Exception) {
             cached?.first?.images ?: emptyMap()
         }
@@ -149,7 +149,7 @@ class ContentRepository @Inject constructor(
         val key = "index:$type"
         val cached = cache.get(key, EntryList::class.java)
         return if (cached != null && cached.second) cached.first.items else try {
-            scraper.fetchIndexEntries(type).also { cache.put(key, EntryList(it)) }
+            v2.getIndexEntries(type).also { cache.put(key, EntryList(it)) }
         } catch (_: Exception) {
             cached?.first?.items ?: emptyList()
         }
@@ -221,7 +221,7 @@ class ContentRepository @Inject constructor(
         val cached = cache.get("digital_legacy", DigitalLegacy::class.java)
         if (cached != null && cached.second) return cached.first
         return try {
-            scraper.fetchDigitalLegacy()?.also { cache.put("digital_legacy", it) } ?: cached?.first
+            v2.getDigitalLegacy().also { cache.put("digital_legacy", it) }
         } catch (e: Exception) {
             cached?.first
         }

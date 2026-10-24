@@ -15,6 +15,7 @@ import javax.inject.Inject
 
 class TalkRepository @Inject constructor(
     private val scraper: FBAScraper,
+    private val v2: com.dharmachakra.fba_android.data.remote.api.V2Catalogue,
     private val talkDao: TalkDao,
 ) {
     // In-memory cache for browse results (keyed by browseUrl), capped size
@@ -78,12 +79,12 @@ class TalkRepository @Inject constructor(
 
     /** General audio search via FBA API. */
     suspend fun searchAudio(query: String): List<SearchResult> {
-        return scraper.searchAudio(query)
+        return v2.searchTalks(query)
     }
 
     /** Series search via FBA API. */
     suspend fun searchSeries(query: String): List<SearchResult> {
-        return scraper.searchSeries(query)
+        return v2.searchSeries(query)
     }
 
     /** Browse all talks by a speaker. Returns BrowsePage with pagination. */
