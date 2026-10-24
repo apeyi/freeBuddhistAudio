@@ -23,7 +23,7 @@ final class ContentRepository {
             return cached.0.nodes
         }
         do {
-            let fresh = try await scraper.fetchSiteMenu()
+            let fresh = try await V2Catalogue.getMenu()
             if !fresh.isEmpty {
                 menuMemo = fresh
                 await cache.put("menu", MenuEnvelope(nodes: fresh))
@@ -60,17 +60,9 @@ final class ContentRepository {
         if page == 1, let memo = pageMemo[key] { return await applyLanguage(memo) }
 
         func fetch() async throws -> ListPage {
-            switch source {
-            case .apiCollection(let type, let title):
-                return try await scraper.fetchApiCollectionPage(type: type, page: page, title: title)
-            case .namedCollection(let slug):
-                return try await scraper.fetchNamedCollectionPage(slug: slug, page: page)
-            case .browse(let path):
-                return try await scraper.fetchBrowsePage(path: path, page: page,
-                                                         apiUrl: previous?.apiUrl ?? "", apiQuery: previous?.apiQuery ?? "")
-            case .series(let path):
-                return try await scraper.fetchSeriesPage(path: path)
-            }
+            // Catalogue lists, collections, browse listings and series now come
+            // from /api/v2 (V2Catalogue), mapped back onto ListPage.
+            try await V2Catalogue.getPage(source, page: page)
         }
 
         let result: ListPage
@@ -122,7 +114,7 @@ final class ContentRepository {
         let key = "images:\(type)"
         let cached: (ImageMap, Bool)? = await cache.get(key, ImageMap.self)
         if let cached, cached.1 { return cached.0.images }
-        if let fresh = try? await scraper.fetchIndexImages(type: type) {
+        if let fresh = try? await V2Catalogue.getIndexImages(type) {
             await cache.put(key, ImageMap(images: fresh))
             return fresh
         }
@@ -138,7 +130,7 @@ final class ContentRepository {
         let key = "index:\(type)"
         let cached: (EntryList, Bool)? = await cache.get(key, EntryList.self)
         if let cached, cached.1 { return cached.0.items }
-        if let fresh = try? await scraper.fetchIndexEntries(type: type) {
+        if let fresh = try? await V2Catalogue.getIndexEntries(type) {
             await cache.put(key, EntryList(items: fresh))
             return fresh
         }
@@ -221,7 +213,7 @@ final class ContentRepository {
     func getDigitalLegacy() async -> DigitalLegacy? {
         let cached: (DigitalLegacy, Bool)? = await cache.get("digital_legacy", DigitalLegacy.self)
         if let cached, cached.1 { return cached.0 }
-        if let fresh = try? await scraper.fetchDigitalLegacy() {
+        if let fresh = try? await V2Catalogue.getDigitalLegacy() {
             await cache.put("digital_legacy", fresh)
             return fresh
         }
