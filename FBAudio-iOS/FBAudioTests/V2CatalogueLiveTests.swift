@@ -43,8 +43,10 @@ final class V2CatalogueLiveTests: XCTestCase {
     }
 
     func testSearch() async throws {
-        XCTAssertFalse(try await V2Catalogue.searchTalks("metta").isEmpty)
-        XCTAssertTrue(try await V2Catalogue.searchSeries("meditation").contains { $0.isSeries })
+        let talks = try await V2Catalogue.searchTalks("metta")
+        XCTAssertFalse(talks.isEmpty)
+        let series = try await V2Catalogue.searchSeries("meditation")
+        XCTAssertTrue(series.contains { $0.isSeries })
     }
 
     func testDigitalLegacy() async throws {
