@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.9.0 — new FBA app API
+
+<details>
+<summary>Changes</summary>
+
+**New**
+- The catalogue now comes from Free Buddhist Audio's purpose-built app API instead of the website — Home, Collections, Latest, Themes, Series, People, Places, browse, search and the Digital Legacy page. Faster, with correct durations and language tags.
+
+**Fixed**
+- Search no longer crashes on some devices (a release-build serialization bug)
+- The keyboard stays up while typing in search, with results appearing live; it only closes on Search or when you open a result
+
+**Note**
+- Playing a talk and logging in still use the existing path, so resume-where-you-left-off and Order-only content keep working; those move to the new API once its account endpoints ship.
+
+</details>
+
 ## v0.8.0 — Android Auto
 
 <details>

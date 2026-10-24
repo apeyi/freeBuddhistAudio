@@ -28,8 +28,8 @@ android {
         applicationId = "com.dharmachakra.fba_android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.8.0"
+        versionCode = 15
+        versionName = "0.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // FBA v2 API client key (per the API owners: identifies the app, not a secret).
         buildConfigField("String", "FBA_CLIENT_KEY", "\"${fbaLocalProps.getProperty("FBA_CLIENT_KEY", "")}\"")
