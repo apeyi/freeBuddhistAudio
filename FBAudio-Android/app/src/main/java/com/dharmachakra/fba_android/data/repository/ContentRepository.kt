@@ -22,6 +22,7 @@ import javax.inject.Inject
  */
 class ContentRepository @Inject constructor(
     private val scraper: FBAScraper,
+    private val v2: com.dharmachakra.fba_android.data.remote.api.V2Catalogue,
     private val cache: ContentCache,
     private val settings: AppSettings,
 ) {
@@ -78,16 +79,10 @@ class ContentRepository @Inject constructor(
         val key = "page:${source.encode()}:$page"
         if (page == 1) synchronized(pageMemo) { pageMemo[key] }?.let { return applyLanguage(it) }
 
-        val fetch: suspend () -> ListPage = {
-            when (source) {
-                is ContentSource.ApiCollection -> scraper.fetchApiCollectionPage(source.type, page, source.title)
-                is ContentSource.NamedCollection -> scraper.fetchNamedCollectionPage(source.slug, page)
-                is ContentSource.Browse -> scraper.fetchBrowsePage(
-                    source.path, page, previous?.apiUrl ?: "", previous?.apiQuery ?: "",
-                )
-                is ContentSource.Series -> scraper.fetchSeriesPage(source.path)
-            }
-        }
+        // Catalogue lists, collections, browse listings and series now come from
+        // /api/v2 (V2Catalogue), mapped back onto ListPage. `previous` (the v1
+        // browse paging cursor) is no longer needed — v2 pages by page number.
+        val fetch: suspend () -> ListPage = { v2.getPage(source, page) }
 
         val result = if (page == 1) {
             val cached = cache.get(key, ListPage::class.java)

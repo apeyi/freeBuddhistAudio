@@ -121,9 +121,10 @@ object AppModule {
     @Singleton
     fun provideContentRepository(
         scraper: FBAScraper,
+        v2: com.dharmachakra.fba_android.data.remote.api.V2Catalogue,
         cache: ContentCache,
         settings: AppSettings,
-    ): ContentRepository = ContentRepository(scraper, cache, settings)
+    ): ContentRepository = ContentRepository(scraper, v2, cache, settings)
 
     @Provides
     @Singleton
