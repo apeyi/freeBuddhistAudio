@@ -161,12 +161,12 @@ enum V2Catalogue {
         case "titles": return .titles
         case "introductions": return .introductions
         case "meditation": return .meditation
-        case "serieslatest": return .seriesLatest
-        case "seriessangharakshita": return .seriesSangharakshita
-        case "seriesotherspeakers": return .seriesOtherSpeakers
-        case "allseries": return .allSeries
-        case "seriesthemes": return .seriesThemes
-        case "ordertalks", "order": return .orderTalks
+        case "serieslatest": return .serieslatest
+        case "seriessangharakshita": return .seriessangharakshita
+        case "seriesotherspeakers": return .seriesotherspeakers
+        case "allseries": return .allseries
+        case "seriesthemes": return .seriesthemes
+        case "ordertalks", "order": return .ordertalks
         default: return nil
         }
     }
