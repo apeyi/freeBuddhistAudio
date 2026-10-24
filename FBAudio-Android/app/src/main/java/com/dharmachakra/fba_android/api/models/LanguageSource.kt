@@ -26,6 +26,12 @@ package com.dharmachakra.fba_android.api.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 
 /**
@@ -33,7 +39,7 @@ import kotlinx.serialization.Serializable
  *
  * Values: TAGGED,DEFAULT,UNKNOWN
  */
-@Serializable
+@Serializable(with = LanguageSourceSerializer::class)
 enum class LanguageSource(val value: kotlin.String) {
 
     @SerialName(value = "tagged")
@@ -72,4 +78,16 @@ enum class LanguageSource(val value: kotlin.String) {
     }
 }
 
-
+/**
+ * Lenient decoding (API contract requirement): a value this build doesn't know —
+ * e.g. an enum value a newer server added — decodes to LanguageSource.UNKNOWN instead of
+ * failing the whole response. Response-only; UNKNOWN is never serialized out.
+ */
+object LanguageSourceSerializer : KSerializer<LanguageSource> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("LanguageSource", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): LanguageSource =
+        LanguageSource.decode(decoder.decodeString()) ?: LanguageSource.UNKNOWN
+    override fun serialize(encoder: Encoder, value: LanguageSource) =
+        encoder.encodeString(value.value)
+}

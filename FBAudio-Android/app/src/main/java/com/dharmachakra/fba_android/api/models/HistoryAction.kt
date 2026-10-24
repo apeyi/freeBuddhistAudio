@@ -26,6 +26,12 @@ package com.dharmachakra.fba_android.api.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 
 /**
@@ -33,7 +39,7 @@ import kotlinx.serialization.Serializable
  *
  * Values: STREAM_START,DOWNLOAD,UNKNOWN
  */
-@Serializable
+@Serializable(with = HistoryActionSerializer::class)
 enum class HistoryAction(val value: kotlin.String) {
 
     @SerialName(value = "streamStart")
@@ -72,4 +78,16 @@ enum class HistoryAction(val value: kotlin.String) {
     }
 }
 
-
+/**
+ * Lenient decoding (API contract requirement): a value this build doesn't know —
+ * e.g. an enum value a newer server added — decodes to HistoryAction.UNKNOWN instead of
+ * failing the whole response. Response-only; UNKNOWN is never serialized out.
+ */
+object HistoryActionSerializer : KSerializer<HistoryAction> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("HistoryAction", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): HistoryAction =
+        HistoryAction.decode(decoder.decodeString()) ?: HistoryAction.UNKNOWN
+    override fun serialize(encoder: Encoder, value: HistoryAction) =
+        encoder.encodeString(value.value)
+}

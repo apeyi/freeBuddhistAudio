@@ -26,6 +26,12 @@ package com.dharmachakra.fba_android.api.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 
 /**
@@ -33,7 +39,7 @@ import kotlinx.serialization.Serializable
  *
  * Values: CHECKED,UNCHECKED,UNKNOWN
  */
-@Serializable
+@Serializable(with = TranscriptStatusSerializer::class)
 enum class TranscriptStatus(val value: kotlin.String) {
 
     @SerialName(value = "checked")
@@ -72,4 +78,16 @@ enum class TranscriptStatus(val value: kotlin.String) {
     }
 }
 
-
+/**
+ * Lenient decoding (API contract requirement): a value this build doesn't know —
+ * e.g. an enum value a newer server added — decodes to TranscriptStatus.UNKNOWN instead of
+ * failing the whole response. Response-only; UNKNOWN is never serialized out.
+ */
+object TranscriptStatusSerializer : KSerializer<TranscriptStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("TranscriptStatus", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): TranscriptStatus =
+        TranscriptStatus.decode(decoder.decodeString()) ?: TranscriptStatus.UNKNOWN
+    override fun serialize(encoder: Encoder, value: TranscriptStatus) =
+        encoder.encodeString(value.value)
+}

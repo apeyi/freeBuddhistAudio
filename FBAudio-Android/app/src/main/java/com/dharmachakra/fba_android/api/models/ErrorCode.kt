@@ -26,6 +26,12 @@ package com.dharmachakra.fba_android.api.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 
 /**
@@ -33,7 +39,7 @@ import kotlinx.serialization.Serializable
  *
  * Values: BAD_REQUEST,UNAUTHORIZED,FORBIDDEN,ORDER_ONLY,NOT_FOUND,RATE_LIMITED,NOT_IMPLEMENTED,SERVER_ERROR,UNKNOWN
  */
-@Serializable
+@Serializable(with = ErrorCodeSerializer::class)
 enum class ErrorCode(val value: kotlin.String) {
 
     @SerialName(value = "badRequest")
@@ -90,4 +96,16 @@ enum class ErrorCode(val value: kotlin.String) {
     }
 }
 
-
+/**
+ * Lenient decoding (API contract requirement): a value this build doesn't know —
+ * e.g. an enum value a newer server added — decodes to ErrorCode.UNKNOWN instead of
+ * failing the whole response. Response-only; UNKNOWN is never serialized out.
+ */
+object ErrorCodeSerializer : KSerializer<ErrorCode> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ErrorCode", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): ErrorCode =
+        ErrorCode.decode(decoder.decodeString()) ?: ErrorCode.UNKNOWN
+    override fun serialize(encoder: Encoder, value: ErrorCode) =
+        encoder.encodeString(value.value)
+}

@@ -26,6 +26,12 @@ package com.dharmachakra.fba_android.api.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 
 /**
@@ -33,7 +39,7 @@ import kotlinx.serialization.Serializable
  *
  * Values: INVALID_REQUEST,INVALID_CLIENT,INVALID_GRANT,UNSUPPORTED_GRANT_TYPE,UNKNOWN
  */
-@Serializable
+@Serializable(with = OAuthErrorCodeSerializer::class)
 enum class OAuthErrorCode(val value: kotlin.String) {
 
     @SerialName(value = "invalid_request")
@@ -78,4 +84,16 @@ enum class OAuthErrorCode(val value: kotlin.String) {
     }
 }
 
-
+/**
+ * Lenient decoding (API contract requirement): a value this build doesn't know —
+ * e.g. an enum value a newer server added — decodes to OAuthErrorCode.UNKNOWN instead of
+ * failing the whole response. Response-only; UNKNOWN is never serialized out.
+ */
+object OAuthErrorCodeSerializer : KSerializer<OAuthErrorCode> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("OAuthErrorCode", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): OAuthErrorCode =
+        OAuthErrorCode.decode(decoder.decodeString()) ?: OAuthErrorCode.UNKNOWN
+    override fun serialize(encoder: Encoder, value: OAuthErrorCode) =
+        encoder.encodeString(value.value)
+}

@@ -26,6 +26,12 @@ package com.dharmachakra.fba_android.api.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 
 /**
@@ -33,7 +39,7 @@ import kotlinx.serialization.Serializable
  *
  * Values: LIST,COLLECTION,SERIES,SPEAKER,PLACE,THEME,YEAR,LANGUAGE,GROUP,PAGE,EXTERNAL,UNKNOWN
  */
-@Serializable
+@Serializable(with = MenuNodeKindSerializer::class)
 enum class MenuNodeKind(val value: kotlin.String) {
 
     @SerialName(value = "list")
@@ -99,4 +105,16 @@ enum class MenuNodeKind(val value: kotlin.String) {
     }
 }
 
-
+/**
+ * Lenient decoding (API contract requirement): a value this build doesn't know —
+ * e.g. an enum value a newer server added — decodes to MenuNodeKind.UNKNOWN instead of
+ * failing the whole response. Response-only; UNKNOWN is never serialized out.
+ */
+object MenuNodeKindSerializer : KSerializer<MenuNodeKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("MenuNodeKind", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): MenuNodeKind =
+        MenuNodeKind.decode(decoder.decodeString()) ?: MenuNodeKind.UNKNOWN
+    override fun serialize(encoder: Encoder, value: MenuNodeKind) =
+        encoder.encodeString(value.value)
+}

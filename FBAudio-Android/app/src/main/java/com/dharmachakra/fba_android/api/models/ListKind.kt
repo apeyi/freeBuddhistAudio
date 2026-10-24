@@ -26,6 +26,12 @@ package com.dharmachakra.fba_android.api.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 
 /**
@@ -33,7 +39,7 @@ import kotlinx.serialization.Serializable
  *
  * Values: LATEST,POPULAR,TITLES,INTRODUCTIONS,MEDITATION,SERIES_LATEST,SERIES_SANGHARAKSHITA,SERIES_OTHER_SPEAKERS,ALL_SERIES,SERIES_THEMES,ORDER_TALKS,UNKNOWN
  */
-@Serializable
+@Serializable(with = ListKindSerializer::class)
 enum class ListKind(val value: kotlin.String) {
 
     @SerialName(value = "latest")
@@ -99,4 +105,16 @@ enum class ListKind(val value: kotlin.String) {
     }
 }
 
-
+/**
+ * Lenient decoding (API contract requirement): a value this build doesn't know —
+ * e.g. an enum value a newer server added — decodes to ListKind.UNKNOWN instead of
+ * failing the whole response. Response-only; UNKNOWN is never serialized out.
+ */
+object ListKindSerializer : KSerializer<ListKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ListKind", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): ListKind =
+        ListKind.decode(decoder.decodeString()) ?: ListKind.UNKNOWN
+    override fun serialize(encoder: Encoder, value: ListKind) =
+        encoder.encodeString(value.value)
+}

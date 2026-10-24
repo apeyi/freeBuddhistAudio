@@ -21,4 +21,5 @@ java -jar "$JAR" generate -g kotlin -i "$SPEC" -o "$OUT" \
 DEST="$ROOT/FBAudio-Android/app/src/main/java/com/dharmachakra/fba_android/api"
 rm -rf "$DEST"; mkdir -p "$DEST"
 cp -r "$OUT/src/main/kotlin/$(echo $PKG | tr . /)/"{models,apis,infrastructure} "$DEST/"
+python3 "$ROOT/scripts/harden-enums.py" "$DEST/models"
 echo "Regenerated $(find "$DEST" -name '*.kt' | wc -l) files into $DEST"
