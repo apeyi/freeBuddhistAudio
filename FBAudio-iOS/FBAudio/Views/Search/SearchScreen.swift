@@ -70,7 +70,7 @@ struct SearchScreen: View {
             }
 
             // Category chips: All + every category that has results
-            if !chips.isEmpty && !isLoading {
+            if !chips.isEmpty {
                 Section {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -82,14 +82,16 @@ struct SearchScreen: View {
                 }
             }
 
-            if isLoading {
+            // Only take over with a spinner on the first search; while a live query
+            // refreshes, keep the previous results on screen behind the keyboard.
+            if isLoading && results.isEmpty {
                 ProgressView().frame(maxWidth: .infinity)
-            } else if let error {
+            } else if let error, results.isEmpty {
                 VStack(spacing: 8) {
                     Text(error).foregroundStyle(.secondary)
                     Button("Retry") { search() }
                 }
-            } else if hasSearched && results.isEmpty {
+            } else if hasSearched && !isLoading && results.isEmpty {
                 Text("No results found for \"\(query)\"").foregroundStyle(.secondary)
             } else {
                 let sections = effectiveFilter == .all ? results.available : [effectiveFilter]

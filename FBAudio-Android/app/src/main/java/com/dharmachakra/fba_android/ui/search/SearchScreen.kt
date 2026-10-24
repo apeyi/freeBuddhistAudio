@@ -49,10 +49,9 @@ fun SearchScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
 
-    // Dismiss keyboard when search results arrive
-    LaunchedEffect(state.hasSearched, state.isLoading) {
-        if (state.hasSearched && !state.isLoading) focusManager.clearFocus()
-    }
+    // The keyboard stays up while typing — live results fill in behind it. It is
+    // only dismissed on an explicit Search (the IME action below) or when a
+    // result is tapped and we navigate away.
 
     LaunchedEffect(state.navigateToCatNum) {
         state.navigateToCatNum?.let {
@@ -105,7 +104,7 @@ fun SearchScreen(
             }
 
             // Category chips: All + every category that has results
-            if (state.chips.isNotEmpty() && !state.isLoading) {
+            if (state.chips.isNotEmpty()) {
                 item {
                     androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.chips.size) { i ->
@@ -123,11 +122,14 @@ fun SearchScreen(
             fun open(result: SearchResult) = if (result.isTalk) onTalkClick(result.catNum) else onItemClick(result)
 
             when {
-                state.isLoading -> item { LoadingIndicator() }
-                state.error != null -> item {
+                // Only take over the screen with a spinner on the first search; while a
+                // live query refreshes, keep the previous results on screen behind the
+                // keyboard rather than flashing a spinner.
+                state.isLoading && state.results.isEmpty -> item { LoadingIndicator() }
+                state.error != null && state.results.isEmpty -> item {
                     ErrorMessage(message = state.error!!, onRetry = { viewModel.search() })
                 }
-                state.hasSearched && state.results.isEmpty -> item {
+                state.hasSearched && !state.isLoading && state.results.isEmpty -> item {
                     EmptyState("No results found for \"${state.query}\"")
                 }
                 else -> {

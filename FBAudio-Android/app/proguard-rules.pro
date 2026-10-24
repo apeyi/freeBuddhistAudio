@@ -32,3 +32,10 @@
 
 # Keep Track data class for Gson deserialization
 -keep class com.dharmachakra.fba_android.domain.model.Track { *; }
+
+# ContentCache round-trips these private nested wrappers through Gson by reflection.
+# They live in data.repository (not covered by the model keeps above), so without
+# this R8 full-mode strips their generic field signatures and Gson deserialises
+# List<SearchResult> as List<LinkedTreeMap> — a ClassCastException in search on
+# minified (Play) builds. Keep the classes, their members and signatures.
+-keep class com.dharmachakra.fba_android.data.repository.ContentRepository$* { *; }
