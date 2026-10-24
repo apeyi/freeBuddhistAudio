@@ -6,11 +6,17 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 val generateSharedData by tasks.registering(GenerateSharedData::class) {
     sharedDataDir = rootProject.file("../fbaudio-shared")
     outputDir = file("${project.buildDir}/generated/shared")
+}
+
+val fbaLocalProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) FileInputStream(f).use { load(it) }
 }
 
 android {
@@ -25,6 +31,8 @@ android {
         versionCode = 14
         versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // FBA v2 API client key (per the API owners: identifies the app, not a secret).
+        buildConfigField("String", "FBA_CLIENT_KEY", "\"${fbaLocalProps.getProperty("FBA_CLIENT_KEY", "")}\"")
     }
 
     signingConfigs {
@@ -128,6 +136,8 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("org.jsoup:jsoup:1.17.2")
     implementation("com.google.code.gson:gson:2.10.1")
+    // Generated FBA v2 API client (app/src/main/java/.../api) uses kotlinx.serialization.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     // Image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
