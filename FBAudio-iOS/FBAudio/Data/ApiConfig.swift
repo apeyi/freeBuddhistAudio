@@ -10,8 +10,8 @@ enum ApiConfig {
 
     static func install() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
-        OpenAPIClientAPI.basePath = baseURL
-        OpenAPIClientAPI.customHeaders = [
+        FBAApiAPI.basePath = baseURL
+        FBAApiAPI.customHeaders = [
             "X-FBA-Client": clientKey,
             "X-FBA-App-Version": version,
         ]
