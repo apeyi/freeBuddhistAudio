@@ -107,8 +107,8 @@ enum V2Catalogue {
 
     // MARK: - search
 
-    static func searchTalks(_ query: String) async throws -> [SearchResult] {
-        try await SearchAPI.search(kind: .talk, q: query, pageSize: 50).items.map { toSearchResult($0.item) }
+    static func searchTalks(_ query: String, language: String? = nil) async throws -> [SearchResult] {
+        try await SearchAPI.search(kind: .talk, q: query, language: language, pageSize: 50).items.map { toSearchResult($0.item) }
     }
 
     static func searchSeries(_ query: String) async throws -> [SearchResult] {

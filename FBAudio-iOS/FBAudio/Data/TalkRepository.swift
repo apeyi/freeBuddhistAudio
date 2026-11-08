@@ -60,8 +60,8 @@ class TalkRepository: ObservableObject {
         return !(known && missing)
     }
 
-    func searchAudio(_ query: String) async throws -> [SearchResult] {
-        try await V2Catalogue.searchTalks(query)
+    func searchAudio(_ query: String, language: String? = nil) async throws -> [SearchResult] {
+        try await V2Catalogue.searchTalks(query, language: language)
     }
 
     func searchSeries(_ query: String) async throws -> [SearchResult] {
