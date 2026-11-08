@@ -93,9 +93,19 @@ struct PlayerScreen: View {
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return [] }
         ctx.interpolationQuality = .medium
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
-        return stride(from: 0, to: data.count, by: 4).compactMap { i in
-            data[i + 3] < 128 ? nil : (UInt32(data[i]) << 16) | (UInt32(data[i + 1]) << 8) | UInt32(data[i + 2])
+        var out: [UInt32] = []
+        out.reserveCapacity(side * side)
+        var i = 0
+        while i + 3 < data.count {
+            if data[i + 3] >= 128 {
+                let r = UInt32(data[i]) << 16
+                let g = UInt32(data[i + 1]) << 8
+                let b = UInt32(data[i + 2])
+                out.append(r | g | b)
+            }
+            i += 4
         }
+        return out
     }
 
     // MARK: - Content
