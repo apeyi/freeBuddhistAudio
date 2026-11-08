@@ -53,10 +53,10 @@ class AuthRepository(
         return when (val result = SsoLogin(client).login(user, password)) {
             is SsoLogin.Result.Success -> {
                 store.setUsername(user)
-                if (installSession(result.cookies)) null else "Couldn't complete the login. Please try again."
+                if (installSession(result.cookies)) null else "Couldn't complete sign in. Please try again."
             }
             SsoLogin.Result.InvalidCredentials -> "Username or password not recognised. Use your Triratna username, not your email address."
-            is SsoLogin.Result.Failure -> "Couldn't reach the login service. Check your connection and try again."
+            is SsoLogin.Result.Failure -> "Couldn't reach the sign-in service. Check your connection and try again."
         }
     }
 

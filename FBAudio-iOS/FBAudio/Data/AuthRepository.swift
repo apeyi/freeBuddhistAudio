@@ -59,11 +59,11 @@ final class AuthRepository: ObservableObject {
         switch await SsoLogin().login(username: user, password: password) {
         case .success(let cookies):
             defaults.set(user, forKey: usernameKey)
-            return await installSession(cookies) ? nil : "Couldn't complete the login. Please try again."
+            return await installSession(cookies) ? nil : "Couldn't complete sign in. Please try again."
         case .invalidCredentials:
             return "Username or password not recognised. Use your Triratna username, not your email address."
         case .failure:
-            return "Couldn't reach the login service. Check your connection and try again."
+            return "Couldn't reach the sign-in service. Check your connection and try again."
         }
     }
 

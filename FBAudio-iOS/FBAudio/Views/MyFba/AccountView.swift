@@ -60,7 +60,6 @@ struct AccountView: View {
                 }
             }
         }
-        .tint(.saffronOrange)
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.inline)
     }

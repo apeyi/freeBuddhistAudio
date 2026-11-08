@@ -137,7 +137,7 @@ fun MyFbaScreen(
                                 FeatureFlags.AUTH -> {
                                     Text("Not logged in", style = MaterialTheme.typography.titleMedium)
                                     Text(
-                                        "Log in with your FBA account to sync your listening history.",
+                                        "Sign in to sync your FBA history and continue listening on any phone, tablet or at freebuddhistaudio.com.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -145,7 +145,7 @@ fun MyFbaScreen(
                                 else -> {
                                     Text("Your FBA", style = MaterialTheme.typography.titleMedium)
                                     Text(
-                                        "Account login arrives with the new FBA service.",
+                                        "Signing in arrives with the new FBA service.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -157,7 +157,7 @@ fun MyFbaScreen(
                             if (auth.loggedIn) {
                                 OutlinedButton(onClick = { viewModel.logout() }) { Text("Log out") }
                             } else {
-                                Button(onClick = onLoginClick) { Text("Log in") }
+                                Button(onClick = onLoginClick) { Text("Sign in") }
                             }
                         }
                     }

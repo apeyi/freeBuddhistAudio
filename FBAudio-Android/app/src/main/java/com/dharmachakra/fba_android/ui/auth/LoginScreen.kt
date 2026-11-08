@@ -102,7 +102,7 @@ fun LoginScreen(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("Log in") },
+                title = { Text("Sign in") },
                 navigationIcon = {
                     IconButton(onClick = onDone) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -121,7 +121,7 @@ fun LoginScreen(
             Text("Your FBA account", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Free Buddhist Audio uses the Triratna login — the same username and password as The Buddhist Centre Online.",
+                "Use your Triratna username and password: the ones you use for The Buddhist Centre Online or Order online spaces.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -178,7 +178,7 @@ fun LoginScreen(
                 if (state.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("Log in")
+                    Text("Sign in")
                 }
             }
 

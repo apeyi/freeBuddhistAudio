@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PlayerScreen: View {
+    @Environment(\.pageColors) private var page
     @ObservedObject var player: AudioPlayer
     // Observed so the download button re-renders when a download finishes while
     // playback is paused (player ticks otherwise masked the staleness).
@@ -67,7 +68,7 @@ struct PlayerScreen: View {
                 }) {
                     Text(talk?.speaker ?? "")
                         .font(.subheadline)
-                        .foregroundStyle(Color.saffronOrange)
+                        .foregroundStyle(.tint)
                 }
                 if hasMultipleTracks {
                     Text("Chapter \(player.currentTrackIndex + 1) of \(tracks.count)")
@@ -107,7 +108,6 @@ struct PlayerScreen: View {
                         .padding(.top, 8)
                     Button("Retry") { player.retry() }
                         .font(.caption)
-                        .tint(.saffronOrange)
                 }
             }
             .padding(.top, 16)
@@ -134,7 +134,6 @@ struct PlayerScreen: View {
                         }
                     }
                 )
-                .tint(.saffronOrange)
 
                 HStack {
                     Text(formatDuration(Int(player.currentPosition)))
@@ -244,7 +243,6 @@ struct PlayerScreen: View {
                 .padding(.bottom, 8)
             }
         }
-        .tint(.saffronOrange)
         .sheet(isPresented: $showChapterSheet) {
             chapterSheet(tracks: tracks)
         }
@@ -256,7 +254,7 @@ struct PlayerScreen: View {
         switch status {
         case .complete:
             Image(systemName: "arrow.down.circle.fill")
-                .foregroundStyle(Color.saffronOrange)
+                .foregroundStyle(.tint)
         case .downloading, .pending:
             ProgressView().controlSize(.small)
         default:
@@ -282,7 +280,7 @@ struct PlayerScreen: View {
                         showChapterSheet = false
                     }
                 )
-                .listRowBackground(index == player.currentTrackIndex ? Color.saffronOrange.opacity(0.1) : nil)
+                .listRowBackground(index == player.currentTrackIndex ? page.tint : nil)
             }
             .navigationTitle("Chapters")
             .navigationBarTitleDisplayMode(.inline)

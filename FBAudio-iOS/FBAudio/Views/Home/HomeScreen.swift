@@ -19,6 +19,7 @@ private let connectLinks: [ConnectLink] = [
 ]
 
 struct HomeScreen: View {
+    @Environment(\.pageColors) private var page
     @ObservedObject private var auth = AuthRepository.shared
     @State private var digitalLegacy: DigitalLegacy?
 
@@ -45,7 +46,6 @@ struct HomeScreen: View {
                     Text("Support FBA").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.saffronOrange)
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 connectRow
@@ -71,7 +71,7 @@ struct HomeScreen: View {
             Text("Free Buddhist Audio").font(.headline)
             Spacer()
             if FeatureFlags.auth {
-                Button(auth.state.loggedIn ? (auth.state.username.isEmpty ? "My account" : auth.state.username) : "Log in",
+                Button(auth.state.loggedIn ? (auth.state.username.isEmpty ? "My account" : auth.state.username) : "sign in",
                        action: { if auth.state.loggedIn { onAccountClick() } else { onLoginClick() } })
                     .font(.subheadline)
             }
@@ -131,14 +131,13 @@ struct HomeScreen: View {
                 .font(.headline)
                 .foregroundStyle(Color(red: 219/255, green: 175/255, blue: 85/255))
             Text(digitalLegacy?.description
-                 ?? "Digitally remastered talks — hear the Dharma renewed for future generations.")
+                 ?? "Digitally remastered talks: hear the Dharma renewed for future generations.")
                 .font(.caption)
                 .foregroundStyle(Color(red: 237/255, green: 224/255, blue: 216/255))
                 .lineLimit(4)
             HStack {
                 Button(action: onDonateClick) { Text("Support the Digital Legacy") }
                     .buttonStyle(.borderedProminent)
-                    .tint(.saffronOrange)
                 Spacer()
                 Button("Learn more", action: onDigitalLegacyClick)
                     .foregroundStyle(Color(red: 219/255, green: 175/255, blue: 85/255))
@@ -167,7 +166,7 @@ struct HomeScreen: View {
                 Image(systemName: "chevron.right").foregroundStyle(.white)
             }
             .padding(16)
-            .background(LinearGradient(colors: [.saffronOrange, .deepSaffron], startPoint: .leading, endPoint: .trailing))
+            .background(LinearGradient(colors: [page.base, page.deep], startPoint: .leading, endPoint: .trailing))
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)

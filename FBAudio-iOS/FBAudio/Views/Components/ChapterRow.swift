@@ -3,6 +3,7 @@ import SwiftUI
 /// A single chapter row showing title, optional duration, and highlighting if current.
 /// Used by both DetailScreen's inline chapter list and PlayerScreen's chapter sheet.
 struct ChapterRow: View {
+    @Environment(\.pageColors) private var page
     let index: Int
     let track: Track
     let isCurrent: Bool
@@ -13,7 +14,7 @@ struct ChapterRow: View {
             HStack {
                 Text(track.title.isEmpty ? "Chapter \(index + 1)" : track.title)
                     .fontWeight(isCurrent ? .bold : .regular)
-                    .foregroundStyle(isCurrent ? Color.saffronOrange : .primary)
+                    .foregroundStyle(isCurrent ? page.deep : Color.primary)
                 Spacer()
                 if track.durationSeconds > 0 {
                     Text(formatDuration(track.durationSeconds))

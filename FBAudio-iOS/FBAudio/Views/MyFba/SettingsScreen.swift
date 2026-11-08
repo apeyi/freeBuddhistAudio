@@ -22,7 +22,6 @@ struct SettingsScreen: View {
                 }
             }
         }
-        .tint(.saffronOrange)
         .miniPlayerClearance()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)

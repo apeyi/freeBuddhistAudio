@@ -50,7 +50,6 @@ struct DigitalLegacyScreen: View {
                 }
             }
         }
-        .tint(.saffronOrange)
         .miniPlayerClearance()
         .navigationTitle("The Digital Legacy")
         .navigationBarTitleDisplayMode(.inline)

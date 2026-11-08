@@ -232,7 +232,7 @@ fun DetailScreen(
                                     strokeWidth = 2.dp,
                                 )
                                 Text(
-                                    "Downloading... ${download.progress}% — tap to cancel",
+                                    "Downloading... ${download.progress}%. Tap to cancel",
                                     modifier = Modifier.padding(start = 8.dp),
                                 )
                             }

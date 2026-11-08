@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct BrowseScreen: View {
+    @Environment(\.pageColors) private var page
     let initialMode: BrowseMode?
     let onTalkClick: (String) -> Void
     // When set, tapping a series pushes a real navigation destination instead of
@@ -46,7 +47,6 @@ struct BrowseScreen: View {
                         self.error = nil
                         Task { await loadInitial() }
                     }
-                    .tint(.saffronOrange)
                 }
             } else if selectedCategory != nil {
                 talksView
@@ -136,7 +136,6 @@ struct BrowseScreen: View {
                             Button("Load more (\(talks.count) of \(totalItems))") {
                                 Task { await loadMore() }
                             }
-                            .tint(.saffronOrange)
                         }
                         Spacer()
                     }
@@ -194,7 +193,7 @@ struct BrowseScreen: View {
                 .font(.caption)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(selected ? Color.saffronOrange : Color(.systemGray5))
+                .background(selected ? page.deep : Color(.systemGray5))
                 .foregroundStyle(selected ? .white : .primary)
                 .clipShape(Capsule())
         }

@@ -32,6 +32,7 @@ struct SearchResults {
 }
 
 struct SearchScreen: View {
+    @Environment(\.pageColors) private var page
     @State private var query = ""
     @State private var results = SearchResults()
     @State private var filter: SearchFilter = .all
@@ -129,7 +130,7 @@ struct SearchScreen: View {
                 .font(.caption)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(selected ? Color.saffronOrange : Color(.systemGray5))
+                .background(selected ? page.deep : Color(.systemGray5))
                 .foregroundStyle(selected ? .white : .primary)
                 .clipShape(Capsule())
         }

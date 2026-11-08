@@ -145,7 +145,7 @@ class PlayerViewModel @Inject constructor(
                 }
             } else {
                 _uiState.value = _uiState.value.copy(
-                    playbackError = if (isNetwork) "Couldn't load audio — check your connection."
+                    playbackError = if (isNetwork) "Couldn't load the audio. Please check your connection."
                     else "Couldn't play this talk.",
                     isReconnecting = false,
                 )

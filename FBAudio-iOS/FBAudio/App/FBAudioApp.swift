@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct FBAudioApp: App {
     @StateObject private var player = AudioPlayer.shared
+    @StateObject private var accentClock = AccentClock()
 
     init() {
         ApiConfig.install()   // base URL + X-FBA-Client / X-FBA-App-Version headers
@@ -12,7 +13,7 @@ struct FBAudioApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(player)
-                .tint(.saffronOrange)
+                .fbaHourlyTheme(accentClock.accent)
         }
     }
 }

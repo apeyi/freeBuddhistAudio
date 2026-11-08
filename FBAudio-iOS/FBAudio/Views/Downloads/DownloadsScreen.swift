@@ -161,7 +161,7 @@ struct DownloadsScreen: View {
                             }
                         }
                     }) {
-                        Image(systemName: "arrow.clockwise").foregroundStyle(Color.saffronOrange)
+                        Image(systemName: "arrow.clockwise").foregroundStyle(.tint)
                     }
                     Button(action: { deleteConfirmCatNum = download.catNum }) {
                         Image(systemName: "trash").foregroundStyle(.red)

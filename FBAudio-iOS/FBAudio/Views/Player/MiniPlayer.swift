@@ -12,7 +12,7 @@ struct MiniPlayer: View {
                     GeometryReader { geo in
                         let progress = (player.currentPosition / player.duration).safeFraction()
                         Rectangle()
-                            .fill(Color.saffronOrange)
+                            .fill(.tint)
                             .frame(width: geo.size.width * CGFloat(progress))
                     }
                     .frame(height: 2)

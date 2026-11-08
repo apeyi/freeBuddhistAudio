@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 private val benefits = listOf(
     "Support us keeping over 7,000 Dharma talks available to all",
     "Support the development of this app and help us reach even more people",
-    "Access to downloads — take any talk or series with you on retreat or on the road",
+    "Access to downloads: take any talk or series with you on retreat or on the road",
     "Access to transcript search, as it becomes available",
 )
 
@@ -56,7 +56,7 @@ fun JoinScreen(
             Text("Join Free Buddhist Audio", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Free Buddhist Audio is free for everyone, and always will be. Members help us keep it that way — and get a little extra in return.",
+                "Free Buddhist Audio is free for everyone, and always will be. Members help us keep it that way, and get a little extra in return.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(20.dp))

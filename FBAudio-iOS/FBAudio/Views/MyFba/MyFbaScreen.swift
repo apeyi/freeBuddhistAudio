@@ -16,7 +16,6 @@ struct MyFbaScreen: View {
                 accountCard
                 Button(action: onDonateClick) { Text("Donate").frame(maxWidth: .infinity) }
                     .buttonStyle(.borderedProminent)
-                    .tint(.saffronOrange)
                     .padding(.horizontal, 16)
 
                 Text("Recently Listened")
@@ -35,7 +34,6 @@ struct MyFbaScreen: View {
             }
             .padding(.bottom, 24)
         }
-        .tint(.saffronOrange)
         .miniPlayerClearance()
         .navigationTitle("My FBA")
         .toolbar {
@@ -79,7 +77,7 @@ struct MyFbaScreen: View {
                 if auth.state.loggedIn {
                     Button("Log out") { Task { await auth.logout() } }.buttonStyle(.bordered)
                 } else {
-                    Button("Log in", action: onLoginClick).buttonStyle(.borderedProminent)
+                    Button("Sign in", action: onLoginClick).buttonStyle(.borderedProminent)
                 }
             }
         }
@@ -115,11 +113,11 @@ struct MyFbaScreen: View {
                         .font(.caption).foregroundStyle(.secondary)
                 } else if FeatureFlags.auth {
                     Text("Not logged in").font(.headline)
-                    Text("Log in with your FBA account to sync your listening history.")
+                    Text("Sign in to sync your FBA history and continue listening on any phone, tablet or at freebuddhistaudio.com.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     Text("Your FBA").font(.headline)
-                    Text("Account login arrives with the new FBA service.")
+                    Text("Signing in arrives with the new FBA service.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -150,17 +148,16 @@ struct MyFbaScreen: View {
                 trailing: (isCompleted || isDownloaded) ? AnyView(
                     HStack(spacing: 4) {
                         if isCompleted {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.saffronOrange).font(.caption)
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint).font(.caption)
                         }
                         if isDownloaded {
-                            Image(systemName: "arrow.down.circle.fill").foregroundStyle(Color.saffronOrange).font(.caption)
+                            Image(systemName: "arrow.down.circle.fill").foregroundStyle(.tint).font(.caption)
                         }
                     }
                 ) : nil
             )
             if progress > 0 && !isCompleted {
                 ProgressView(value: progress.safeFraction())
-                    .tint(.saffronOrange)
                     .padding(.horizontal, 12)
                     .padding(.top, 2)
             }

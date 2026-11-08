@@ -86,7 +86,6 @@ struct ListScreen: View {
                 if source.isSeries {
                     Button(action: onDonateClick) { Text("Donate").frame(maxWidth: .infinity) }
                         .buttonStyle(.borderedProminent)
-                        .tint(.saffronOrange)
                 }
             }
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))

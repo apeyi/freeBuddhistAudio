@@ -115,7 +115,7 @@ fun HomeScreen(
                     )
                     if (FeatureFlags.AUTH) {
                         TextButton(onClick = { if (auth.loggedIn) onAccountClick() else onLoginClick() }) {
-                            Text(if (auth.loggedIn) auth.username.ifBlank { "My account" } else "Log in")
+                            Text(if (auth.loggedIn) auth.username.ifBlank { "My account" } else "sign in")
                         }
                     }
                 }
@@ -136,7 +136,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(12.dp))
                 DigitalLegacyCard(
                     description = state.digitalLegacy?.description
-                        ?: "Digitally remastered talks — hear the Dharma renewed for future generations.",
+                        ?: "Digitally remastered talks: hear the Dharma renewed for future generations.",
                     onClick = onDigitalLegacyClick,
                     onSupportClick = onDonateClick,
                 )

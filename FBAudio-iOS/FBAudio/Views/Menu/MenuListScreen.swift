@@ -35,7 +35,7 @@ struct MenuListScreen: View {
                         HStack(spacing: 12) {
                             if isIndex {
                                 Image(systemName: "list.bullet")
-                                    .font(.title2).foregroundStyle(Color.saffronOrange)
+                                    .font(.title2).foregroundStyle(.tint)
                                     .frame(width: 48, height: 48)
                             } else {
                                 CollectionTile(title: "", slug: node.collectionSlug ?? node.label,
@@ -46,7 +46,7 @@ struct MenuListScreen: View {
                                 Text(capitalizedFirst(node.label))
                                     .font(.body).foregroundStyle(.primary)
                                 if isIndex {
-                                    Text("Complete A–Z list").font(.caption).foregroundStyle(.secondary)
+                                    Text("Complete list, A to Z").font(.caption).foregroundStyle(.secondary)
                                 } else if node.hasChildren {
                                     Text("\(node.children.count) entries").font(.caption).foregroundStyle(.secondary)
                                 }

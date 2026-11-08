@@ -18,7 +18,7 @@ struct LoginScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Your FBA account").font(.title2).bold()
-                    Text("Free Buddhist Audio uses the Triratna login — the same username and password as The Buddhist Centre Online.")
+                    Text("Use your Triratna username and password: the ones you use for The Buddhist Centre Online or Order online spaces.")
                         .font(.subheadline).foregroundStyle(.secondary)
 
                     TextField("Username", text: $username)
@@ -55,7 +55,7 @@ struct LoginScreen: View {
 
                     Button(action: submit) {
                         Group {
-                            if isLoading { ProgressView().tint(.white) } else { Text("Log in") }
+                            if isLoading { ProgressView().tint(.white) } else { Text("Sign in") }
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -73,8 +73,7 @@ struct LoginScreen: View {
                 }
                 .padding(24)
             }
-            .tint(.saffronOrange)
-            .navigationTitle("Log in")
+            .navigationTitle("Sign in")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onDone) }

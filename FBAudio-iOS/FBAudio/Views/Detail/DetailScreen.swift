@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DetailScreen: View {
+    @Environment(\.pageColors) private var page
     let catNum: String
     let onPlay: (String) -> Void
     let onSpeakerClick: (String) -> Void
@@ -79,14 +80,14 @@ struct DetailScreen: View {
 
                 // Speaker
                 Button(action: { onSpeakerClick(talk.speaker) }) {
-                    Text(talk.speaker).foregroundStyle(Color.saffronOrange)
+                    Text(talk.speaker).foregroundStyle(.tint)
                 }
 
                 // Series
                 if !talk.series.isEmpty {
                     Button(action: { onSeriesClick(talk.seriesHref.isEmpty ? talk.series : talk.seriesHref) }) {
                         Text("Series: \(talk.series)")
-                            .font(.caption).foregroundStyle(Color.deepSaffron)
+                            .font(.caption).foregroundStyle(page.deep)
                     }
                 }
 
@@ -118,7 +119,6 @@ struct DetailScreen: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.saffronOrange)
 
                 // Download button
                 downloadButton(talk: talk)
@@ -151,7 +151,6 @@ struct DetailScreen: View {
                     Text("Donate").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.saffronOrange)
 
                 // Description
                 if !talk.description.isEmpty {
@@ -193,7 +192,7 @@ struct DetailScreen: View {
             Button(action: { downloadManager.cancelDownload(catNum: catNum) }) {
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Downloading... \(state?.progress ?? 0)% — tap to cancel")
+                    Text("Downloading... \(state?.progress ?? 0)%. Tap to cancel")
                 }
                 .frame(maxWidth: .infinity)
             }

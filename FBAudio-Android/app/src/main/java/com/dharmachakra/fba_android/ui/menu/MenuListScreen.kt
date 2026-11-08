@@ -156,7 +156,7 @@ fun MenuListScreen(
                                         style = MaterialTheme.typography.bodyLarge,
                                     )
                                     Text(
-                                        "Complete A–Z list",
+                                        "Complete list, A to Z",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )

@@ -3,7 +3,7 @@ import SwiftUI
 private let benefits = [
     "Support us keeping over 7,000 Dharma talks available to all",
     "Support the development of this app and help us reach even more people",
-    "Access to downloads — take any talk or series with you on retreat or on the road",
+    "Access to downloads: take any talk or series with you on retreat or on the road",
     "Access to transcript search, as it becomes available",
 ]
 
@@ -16,13 +16,13 @@ struct JoinScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Join Free Buddhist Audio").font(.title2).bold()
-                Text("Free Buddhist Audio is free for everyone, and always will be. Members help us keep it that way — and get a little extra in return.")
+                Text("Free Buddhist Audio is free for everyone, and always will be. Members help us keep it that way, and get a little extra in return.")
                     .font(.body)
 
                 Text("Benefits of joining").font(.headline).padding(.top, 8)
                 ForEach(benefits, id: \.self) { benefit in
                     HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.saffronOrange)
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
                         Text(benefit).font(.body)
                     }
                 }
@@ -42,7 +42,6 @@ struct JoinScreen: View {
             }
             .padding(16)
         }
-        .tint(.saffronOrange)
         .miniPlayerClearance()
         .navigationTitle("Join")
     }

@@ -372,7 +372,7 @@ class AudioPlayer: ObservableObject {
         } else {
             isReconnecting = false
             playbackError = isNetwork
-                ? "Couldn't load audio — check your connection."
+                ? "Couldn't load the audio. Please check your connection."
                 : "Couldn't play this talk."
         }
     }
