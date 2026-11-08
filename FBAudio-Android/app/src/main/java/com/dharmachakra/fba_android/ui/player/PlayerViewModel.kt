@@ -51,6 +51,10 @@ data class PlayerUiState(
     /** Something has played since the app opened. Until then the Now Playing bar shows
      *  the restored talk as "Continue listening · N min left". */
     val playedThisSession: Boolean = false,
+    /** Where playback was started ("Home", "Search", ...), shown as "Playing from" in the player. */
+    val playingFrom: String = "",
+    /** The tab route to return to from "Playing from". */
+    val playingFromRoute: String? = null,
 ) {
     /** "Continue listening · 18 min left" while the restored talk hasn't been played yet. */
     val continueListeningLabel: String?
@@ -79,7 +83,18 @@ class PlayerViewModel @Inject constructor(
     private val downloadRepository: DownloadRepository,
     private val settings: AppSettings,
     private val resolver: PlaybackResolver,
+    private val sleepTimer: com.dharmachakra.fba_android.player.SleepTimer,
 ) : ViewModel() {
+
+    /** Sleep timer state (lives with the playback service). */
+    val sleepTimerState = sleepTimer.state
+
+    fun setSleepTimer(option: com.dharmachakra.fba_android.player.SleepOption) = sleepTimer.set(option)
+
+    /** The section the listener is in (tab label + route), recorded when playback starts. */
+    private var section: Pair<String, String?> = "" to null
+
+    fun setSection(label: String, route: String?) { section = label to route }
 
     private val prefs: SharedPreferences = resolver.prefs
     private val savedSpeed = prefs.getFloat("playback_speed", 1.0f)
@@ -371,7 +386,10 @@ class PlayerViewModel @Inject constructor(
         userInitiatedPlayback = true
         pendingRestore = null
         autoRetryCount = 0
-        _uiState.value = _uiState.value.copy(playbackError = null, isReconnecting = false)
+        _uiState.value = _uiState.value.copy(
+            playbackError = null, isReconnecting = false,
+            playingFrom = section.first, playingFromRoute = section.second,
+        )
         viewModelScope.launch {
             val controller = controllerReady.await()
             val prepared = resolver.prepare(catNum) ?: return@launch
@@ -470,13 +488,14 @@ class PlayerViewModel @Inject constructor(
         updatePosition()
     }
 
+    /** Forward 30 s (the player's seek-forward increment, same as the notification). */
     fun seekForward() {
-        mediaController?.let { it.seekTo(it.currentPosition + 10_000) }
+        mediaController?.seekForward()
         updatePosition()
     }
 
     fun seekBack() {
-        mediaController?.let { it.seekTo((it.currentPosition - 10_000).coerceAtLeast(0)) }
+        mediaController?.seekBack()   // 15 s
         updatePosition()
     }
 

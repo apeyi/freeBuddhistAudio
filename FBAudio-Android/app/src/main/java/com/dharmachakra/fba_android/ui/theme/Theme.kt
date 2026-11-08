@@ -24,9 +24,9 @@ fun Long.toColor(): Color = Color(this)
 
 /** The current page's colour family as Compose colours (hourly accent, gold or Order blue). */
 @Immutable
-data class PageColors(val base: Color, val deep: Color, val tint: Color) {
+data class PageColors(val base: Color, val deep: Color, val tint: Color, val set: AccentSet) {
     companion object {
-        fun of(set: AccentSet) = PageColors(set.base.toColor(), set.deep.toColor(), set.tint.toColor())
+        fun of(set: AccentSet) = PageColors(set.base.toColor(), set.deep.toColor(), set.tint.toColor(), set)
     }
 }
 

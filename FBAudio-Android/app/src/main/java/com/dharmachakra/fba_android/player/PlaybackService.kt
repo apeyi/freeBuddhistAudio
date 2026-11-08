@@ -42,6 +42,7 @@ class PlaybackService : MediaLibraryService() {
     @Inject lateinit var resolver: PlaybackResolver
     @Inject lateinit var tree: LibraryTree
     @Inject lateinit var persistence: PlaybackPersistence
+    @Inject lateinit var sleepTimer: SleepTimer
 
     private var mediaSession: MediaLibrarySession? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -59,6 +60,9 @@ class PlaybackService : MediaLibraryService() {
                 true // handleAudioFocus
             )
             .setHandleAudioBecomingNoisy(true)
+            // v1.0 design: back 15 s, forward 30 s, everywhere (app, notification, lock screen, car).
+            .setSeekBackIncrementMs(15_000)
+            .setSeekForwardIncrementMs(30_000)
             .build()
 
         // Dismiss notification when playback ends (prevents stale notification)
@@ -72,6 +76,7 @@ class PlaybackService : MediaLibraryService() {
             }
         })
         persistence.attach(player, serviceScope)
+        sleepTimer.attach(player, serviceScope)
 
         // PendingIntent so tapping the notification (re)launches the app — without
         // this the notification body does nothing, including after the OS kills us.

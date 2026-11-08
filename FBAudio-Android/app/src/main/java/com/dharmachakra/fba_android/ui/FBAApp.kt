@@ -72,6 +72,10 @@ fun FBAApp(
         // stack (a talk opened from Search keeps Search active; deep links fall back to Home).
         val backStack by navController.currentBackStack.collectAsStateWithLifecycle()
         val currentTab = backStack.lastOrNull { it.destination.route in TAB_ROUTES }?.destination?.route
+        // "Playing from" in the player: the section playback is started in.
+        LaunchedEffect(currentTab) {
+            playerViewModel.setSection(TAB_LABELS[currentTab] ?: "", currentTab)
+        }
         val isMember by appViewModel.isMember.collectAsStateWithLifecycle()
         val canDownload = !FeatureFlags.MEMBERSHIP_GATING || isMember
 
@@ -122,6 +126,9 @@ fun FBAApp(
         }
 
         Scaffold(
+            // The full-screen player draws its colour under the status bar itself.
+            contentWindowInsets = if (currentRoute == Routes.PLAYER) androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
+                else androidx.compose.material3.ScaffoldDefaults.contentWindowInsets,
             bottomBar = {
                 if (!hideBottomBar) {
                     Column {
@@ -164,6 +171,7 @@ fun FBAApp(
 }
 
 private val TAB_ROUTES = setOf(Routes.HOME, Routes.EXPLORE, Routes.SEARCH, Routes.MY_FBA)
+private val TAB_LABELS = mapOf(Routes.HOME to "Home", Routes.EXPLORE to "Explore", Routes.SEARCH to "Search", Routes.MY_FBA to "My FBA")
 
 /** One tab: route, label, filled (selected) and outlined icons. */
 private data class FbaTab(val route: String?, val label: String, val selectedIcon: ImageVector, val icon: ImageVector)

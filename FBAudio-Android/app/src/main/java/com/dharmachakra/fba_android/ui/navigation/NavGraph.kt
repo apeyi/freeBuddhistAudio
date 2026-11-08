@@ -232,6 +232,12 @@ fun NavGraph(
         composable(Routes.PLAYER) {
             PlayerScreen(
                 onBack = { navController.popBackStack() },
+                onTranscriptClick = { url, cat -> navController.navigate(Routes.transcript(url, cat)) },
+                onDonateClick = onDonate,
+                onPlayingFromClick = { route ->
+                    // Back to where playback started (the tab), closing the player.
+                    if (!navController.popBackStack(route, inclusive = false)) navController.navigate(route)
+                },
                 onNavigateToDetail = { catNum ->
                     navController.navigate(Routes.detail(catNum))
                 },

@@ -141,6 +141,8 @@ dependencies {
 
     // Image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
+    // Full-screen player colours from the artwork
+    implementation("androidx.palette:palette-ktx:1.0.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

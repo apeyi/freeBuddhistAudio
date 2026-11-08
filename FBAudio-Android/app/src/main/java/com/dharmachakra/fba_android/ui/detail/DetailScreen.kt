@@ -239,32 +239,10 @@ fun DetailScreen(
                     )
                 }
                 if (showReport) {
-                    ReportSheet(
-                        talk = talk,
-                        onDismiss = { showReport = false },
-                        onReason = { reason ->
-                            val position = if (isActive) {
-                                (PlaybackMath.cumulativePositionMs(talk.tracks, playerState.currentTrackIndex, playerState.currentPosition) / 1000).toInt()
-                            } else null
-                            val email = ReportProblem.email(
-                                reason = reason,
-                                talkTitle = talk.title,
-                                catNum = talk.catNum,
-                                positionSeconds = position,
-                                device = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}",
-                                appVersion = BuildConfig.VERSION_NAME,
-                                signedIn = false,
-                            )
-                            val mail = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
-                                putExtra(Intent.EXTRA_EMAIL, arrayOf(email.to))
-                                putExtra(Intent.EXTRA_SUBJECT, email.subject)
-                                putExtra(Intent.EXTRA_TEXT, email.body)
-                            }
-                            runCatching { context.startActivity(mail) }
-                                .onFailure { clipboard.setText(AnnotatedString(email.to)) }
-                            showReport = false
-                        },
-                    )
+                    val position = if (isActive) {
+                        (PlaybackMath.cumulativePositionMs(talk.tracks, playerState.currentTrackIndex, playerState.currentPosition) / 1000).toInt()
+                    } else null
+                    com.dharmachakra.fba_android.ui.components.ReportProblemSheet(talk, position, onDismiss = { showReport = false })
                 }
             }
         }
@@ -741,26 +719,6 @@ private fun MoreSheet(
             if (talk.series.isNotBlank()) row("Go to series", onSeries)()
             if (talk.speaker.isNotBlank()) row("Go to speaker", onSpeaker)()
             row("Report a problem", onReport)()
-        }
-    }
-}
-
-/** Report a problem: the talk, then the reasons; each opens an email to support. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ReportSheet(talk: Talk, onDismiss: () -> Unit, onReason: (String) -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
-            Text("Report a problem", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 24.dp))
-            Text("${talk.title} · ${talk.speaker}", fontSize = 14.sp, color = FbaColors.meta,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp))
-            ReportProblem.reasons.forEach { reason ->
-                ListItem(
-                    headlineContent = { Text(reason) },
-                    modifier = Modifier.clickable(role = Role.Button) { onReason(reason) },
-                )
-            }
-            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Cancel") }
         }
     }
 }
