@@ -27,8 +27,9 @@ enum ArtworkRule {
         let diameter = Double(min(width, height))
         let h = diameter / (1 + aspect * aspect).squareRoot()
         let w = h * aspect
-        let cw = min(max(Int(w.rounded()), 1), width)
-        let ch = min(max(Int(h.rounded()), 1), height)
+        // Floor, not round: rounding up can put the crop corners just outside the circle.
+        let cw = min(max(Int(w), 1), width)
+        let ch = min(max(Int(h), 1), height)
         return Crop(x: (width - cw) / 2, y: (height - ch) / 2, width: cw, height: ch)
     }
 }

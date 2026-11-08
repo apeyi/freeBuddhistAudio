@@ -17,10 +17,10 @@ final class ArtworkRuleTests: XCTestCase {
 
     func testInscribedCropFitsInsideTheCircle() {
         let c = ArtworkRule.inscribedCrop(width: 500, height: 500, aspect: 362.0 / 240.0)
-        XCTAssertEqual(c.width, 417)
+        XCTAssertEqual(c.width, 416)
         XCTAssertEqual(c.height, 276)
-        XCTAssertEqual(c.x, (500 - 417) / 2)
+        XCTAssertEqual(c.x, (500 - 416) / 2)
         XCTAssertEqual(c.y, (500 - 276) / 2)
-        XCTAssertEqual(ArtworkRule.inscribedCrop(width: 500, height: 500, aspect: 1).width, 354)
+        XCTAssertEqual(ArtworkRule.inscribedCrop(width: 500, height: 500, aspect: 1).width, 353)
     }
 }

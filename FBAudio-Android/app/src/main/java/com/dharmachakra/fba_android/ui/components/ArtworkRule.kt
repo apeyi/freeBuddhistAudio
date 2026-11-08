@@ -1,7 +1,6 @@
 package com.dharmachakra.fba_android.ui.components
 
 import kotlin.math.min
-import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -31,8 +30,9 @@ object ArtworkRule {
         val diameter = min(width, height).toDouble()
         val h = diameter / sqrt(1.0 + aspect * aspect)
         val w = h * aspect
-        val cw = w.roundToInt().coerceIn(1, width)
-        val ch = h.roundToInt().coerceIn(1, height)
+        // Floor, not round: rounding up can put the crop corners just outside the circle.
+        val cw = w.toInt().coerceIn(1, width)
+        val ch = h.toInt().coerceIn(1, height)
         return Crop((width - cw) / 2, (height - ch) / 2, cw, ch)
     }
 }

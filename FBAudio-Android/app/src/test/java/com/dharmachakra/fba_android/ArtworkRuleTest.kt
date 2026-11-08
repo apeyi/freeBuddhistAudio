@@ -23,14 +23,14 @@ class ArtworkRuleTest {
     @Test fun inscribedCropFitsInsideTheCircle() {
         // 500 x 500 circular PNG (e.g. Jnanalila), wide artwork 362 x 240
         val c = ArtworkRule.inscribedCrop(500, 500, 362f / 240f)
-        assertEquals(417, c.width)
+        assertEquals(416, c.width)
         assertEquals(276, c.height)
-        assertEquals((500 - 417) / 2, c.left)
+        assertEquals((500 - 416) / 2, c.left)
         assertEquals((500 - 276) / 2, c.top)
         // corners of the crop lie inside the circle (radius 250 around the centre)
         val dx = c.width / 2.0; val dy = c.height / 2.0
         assertTrue(dx * dx + dy * dy <= 250.0 * 250.0 + 1)
         // square thumbnail: side = d / sqrt(2)
-        assertEquals(354, ArtworkRule.inscribedCrop(500, 500, 1f).width)
+        assertEquals(353, ArtworkRule.inscribedCrop(500, 500, 1f).width)
     }
 }
