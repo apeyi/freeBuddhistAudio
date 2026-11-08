@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TalkEntity::class, DownloadEntity::class, RecentlyListenedEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class FBADatabase : RoomDatabase() {
@@ -67,6 +67,15 @@ abstract class FBADatabase : RoomDatabase() {
             }
         }
 
+        /** v1.0 talk page: banner, speaker image and place from /api/v2. */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                for (col in listOf("bannerUrl", "speakerImageUrl", "placeName", "placeSlug")) {
+                    db.execSQL("ALTER TABLE talks ADD COLUMN $col TEXT NOT NULL DEFAULT ''")
+                }
+            }
+        }
+
         fun create(context: Context): FBADatabase {
             // No destructive fallback: a missing migration must fail loudly in
             // development, not silently wipe users' downloads and history.
@@ -75,7 +84,7 @@ abstract class FBADatabase : RoomDatabase() {
                 FBADatabase::class.java,
                 "fba_database"
             )
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
         }
     }

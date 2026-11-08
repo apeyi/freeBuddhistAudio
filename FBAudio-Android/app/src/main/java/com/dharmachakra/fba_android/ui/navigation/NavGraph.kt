@@ -118,6 +118,18 @@ fun NavGraph(
                 catNum = catNum,
                 onPlay = onPlayTalk,
                 onPlayChapter = onPlayChapter,
+                onPlayFromStart = { cat ->
+                    playerViewModel.playTalk(cat, fromStart = true)
+                    navController.navigate(Routes.PLAYER) { launchSingleTop = true }
+                },
+                onPlaceClick = { slug, name ->
+                    navController.navigate(Routes.list(ContentSource.Browse("/browse?p=${Uri.encode(slug)}"), name))
+                },
+                onYearClick = { year ->
+                    navController.navigate(Routes.list(ContentSource.Browse("/browse?y=$year"), "Talks from $year"))
+                },
+                onTalkClick = { navController.navigate(Routes.detail(it)) },
+                onDigitalLegacyClick = { navController.navigate(Routes.DIGITAL_LEGACY) },
                 onBack = { navController.popBackStack() },
                 onSpeakerClick = { speakerName ->
                     navController.navigate(Routes.browseForSpeaker(speakerName))

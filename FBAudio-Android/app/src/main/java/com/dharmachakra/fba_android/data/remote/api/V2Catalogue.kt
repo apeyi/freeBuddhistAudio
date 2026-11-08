@@ -121,6 +121,34 @@ class V2Catalogue @Inject constructor(
         search.search(SearchKind.SERIES, query, pageSize = 50).items.map { it.item.toSearchResult() }
     }
 
+    // ---- talk page extras --------------------------------------------------
+
+    /** Fields the v1.0 talk page needs that the scraped talk lacks. */
+    data class TalkExtras(
+        val bannerUrl: String,
+        val speakerImageUrl: String,
+        val placeName: String,
+        val placeSlug: String,
+        val seriesTitle: String,
+        val seriesCatNum: String,
+    )
+
+    suspend fun getTalkExtras(catNum: String): TalkExtras = withContext(Dispatchers.IO) {
+        val t = catalogue.getTalk(catNum)
+        TalkExtras(
+            bannerUrl = t.marqueeImage ?: "",
+            speakerImageUrl = t.speaker.image ?: "",
+            placeName = t.place?.name ?: "",
+            placeSlug = t.place?.slug ?: "",
+            seriesTitle = t.series.firstOrNull()?.title ?: "",
+            seriesCatNum = t.series.firstOrNull()?.catNum ?: "",
+        )
+    }
+
+    suspend fun getRelatedTalks(catNum: String): List<SearchResult> = withContext(Dispatchers.IO) {
+        catalogue.listRelatedTalks(catNum, pageSize = 24).items.map { it.toSearchResult() }
+    }
+
     // ---- digital legacy ----------------------------------------------------
 
     suspend fun getDigitalLegacy(): DigitalLegacy = withContext(Dispatchers.IO) {

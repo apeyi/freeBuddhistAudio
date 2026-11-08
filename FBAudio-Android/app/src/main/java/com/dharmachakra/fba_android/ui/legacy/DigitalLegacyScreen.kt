@@ -237,7 +237,7 @@ fun DigitalLegacyScreen(
                                     onClick = { viewModel.setVersion(true) },
                                     enabled = state.sampleReady,
                                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                                ) { Text("Remastered") }
+                                ) { Text("Enhanced") }
                             }
                             Spacer(Modifier.width(12.dp))
                             androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
@@ -271,7 +271,7 @@ fun DigitalLegacyScreen(
                         )
                         Text(
                             "${formatDuration((state.positionMs / 1000).toInt())} / ${formatDuration((state.durationMs / 1000).toInt())}" +
-                                "  ·  ${if (state.useRemaster) "remastered" else "original"}",
+                                "  ·  ${if (state.useRemaster) "enhanced" else "original"}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

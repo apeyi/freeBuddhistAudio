@@ -10,6 +10,7 @@ import com.dharmachakra.fba_android.domain.model.SearchResult
 import com.dharmachakra.fba_android.domain.model.Talk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -66,15 +67,37 @@ class TalkRepository @Inject constructor(
             if (cached != null && cached.cachedAt >= TALK_CACHE_EPOCH) return cached.toDomain()
         }
 
-        // Fetch from web, fill chapter lengths the site lacks, and cache
-        val talk = scraper.fetchTalkDetail(catNum)?.let { scraper.fillMissingTrackDurations(it) } ?: return null
+        // Fetch from web, fill chapter lengths the site lacks, add the v2 artwork/place
+        // fields the talk page needs, and cache. The v2 call runs alongside the scrape and
+        // is best-effort: Order-only (403) or a network blip leaves the scraped talk as is.
+        val talk = kotlinx.coroutines.coroutineScope {
+            val extras = async { runCatching { v2.getTalkExtras(catNum) }.getOrNull() }
+            val scraped = scraper.fetchTalkDetail(catNum)?.let { scraper.fillMissingTrackDurations(it) }
+            scraped?.withExtras(extras.await()) ?: run { extras.cancel(); null }
+        } ?: return null
         talkDao.insertTalk(TalkEntity.fromDomain(talk))
         return talk
     }
 
+    /** Talks related to [catNum] (v2), for the talk page's Related talks tab and Up next. */
+    suspend fun getRelatedTalks(catNum: String): List<SearchResult> = v2.getRelatedTalks(catNum)
+
     companion object {
-        /** 2026-09-05 (evening): chapter lengths the site lacks are now estimated — older cache rows are stale. */
-        const val TALK_CACHE_EPOCH = 1_788_645_034_506L
+        /** 2026-11-08: talks now carry banner / speaker image / place from v2 — older cache rows are stale. */
+        const val TALK_CACHE_EPOCH = 1_794_163_023_254L
+
+        /** Merge v2 extras into a scraped talk; scraped series info wins when present. */
+        fun Talk.withExtras(e: com.dharmachakra.fba_android.data.remote.api.V2Catalogue.TalkExtras?): Talk {
+            if (e == null) return this
+            return copy(
+                bannerUrl = e.bannerUrl,
+                speakerImageUrl = e.speakerImageUrl,
+                placeName = e.placeName,
+                placeSlug = e.placeSlug,
+                series = series.ifBlank { e.seriesTitle },
+                seriesHref = seriesHref.ifBlank { e.seriesCatNum.takeIf { it.isNotBlank() }?.let { "/series/details?num=$it" } ?: "" },
+            )
+        }
     }
 
     /** General audio search via FBA API. */

@@ -40,6 +40,10 @@ data class Talk(
     val bannerUrl: String = "",
     /** The speaker's image, second choice for talk artwork. */
     val speakerImageUrl: String = "",
+    /** Where the talk was given (link to all talks from that place). */
+    val placeName: String = "",
+    /** The place's browse slug (`/browse?p=…`). */
+    val placeSlug: String = "",
 ) {
     val hasRemaster: Boolean get() = tracks.any { it.hasRemaster }
 }

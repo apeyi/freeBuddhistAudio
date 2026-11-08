@@ -25,6 +25,10 @@ data class TalkEntity(
     val seriesHref: String = "",
     val cachedAt: Long = System.currentTimeMillis(),
     @ColumnInfo(defaultValue = "0") val omOnly: Boolean = false,
+    @ColumnInfo(defaultValue = "") val bannerUrl: String = "",
+    @ColumnInfo(defaultValue = "") val speakerImageUrl: String = "",
+    @ColumnInfo(defaultValue = "") val placeName: String = "",
+    @ColumnInfo(defaultValue = "") val placeSlug: String = "",
 ) {
     fun toDomain(): Talk {
         // Decode through a nullable mirror type: Gson bypasses Kotlin defaults, so
@@ -64,6 +68,10 @@ data class TalkEntity(
             series = series,
             seriesHref = seriesHref,
             omOnly = omOnly,
+            bannerUrl = bannerUrl,
+            speakerImageUrl = speakerImageUrl,
+            placeName = placeName,
+            placeSlug = placeSlug,
         )
     }
 
@@ -92,6 +100,10 @@ data class TalkEntity(
             series = talk.series,
             seriesHref = talk.seriesHref,
             omOnly = talk.omOnly,
+            bannerUrl = talk.bannerUrl,
+            speakerImageUrl = talk.speakerImageUrl,
+            placeName = talk.placeName,
+            placeSlug = talk.placeSlug,
         )
     }
 }

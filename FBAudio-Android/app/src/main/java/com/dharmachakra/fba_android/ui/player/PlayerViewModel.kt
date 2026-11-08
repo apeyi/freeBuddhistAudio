@@ -366,7 +366,8 @@ class PlayerViewModel @Inject constructor(
      * Start playing a talk, optionally at a specific chapter. Queues all chapters
      * so the player advances between them natively (works in the background too).
      */
-    fun playTalk(catNum: String, trackIndex: Int? = null) {
+    /** Play [catNum] from its saved point (or [trackIndex]); [fromStart] ignores the saved point. */
+    fun playTalk(catNum: String, trackIndex: Int? = null, fromStart: Boolean = false) {
         userInitiatedPlayback = true
         pendingRestore = null
         autoRetryCount = 0
@@ -374,7 +375,9 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val controller = controllerReady.await()
             val prepared = resolver.prepare(catNum) ?: return@launch
-            val (startIndex, startPos) = resolver.resumePoint(prepared.talk, prepared.items.size, trackIndex)
+            val (startIndex, startPos) =
+                if (fromStart) (trackIndex ?: 0).coerceIn(0, prepared.items.size - 1) to 0L
+                else resolver.resumePoint(prepared.talk, prepared.items.size, trackIndex)
 
             controller.setMediaItems(prepared.items, startIndex, startPos)
             controller.prepare()

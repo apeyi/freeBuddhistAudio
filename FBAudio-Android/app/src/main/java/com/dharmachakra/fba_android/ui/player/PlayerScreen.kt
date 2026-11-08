@@ -215,7 +215,7 @@ fun PlayerScreen(
                         onClick = { playerViewModel.setUseRemaster(true) },
                         enabled = !state.versionLocked,
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    ) { Text("Remastered") }
+                    ) { Text("Enhanced") }
                 }
                 if (state.versionLocked) {
                     Text(

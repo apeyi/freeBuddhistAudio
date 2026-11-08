@@ -80,8 +80,14 @@ fun FBAApp(
         LaunchedEffect(deepLink) {
             if (deepLink == null) return@LaunchedEffect
             when (deepLink) {
-                is DeepLink.Talk -> navController.navigate(Routes.detail(deepLink.catNum)) {
-                    launchSingleTop = true
+                // Not launchSingleTop: that matches the route pattern "detail/{catNum}", so a
+                // link to another talk while a talk page is on top did nothing. Skip only
+                // when that exact talk is already showing.
+                is DeepLink.Talk -> {
+                    val top = navController.currentBackStackEntry
+                    val showing = top?.destination?.route == Routes.DETAIL &&
+                        top.arguments?.getString("catNum") == deepLink.catNum
+                    if (!showing) navController.navigate(Routes.detail(deepLink.catNum))
                 }
                 is DeepLink.Series -> navController.navigate(
                     Routes.list(ContentSource.seriesByCatNum(deepLink.seriesId))
