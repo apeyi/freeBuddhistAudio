@@ -86,10 +86,20 @@ extension EnvironmentValues {
 /// Publishes the hourly accent and re-evaluates it at the top of each hour.
 @MainActor
 final class AccentClock: ObservableObject {
-    @Published private(set) var accent: AccentSet = AccentCycle.mode(for: Date()).set
+    @Published private(set) var accent: AccentSet = AccentClock.current()
     private var timer: Timer?
 
     init() { schedule() }
+
+    /// The hourly accent, unless pinned with the `-fbaAccent <brand>` launch argument
+    /// (CI screenshots compare against a Figma frame shown in one colour).
+    nonisolated static func current() -> AccentSet {
+        if let pinned = UserDefaults.standard.string(forKey: "fbaAccent"),
+           let brand = Brand.allCases.first(where: { "\($0)" == pinned }) {
+            return brand.set
+        }
+        return AccentCycle.mode(for: Date()).set
+    }
 
     private func schedule() {
         timer?.invalidate()
@@ -97,7 +107,7 @@ final class AccentClock: ObservableObject {
                                      repeats: false) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
-                self.accent = AccentCycle.mode(for: Date()).set
+                self.accent = AccentClock.current()
                 self.schedule()
             }
         }

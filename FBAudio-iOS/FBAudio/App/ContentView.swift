@@ -5,7 +5,8 @@ let donateURL = URL(string: "https://www.freebuddhistaudio.com/donate/")!
 struct ContentView: View {
     @EnvironmentObject var player: AudioPlayer
     @ObservedObject private var membership = MembershipRepository.shared
-    @State private var selectedTab = 0
+    /// Debug/CI hook: `-fbaTab N` launch argument opens on tab N (screenshot runs).
+    @State private var selectedTab = UserDefaults.standard.integer(forKey: "fbaTab")
     @State private var showPlayer = false
     @State private var showLogin = false
     @State private var navigationPath = NavigationPath()
