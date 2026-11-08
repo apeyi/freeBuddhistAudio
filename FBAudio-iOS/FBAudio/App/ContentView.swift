@@ -46,7 +46,9 @@ struct ContentView: View {
                     onDonateClick: openDonate,
                     onLoginClick: { showLogin = true },
                     onAccountClick: { selectedTab = Tab.myFba },
-                    onOpenUrl: { url in if let u = URL(string: url) { UIApplication.shared.open(u) } }
+                    onOpenUrl: { url in if let u = URL(string: url) { UIApplication.shared.open(u) } },
+                    onTalkClick: { navigateToDetail($0) },
+                    onSeriesClick: { navigate(.list(.seriesByCatNum($0), "")) }
                 )
                 .navigationDestination(for: Route.self) { route in routeView(route) }
             }

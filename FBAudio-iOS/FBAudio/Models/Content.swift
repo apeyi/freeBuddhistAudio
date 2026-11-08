@@ -129,6 +129,14 @@ struct ListPage: Codable {
     var hasMore: Bool { !items.isEmpty && totalItems > 0 && page * ListPage.pageSize < totalItems }
 }
 
+/// A featured post for the Home carousel (v2 `highlightedContent`).
+struct Featured: Codable, Equatable, Identifiable {
+    let title: String
+    let imageUrl: String
+    let webUrl: String
+    var id: String { webUrl + title }
+}
+
 /// Content of the website's Digital Legacy page.
 struct DigitalLegacy: Codable {
     let title: String

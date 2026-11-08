@@ -138,6 +138,13 @@ enum V2Catalogue {
         try await CatalogueAPI.listRelatedTalks(catNum: catNum, pageSize: 24).items.map(toSearchResult)
     }
 
+    // MARK: - home
+
+    /// Featured posts for the Home carousel (no description or band colour in v2 yet).
+    static func getFeatured() async throws -> [Featured] {
+        try await ServiceAPI.getHome().highlightedContent.map { Featured(title: $0.title, imageUrl: $0.image ?? "", webUrl: $0.webUrl) }
+    }
+
     // MARK: - digital legacy
 
     static func getDigitalLegacy() async throws -> DigitalLegacy {

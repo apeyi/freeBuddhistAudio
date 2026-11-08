@@ -210,6 +210,17 @@ final class ContentRepository {
         )
     }
 
+    /// Home carousel posts (cached like the other site content).
+    func getFeatured() async -> [Featured] {
+        let cached: ([Featured], Bool)? = await cache.get("featured", [Featured].self)
+        if let cached, cached.1 { return cached.0 }
+        if let fresh = try? await V2Catalogue.getFeatured() {
+            await cache.put("featured", fresh)
+            return fresh
+        }
+        return cached?.0 ?? []
+    }
+
     func getDigitalLegacy() async -> DigitalLegacy? {
         let cached: (DigitalLegacy, Bool)? = await cache.get("digital_legacy", DigitalLegacy.self)
         if let cached, cached.1 { return cached.0 }
