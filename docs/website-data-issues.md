@@ -87,3 +87,4 @@ ended up in the duration field.
 | 2026-09-05 | `digitalLegacyPage.descriptionHtml` contains inline `style` attributes and links. | Converted to plain text. |
 | 2026-09-05 | Series `marquee_image` often `null`; `image` may also be `null` with only `speaker_image` set. | Fallback chain marquee → image → speaker image. |
 | 2026-09-05 | Talk `visibility_token` present on every talk (purpose unknown). | Ignored. |
+| 2026-11-08 | Series X06 (Aspects of Buddhist Psychology) blurb has a stray `</p><p>` mid-sentence ("In this </p><p>fascinating series"), so `blurbText` breaks the sentence into two paragraphs. | Shown as given; fix the blurb on the site. |
