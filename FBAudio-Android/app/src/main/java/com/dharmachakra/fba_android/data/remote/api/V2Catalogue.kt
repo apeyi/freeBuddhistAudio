@@ -113,8 +113,8 @@ class V2Catalogue @Inject constructor(
 
     // ---- search ------------------------------------------------------------
 
-    suspend fun searchTalks(query: String): List<SearchResult> = withContext(Dispatchers.IO) {
-        search.search(SearchKind.TALK, query, pageSize = 50).items.map { it.item.toSearchResult() }
+    suspend fun searchTalks(query: String, language: String? = null): List<SearchResult> = withContext(Dispatchers.IO) {
+        search.search(SearchKind.TALK, query, language = language, pageSize = 50).items.map { it.item.toSearchResult() }
     }
 
     suspend fun searchSeries(query: String): List<SearchResult> = withContext(Dispatchers.IO) {

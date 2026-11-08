@@ -101,8 +101,8 @@ class TalkRepository @Inject constructor(
     }
 
     /** General audio search via FBA API. */
-    suspend fun searchAudio(query: String): List<SearchResult> {
-        return v2.searchTalks(query)
+    suspend fun searchAudio(query: String, language: String? = null): List<SearchResult> {
+        return v2.searchTalks(query, language)
     }
 
     /** Series search via FBA API. */

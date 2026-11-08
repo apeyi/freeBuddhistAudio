@@ -109,6 +109,8 @@ fun NavGraph(
                 onTalkClick = { navController.navigate(Routes.detail(it)) },
                 onItemClick = onItemClick,
                 onBack = { navController.popBackStack() },
+                onOpenUrl = openUrl,
+                playerViewModel = playerViewModel,
             )
         }
         composable(

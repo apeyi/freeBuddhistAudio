@@ -46,7 +46,16 @@ data class SearchResults(
             .filter { of(it).isNotEmpty() }
 }
 
+/** The design's search categories (Audio = talks and series). */
+enum class SearchCategory(val label: String) { AUDIO("Audio"), SPEAKERS("Speakers"), TRANSCRIPTS("Transcripts"), PODCASTS("Podcasts") }
+
 data class SearchUiState(
+    val category: SearchCategory = SearchCategory.AUDIO,
+    /** null = All languages (pinned first in the language row). */
+    val language: String? = null,
+    val languages: List<com.dharmachakra.fba_android.data.remote.api.V2Catalogue.LanguageEntry> = emptyList(),
+    /** A section opened with "See all n". */
+    val expanded: SearchFilter? = null,
     val query: String = "",
     val filter: SearchFilter = SearchFilter.ALL,
     val results: SearchResults = SearchResults(),
@@ -71,6 +80,43 @@ class SearchViewModel @Inject constructor(
 
     private var searchJob: Job? = null
     private val searchCache = mutableMapOf<String, SearchResults>()
+
+    init {
+        viewModelScope.launch {
+            val order = listOf("en", "hi", "de", "es", "fr", "nl", "no", "pl", "pt", "ru", "fi", "sv")
+            val langs = content.getLanguages().sortedBy { l -> order.indexOf(l.code).let { if (it < 0) order.size else it } }
+            _uiState.value = _uiState.value.copy(languages = langs)
+        }
+    }
+
+    fun setCategory(category: SearchCategory) {
+        _uiState.value = _uiState.value.copy(category = category, expanded = null)
+    }
+
+    fun setExpanded(section: SearchFilter?) {
+        _uiState.value = _uiState.value.copy(expanded = section)
+    }
+
+    /** Choose a talk language; with no search term it lists that language's talks. */
+    fun setLanguage(code: String?) {
+        _uiState.value = _uiState.value.copy(language = code, expanded = null)
+        val q = _uiState.value.query.trim()
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            if (q.length >= 3) performSearch(q)
+            else if (code != null) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                try {
+                    val page = content.getPage(com.dharmachakra.fba_android.domain.model.ContentSource.Browse("/browse?lang=$code"), 1)
+                    _uiState.value = _uiState.value.copy(results = SearchResults(talks = page.items), isLoading = false, hasSearched = true)
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(isLoading = false, hasSearched = true, error = friendlyError(e))
+                }
+            } else {
+                _uiState.value = _uiState.value.copy(results = SearchResults(), hasSearched = false)
+            }
+        }
+    }
 
     fun onQueryChanged(query: String) {
         _uiState.value = _uiState.value.copy(query = query)
@@ -124,7 +170,8 @@ class SearchViewModel @Inject constructor(
             return
         }
 
-        val cacheKey = query.lowercase()
+        val language = _uiState.value.language
+        val cacheKey = query.lowercase() + "|" + (language ?: "")
         searchCache[cacheKey]?.let { cached ->
             _uiState.value = _uiState.value.copy(results = cached, isLoading = false, hasSearched = true, error = null)
             return
@@ -147,12 +194,12 @@ class SearchViewModel @Inject constructor(
                 } else {
                     // Sequential, not parallel: while logged in the site rotates the session
                     // cookie per response, so concurrent calls would invalidate each other.
-                    val audio = repository.searchAudio(query)
+                    val audio = repository.searchAudio(query, language)
                     val series = try { repository.searchSeries(query) } catch (_: Exception) { emptyList() }
                     val seen = mutableSetOf<String>()
-                    val merged = content.filterForLanguage((series + audio).filter {
-                        seen.add("${if (it.isSeries) "s" else "a"}:${it.catNum}")
-                    })
+                    val unique = (series + audio).filter { seen.add("${if (it.isSeries) "s" else "a"}:${it.catNum}") }
+                    // A language chosen in the row overrides the English-only setting.
+                    val merged = if (language != null) unique else content.filterForLanguage(unique)
                     merged.filter { !it.isSeries } to merged.filter { it.isSeries }
                 }
             val names = namesDeferred.await()
