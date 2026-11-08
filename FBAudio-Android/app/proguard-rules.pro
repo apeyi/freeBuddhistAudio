@@ -39,3 +39,5 @@
 # List<SearchResult> as List<LinkedTreeMap> — a ClassCastException in search on
 # minified (Play) builds. Keep the classes, their members and signatures.
 -keep class com.dharmachakra.fba_android.data.repository.ContentRepository$* { *; }
+# Value types nested in V2Catalogue are cached on disk via Gson (e.g. LanguageEntry).
+-keep class com.dharmachakra.fba_android.data.remote.api.V2Catalogue$* { *; }

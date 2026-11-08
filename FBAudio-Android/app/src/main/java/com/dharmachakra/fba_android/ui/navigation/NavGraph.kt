@@ -180,13 +180,22 @@ fun NavGraph(
                 LoginScreen(onDone = { navController.popBackStack() })
             }
         }
-        // Explore tab. Interim: the Collections hub, until the Explore screen (design area 7) lands.
         composable(Routes.EXPLORE) {
-            CollectionsScreen(
-                onCollectionClick = { node -> onMenuNodeClick(listOf("collections"), node) },
+            com.dharmachakra.fba_android.ui.explore.ExploreScreen(
+                onItemClick = onItemClick,
+                onTalkClick = { navController.navigate(Routes.detail(it)) },
                 onSourceClick = { source, title -> navController.navigate(Routes.list(source, title)) },
                 onMenuClick = { path, title -> navController.navigate(Routes.menu(path, title)) },
-                onBack = { navController.popBackStack() },
+                onContinueSeeAll = {
+                    navController.navigate(Routes.MY_FBA) {
+                        popUpTo(Routes.HOME) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                onLanguagesSettings = { navController.navigate(Routes.SETTINGS) },
+                onDigitalLegacyClick = { navController.navigate(Routes.DIGITAL_LEGACY) },
+                onDonateClick = onDonate,
             )
         }
         composable(Routes.COLLECTIONS) {

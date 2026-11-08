@@ -158,6 +158,18 @@ class V2Catalogue @Inject constructor(
         }
     }
 
+    /** Home sections by kind ("speakers", "places", "popular", ...), for Explore rows. */
+    suspend fun getHomeSections(): Map<String, List<SearchResult>> = withContext(Dispatchers.IO) {
+        service.getHome().sections.associate { it.kind.value to it.items.map { item -> item.toSearchResult() } }
+    }
+
+    data class LanguageEntry(val code: String, val name: String, val nativeName: String)
+
+    /** The site's talk languages (from /meta), for Explore and the Talk languages setting. */
+    suspend fun getLanguages(): List<LanguageEntry> = withContext(Dispatchers.IO) {
+        service.getMeta().languages.map { LanguageEntry(it.code, it.name, it.nativeName ?: it.name) }
+    }
+
     // ---- digital legacy ----------------------------------------------------
 
     suspend fun getDigitalLegacy(): DigitalLegacy = withContext(Dispatchers.IO) {

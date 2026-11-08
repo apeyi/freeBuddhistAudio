@@ -230,6 +230,31 @@ class ContentRepository @Inject constructor(
 
     data class FeaturedList(val items: List<com.dharmachakra.fba_android.domain.model.Featured>)
 
+    data class HomeSections(val sections: Map<String, List<SearchResult>>)
+
+    /** /home sections (speakers, places, ...) for Explore, cached. */
+    suspend fun getHomeSections(): Map<String, List<SearchResult>> {
+        val cached = cache.get("home_sections", HomeSections::class.java)
+        if (cached != null && cached.second) return cached.first.sections
+        return try {
+            v2.getHomeSections().also { cache.put("home_sections", HomeSections(it)) }
+        } catch (_: Exception) {
+            cached?.first?.sections ?: emptyMap()
+        }
+    }
+
+    data class Languages(val items: List<com.dharmachakra.fba_android.data.remote.api.V2Catalogue.LanguageEntry>)
+
+    suspend fun getLanguages(): List<com.dharmachakra.fba_android.data.remote.api.V2Catalogue.LanguageEntry> {
+        val cached = cache.get("languages", Languages::class.java)
+        if (cached != null && cached.second) return cached.first.items
+        return try {
+            v2.getLanguages().also { cache.put("languages", Languages(it)) }
+        } catch (_: Exception) {
+            cached?.first?.items ?: emptyList()
+        }
+    }
+
     suspend fun getDigitalLegacy(): DigitalLegacy? {
         val cached = cache.get("digital_legacy", DigitalLegacy::class.java)
         if (cached != null && cached.second) return cached.first

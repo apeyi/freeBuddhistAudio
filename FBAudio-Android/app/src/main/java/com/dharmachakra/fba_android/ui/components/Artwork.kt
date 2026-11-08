@@ -60,15 +60,12 @@ fun TalkArtwork(
     contentScale = contentScale,
 )
 
-/** Crops pre-cut circular images (transparent corners) to a rectangle inside the circle. */
+/** Crops pre-cut circular images (transparent or white corners) to a rectangle inside the circle. */
 private class CircleSafeCrop(private val aspect: Float) : Transformation {
     override val cacheKey: String = "circle-safe-crop-$aspect"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
-        if (!input.hasAlpha() || input.width < 8 || input.height < 8) return input
-        val cornerAlpha = android.graphics.Color.alpha(input.getPixel(2, 2))
-        val centreAlpha = android.graphics.Color.alpha(input.getPixel(input.width / 2, input.height / 2))
-        if (cornerAlpha > 16 || centreAlpha < 200) return input
+        if (!ArtworkRule.looksPreCutCircle(input.width, input.height) { x, y -> input.getPixel(x, y) }) return input
         val c = ArtworkRule.inscribedCrop(input.width, input.height, aspect)
         return Bitmap.createBitmap(input, c.left, c.top, c.width, c.height)
     }

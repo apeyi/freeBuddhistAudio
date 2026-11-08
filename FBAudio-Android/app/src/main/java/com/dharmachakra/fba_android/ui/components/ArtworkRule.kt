@@ -18,6 +18,27 @@ object ArtworkRule {
 
     fun usable(url: String?): Boolean = !url.isNullOrBlank() && !url.contains("/default")
 
+    /** A transparent or near-white pixel (ARGB): the background around a pre-cut circle. */
+    fun isBlank(argb: Int): Boolean {
+        val a = (argb ushr 24) and 0xFF
+        val r = (argb shr 16) and 0xFF; val g = (argb shr 8) and 0xFF; val b = argb and 0xFF
+        return a <= 16 || (r >= 245 && g >= 245 && b >= 245)
+    }
+
+    /**
+     * Whether an image is a pre-cut circle: blank (transparent or white, e.g. Kalyacitta's JPEG)
+     * at all four corners and just inside them, with a non-blank centre. [pixel] reads (x, y).
+     */
+    fun looksPreCutCircle(width: Int, height: Int, pixel: (Int, Int) -> Int): Boolean {
+        if (width < 16 || height < 16) return false
+        val ins = (min(width, height) * 0.07).toInt().coerceAtLeast(2)
+        val points = listOf(
+            2 to 2, width - 3 to 2, 2 to height - 3, width - 3 to height - 3,
+            ins to ins, width - 1 - ins to ins, ins to height - 1 - ins, width - 1 - ins to height - 1 - ins,
+        )
+        return points.all { (x, y) -> isBlank(pixel(x, y)) } && !isBlank(pixel(width / 2, height / 2))
+    }
+
     /** A crop rectangle in source pixels. */
     data class Crop(val left: Int, val top: Int, val width: Int, val height: Int)
 

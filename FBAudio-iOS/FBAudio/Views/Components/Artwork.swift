@@ -16,6 +16,19 @@ enum ArtworkRule {
         return !url.contains("/default")
     }
 
+    /// A transparent or near-white pixel: the background around a pre-cut circle.
+    static func isBlank(r: Int, g: Int, b: Int, a: Int) -> Bool { a <= 16 || (r >= 245 && g >= 245 && b >= 245) }
+
+    /// Whether an image is a pre-cut circle: blank (transparent or white, e.g. Kalyacitta's JPEG) at all
+    /// four corners and just inside them, with a non-blank centre. `blank(x, y)` reads one pixel.
+    static func looksPreCutCircle(width: Int, height: Int, blank: (Int, Int) -> Bool) -> Bool {
+        guard width >= 16, height >= 16 else { return false }
+        let ins = max(Int(Double(min(width, height)) * 0.07), 2)
+        let points = [(2, 2), (width - 3, 2), (2, height - 3), (width - 3, height - 3),
+                      (ins, ins), (width - 1 - ins, ins), (ins, height - 1 - ins), (width - 1 - ins, height - 1 - ins)]
+        return points.allSatisfy { blank($0.0, $0.1) } && !blank(width / 2, height / 2)
+    }
+
     struct Crop: Equatable {
         let x: Int, y: Int, width: Int, height: Int
     }
@@ -51,26 +64,26 @@ actor ArtworkLoader {
     }
 
     private static func circleSafe(_ image: UIImage, aspect: Double) -> UIImage {
-        guard let cg = image.cgImage, cg.width >= 8, cg.height >= 8,
-              alpha(of: cg, x: 2, y: 2) <= 16, alpha(of: cg, x: cg.width / 2, y: cg.height / 2) >= 200
+        guard let cg = image.cgImage,
+              ArtworkRule.looksPreCutCircle(width: cg.width, height: cg.height, blank: { x, y in isBlank(cg, x: x, y: y) })
         else { return image }
         let c = ArtworkRule.inscribedCrop(width: cg.width, height: cg.height, aspect: aspect)
         guard let cropped = cg.cropping(to: CGRect(x: c.x, y: c.y, width: c.width, height: c.height)) else { return image }
         return UIImage(cgImage: cropped, scale: image.scale, orientation: image.imageOrientation)
     }
 
-    /// Alpha (0–255) of one pixel, by drawing it into a 1×1 RGBA context.
-    private static func alpha(of cg: CGImage, x: Int, y: Int) -> Int {
-        switch cg.alphaInfo {
-        case .none, .noneSkipFirst, .noneSkipLast: return 255
-        default: break
-        }
+    /// Whether one pixel is blank (transparent or near-white), by drawing it into a 1×1 RGBA context.
+    private static func isBlank(_ cg: CGImage, x: Int, y: Int) -> Bool {
         var pixel = [UInt8](repeating: 0, count: 4)
         guard let ctx = CGContext(data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
                                   space: CGColorSpaceCreateDeviceRGB(),
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 255 }
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
         ctx.draw(cg, in: CGRect(x: -x, y: -(cg.height - 1 - y), width: cg.width, height: cg.height))
-        return Int(pixel[3])
+        let a = Int(pixel[3])
+        guard a > 16 else { return true }
+        // Un-premultiply before checking for white.
+        func ch(_ v: UInt8) -> Int { min(255, Int(v) * 255 / a) }
+        return ArtworkRule.isBlank(r: ch(pixel[0]), g: ch(pixel[1]), b: ch(pixel[2]), a: a)
     }
 }
 

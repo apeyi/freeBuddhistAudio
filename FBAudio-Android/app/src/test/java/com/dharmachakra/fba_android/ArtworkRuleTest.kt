@@ -20,6 +20,20 @@ class ArtworkRuleTest {
         assertEquals("s", ArtworkRule.talkImage("https://x/images/default.jpg", "s", null))
     }
 
+    @Test fun detectsPreCutCirclesOnTransparentOrWhite() {
+        fun circle(bg: Int) = { x: Int, y: Int ->
+            val dx = x - 250.0; val dy = y - 250.0
+            if (dx * dx + dy * dy <= 250.0 * 250.0) 0xFF8A6A4F.toInt() else bg
+        }
+        assertTrue(ArtworkRule.looksPreCutCircle(500, 500, circle(0x00000000)))          // PNG, transparent corners
+        assertTrue(ArtworkRule.looksPreCutCircle(500, 500, circle(0xFFFFFFFF.toInt())))  // JPEG on white (Kalyacitta)
+        // An ordinary photo with one white corner is left alone
+        val photo = { x: Int, y: Int -> if (x < 20 && y < 20) 0xFFFFFFFF.toInt() else 0xFF336699.toInt() }
+        org.junit.Assert.assertFalse(ArtworkRule.looksPreCutCircle(500, 500, photo))
+        // An all-white image isn't a circle either
+        org.junit.Assert.assertFalse(ArtworkRule.looksPreCutCircle(500, 500) { _, _ -> 0xFFFFFFFF.toInt() })
+    }
+
     @Test fun inscribedCropFitsInsideTheCircle() {
         // 500 x 500 circular PNG (e.g. Jnanalila), wide artwork 362 x 240
         val c = ArtworkRule.inscribedCrop(500, 500, 362f / 240f)
