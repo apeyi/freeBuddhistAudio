@@ -178,7 +178,8 @@ enum V2Catalogue {
     private static func toListPage(_ s: V2Series) -> ListPage {
         ListPage(items: s.members.map(toSearchResult), totalItems: s.members.count, page: 1,
                  title: s.title, description: s.blurbText, imageUrl: s.image ?? "",
-                 hasRemaster: s.hasRemaster, omOnly: s.omOnly)
+                 hasRemaster: s.hasRemaster, omOnly: s.omOnly,
+                 speaker: s.speaker?.name ?? "", year: s.year ?? 0, bannerUrl: s.marqueeImage ?? "", catNum: s.catNum)
     }
 
     private static func extractNum(_ path: String) -> String {

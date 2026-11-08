@@ -101,7 +101,7 @@ struct SearchScreen: View {
                     let items = results.of(section)
                     if showHeaders { sectionHeader(section.rawValue, items.count) }
                     ForEach(items) { result in
-                        ListItemCard(item: result, onClick: { open(result) })
+                        CompactTalkRow(title: result.title, meta: result.metaLine, imageUrl: result.imageUrl, onClick: { open(result) })
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                             .listRowSeparator(.hidden)
                     }

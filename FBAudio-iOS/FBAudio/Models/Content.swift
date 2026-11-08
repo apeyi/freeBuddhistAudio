@@ -120,6 +120,11 @@ struct ListPage: Codable {
     /// For browse listings: the API endpoint + query that pages the same list.
     var apiUrl: String = ""
     var apiQuery: String = ""
+    /// Series pages: the speaker, year, wide banner and catalogue number.
+    var speaker: String = ""
+    var year: Int = 0
+    var bannerUrl: String = ""
+    var catNum: String = ""
 
     var hasMore: Bool { !items.isEmpty && totalItems > 0 && page * ListPage.pageSize < totalItems }
 }

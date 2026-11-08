@@ -331,7 +331,9 @@ struct ContentView: View {
         case .transcript(let url, let catNum):
             TranscriptScreen(transcriptUrl: url, catNum: catNum)
         case .list(let source, let title):
-            ListScreen(source: source, initialTitle: title, onItemClick: openItem, onDonateClick: openDonate)
+            ListScreen(source: source, initialTitle: title, onItemClick: openItem, onDonateClick: openDonate,
+                       onSpeakerClick: { navigateToBrowse(.speaker($0)) },
+                       onYearClick: { year in navigate(.list(.browse("/browse?y=\(year)"), "Talks from \(String(year))")) })
         case .menu(let path, let title):
             MenuListScreen(path: path, title: title, onNodeClick: { openMenuNode($0, parentPath: path) })
         case .join:
