@@ -42,6 +42,17 @@ object ReportProblem {
         )
     }
 
+    /** Help and support, Email us: the app version, device and sign-in state under the message. */
+    fun supportEmail(device: String, appVersion: String, signedIn: Boolean): Email = Email(
+        to = SUPPORT_EMAIL,
+        subject = "FBA app support",
+        body = "\n\n\n" + listOf(
+            "App version: $appVersion",
+            "Device: $device",
+            "Signed in: ${if (signedIn) "yes" else "no"}",
+        ).joinToString("\n"),
+    )
+
     /** 662 → "11:02", 3725 → "1:02:05". */
     fun formatClock(seconds: Int): String {
         val h = seconds / 3600

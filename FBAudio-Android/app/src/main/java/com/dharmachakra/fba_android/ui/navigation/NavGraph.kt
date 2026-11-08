@@ -23,7 +23,8 @@ import com.dharmachakra.fba_android.ui.join.JoinScreen
 import com.dharmachakra.fba_android.ui.legacy.DigitalLegacyScreen
 import com.dharmachakra.fba_android.ui.list.ListScreen
 import com.dharmachakra.fba_android.ui.menu.MenuListScreen
-import com.dharmachakra.fba_android.ui.myfba.AccountScreen
+import com.dharmachakra.fba_android.ui.myfba.HelpScreen
+import com.dharmachakra.fba_android.ui.myfba.HistoryScreen
 import com.dharmachakra.fba_android.ui.myfba.MyFbaScreen
 import com.dharmachakra.fba_android.ui.myfba.SettingsScreen
 import com.dharmachakra.fba_android.ui.player.PlayerScreen
@@ -34,7 +35,9 @@ import com.dharmachakra.fba_android.ui.transcript.TranscriptScreen
 const val DONATE_URL = "https://www.freebuddhistaudio.com/donate/"
 // Triratna accounts are managed on thebuddhistcentre.com (the SSO's own
 // "forgot password" link points here); the app can't change an SSO password itself.
-const val PASSWORD_URL = "https://thebuddhistcentre.com/user/password"
+/** Manage account (name, photo, password) lives on the Triratna sign-in site. */
+const val MANAGE_ACCOUNT_URL = "https://thebuddhistcentre.com/user/password"
+const val CREATE_ACCOUNT_URL = "https://thebuddhistcentre.com/user/register"
 
 @Composable
 fun NavGraph(
@@ -164,17 +167,47 @@ fun NavGraph(
                 onLoginClick = { navController.navigate(Routes.LOGIN) },
                 onJoinClick = { navController.navigate(Routes.JOIN) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
-                onAccountClick = { navController.navigate(Routes.ACCOUNT) },
                 onDownloadsClick = { navController.navigate(if (canDownload) Routes.DOWNLOADS else Routes.JOIN) },
+                onContinueSeeAll = { navController.navigate(Routes.CONTINUE_LISTENING) },
+                onHistoryClick = { navController.navigate(Routes.HISTORY) },
+                onHelpClick = { navController.navigate(Routes.HELP) },
+                onExploreClick = {
+                    navController.navigate(Routes.EXPLORE) {
+                        popUpTo(Routes.HOME) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                onManageAccount = { openUrl(MANAGE_ACCOUNT_URL) },
+                onCreateAccount = { openUrl(CREATE_ACCOUNT_URL) },
+                playerViewModel = playerViewModel,
             )
         }
-        composable(Routes.SETTINGS) {
-            SettingsScreen(onBack = { navController.popBackStack() })
-        }
-        composable(Routes.ACCOUNT) {
-            AccountScreen(
+        composable(Routes.CONTINUE_LISTENING) {
+            HistoryScreen(
+                continueOnly = true,
+                onTalkClick = { navController.navigate(Routes.detail(it)) },
                 onBack = { navController.popBackStack() },
-                onChangePassword = { openUrl(PASSWORD_URL) },
+                onFullHistory = { navController.navigate(Routes.HISTORY) },
+                playerViewModel = playerViewModel,
+            )
+        }
+        composable(Routes.HISTORY) {
+            HistoryScreen(
+                continueOnly = false,
+                onTalkClick = { navController.navigate(Routes.detail(it)) },
+                onBack = { navController.popBackStack() },
+                playerViewModel = playerViewModel,
+            )
+        }
+        composable(Routes.HELP) {
+            HelpScreen(onBack = { navController.popBackStack() }, onOpenUrl = openUrl, playerViewModel = playerViewModel)
+        }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onDownloadsClick = { navController.navigate(if (canDownload) Routes.DOWNLOADS else Routes.JOIN) },
+                onContactSupport = { navController.navigate(Routes.HELP) },
             )
         }
         if (FeatureFlags.AUTH) {
@@ -188,13 +221,7 @@ fun NavGraph(
                 onTalkClick = { navController.navigate(Routes.detail(it)) },
                 onSourceClick = { source, title -> navController.navigate(Routes.list(source, title)) },
                 onMenuClick = { path, title -> navController.navigate(Routes.menu(path, title)) },
-                onContinueSeeAll = {
-                    navController.navigate(Routes.MY_FBA) {
-                        popUpTo(Routes.HOME) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
+                onContinueSeeAll = { navController.navigate(Routes.CONTINUE_LISTENING) },
                 onLanguagesSettings = { navController.navigate(Routes.SETTINGS) },
                 onDigitalLegacyClick = { navController.navigate(Routes.DIGITAL_LEGACY) },
                 onDonateClick = onDonate,

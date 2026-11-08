@@ -94,7 +94,7 @@ fun ListScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val player = playerViewModel?.uiState?.collectAsStateWithLifecycle()?.value
-    val nowPlaying = player?.currentTalk?.catNum
+    val nowPlaying = player?.activeCatNum
     val listState = rememberLazyListState()
     // Series: the title moves into the bar once the page title has scrolled away.
     val titleInBar by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }

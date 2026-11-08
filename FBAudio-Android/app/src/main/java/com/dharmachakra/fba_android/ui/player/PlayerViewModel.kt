@@ -56,6 +56,10 @@ data class PlayerUiState(
     /** The tab route to return to from "Playing from". */
     val playingFromRoute: String? = null,
 ) {
+    /** The talk lists mark as current ("Playing"): only once something has played this session,
+     *  not the restored talk waiting in the bar as "Continue listening". */
+    val activeCatNum: String? get() = if (playedThisSession) currentTalk?.catNum else null
+
     /** "Continue listening · 18 min left" while the restored talk hasn't been played yet. */
     val continueListeningLabel: String?
         get() {

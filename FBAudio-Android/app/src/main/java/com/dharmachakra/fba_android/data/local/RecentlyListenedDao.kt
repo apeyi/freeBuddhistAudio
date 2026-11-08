@@ -14,6 +14,13 @@ interface RecentlyListenedDao {
     @Query("SELECT * FROM recently_listened")
     suspend fun getAllOnce(): List<RecentlyListenedEntity>
 
+    @Query("DELETE FROM recently_listened")
+    suspend fun deleteAll()
+
+    /** Swipe "Mark as finished" on Continue listening. */
+    @Query("UPDATE recently_listened SET positionMs = totalDurationSeconds * 1000 WHERE catNum = :catNum")
+    suspend fun markFinished(catNum: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: RecentlyListenedEntity)
 

@@ -41,4 +41,14 @@ class ReportProblemTest {
         assertFalse(e.body.contains("Playback position"))
         assertEquals("11:02", ReportProblem.formatClock(662))
     }
+
+    @Test fun supportEmailCarriesVersionDeviceAndSignIn() {
+        val e = ReportProblem.supportEmail(device = "Google Pixel 8, Android 16", appVersion = "0.10.0", signedIn = true)
+        assertEquals("support@dharmachakra.com", e.to)
+        assertEquals("FBA app support", e.subject)
+        assertTrue(e.body.startsWith("\n\n\n"))
+        assertTrue(e.body.contains("App version: 0.10.0"))
+        assertTrue(e.body.contains("Device: Google Pixel 8, Android 16"))
+        assertTrue(e.body.contains("Signed in: yes"))
+    }
 }

@@ -17,6 +17,15 @@ class AppSettings(context: Context) {
     /** Play the remastered version when a talk has one (default on). */
     val preferRemastered: StateFlow<Boolean> = _preferRemastered
 
+    private val _wifiOnlyDownloads = MutableStateFlow(prefs.getBoolean(KEY_WIFI_ONLY_DOWNLOADS, false))
+    /** Download over Wi-Fi only (default off): downloads wait for an unmetered network. */
+    val wifiOnlyDownloads: StateFlow<Boolean> = _wifiOnlyDownloads
+
+    fun setWifiOnlyDownloads(value: Boolean) {
+        prefs.edit().putBoolean(KEY_WIFI_ONLY_DOWNLOADS, value).apply()
+        _wifiOnlyDownloads.value = value
+    }
+
     fun setEnglishOnly(value: Boolean) {
         prefs.edit().putBoolean(KEY_ENGLISH_ONLY, value).apply()
         _englishOnly.value = value
@@ -41,5 +50,10 @@ class AppSettings(context: Context) {
     companion object {
         private const val KEY_ENGLISH_ONLY = "english_only"
         private const val KEY_PREFER_REMASTERED = "prefer_remastered"
+        private const val KEY_WIFI_ONLY_DOWNLOADS = "wifi_only_downloads"
+
+        /** Read without an instance (DownloadRepository builds work requests from a plain Context). */
+        fun wifiOnlyDownloads(context: Context): Boolean =
+            context.getSharedPreferences("app_settings", Context.MODE_PRIVATE).getBoolean(KEY_WIFI_ONLY_DOWNLOADS, false)
     }
 }

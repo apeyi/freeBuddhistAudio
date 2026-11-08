@@ -124,6 +124,18 @@ class HistoryRepository(
         })
     }
 
+    /** Remove every listen of [catNums] from the account's history (Clear listening history). */
+    suspend fun deleteFromAccount(catNums: Collection<String>) = withContext(Dispatchers.IO) {
+        if (!auth.isLoggedIn) return@withContext
+        for (cat in catNums) {
+            try {
+                val request = Request.Builder().url("$BASE/api/v1/history/${android.net.Uri.encode(cat)}/")
+                    .header("Accept", "application/json").delete().build()
+                client.newCall(request).execute().close()
+            } catch (_: Exception) { /* offline: the phone copy is still cleared */ }
+        }
+    }
+
     private suspend fun getJson(url: String): JsonObject? = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url(url).header("Accept", "application/json").build()

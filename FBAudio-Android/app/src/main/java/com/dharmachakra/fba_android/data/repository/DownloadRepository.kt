@@ -95,7 +95,10 @@ class DownloadRepository @Inject constructor(
             .setInputData(workData)
             .setConstraints(
                 Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiredNetworkType(
+                        if (com.dharmachakra.fba_android.data.local.AppSettings.wifiOnlyDownloads(context)) NetworkType.UNMETERED
+                        else NetworkType.CONNECTED
+                    )
                     .build()
             )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)

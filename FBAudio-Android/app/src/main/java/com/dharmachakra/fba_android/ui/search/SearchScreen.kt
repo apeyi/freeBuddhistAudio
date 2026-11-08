@@ -198,7 +198,7 @@ fun SearchScreen(
                                         imageUrl = r.imageUrl,
                                         onClick = { focusManager.clearFocus(); open(r) },
                                         onPlay = if (r.isTalk && playerViewModel != null) ({ play(r) }) else null,
-                                        isCurrent = r.isTalk && player?.currentTalk?.catNum == r.catNum,
+                                        isCurrent = r.isTalk && player?.activeCatNum == r.catNum,
                                         isPlaying = player?.isPlaying == true,
                                     )
                                     HorizontalDivider(color = FbaColors.divider)
