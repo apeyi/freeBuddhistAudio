@@ -35,7 +35,8 @@ import com.dharmachakra.fba_android.ui.components.EmptyState
 import com.dharmachakra.fba_android.ui.components.ErrorMessage
 import com.dharmachakra.fba_android.ui.components.LoadingIndicator
 import com.dharmachakra.fba_android.domain.model.SearchResult
-import com.dharmachakra.fba_android.ui.list.ListItemCard
+import com.dharmachakra.fba_android.ui.components.CompactTalkRow
+import com.dharmachakra.fba_android.ui.components.metaLine
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,7 +141,7 @@ fun SearchScreen(
                         val items = state.results.of(section)
                         if (showHeaders) item(key = "header:$section") { SectionHeader(section.label, items.size) }
                         items(items, key = { "$section|${it.path}|${it.catNum}" }) { result ->
-                            ListItemCard(result, onClick = { open(result) })
+                            CompactTalkRow(title = result.title, meta = result.metaLine(), imageUrl = result.imageUrl, onClick = { open(result) })
                         }
                     }
                 }

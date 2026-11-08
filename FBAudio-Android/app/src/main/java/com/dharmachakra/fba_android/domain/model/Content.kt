@@ -94,6 +94,11 @@ data class ListPage(
     /** For browse listings: the API endpoint + query that pages the same list. */
     val apiUrl: String = "",
     val apiQuery: String = "",
+    /** Series pages: the speaker, year, wide banner and catalogue number. */
+    val speaker: String = "",
+    val year: Int = 0,
+    val bannerUrl: String = "",
+    val catNum: String = "",
 ) {
     val hasMore: Boolean get() = items.isNotEmpty() && totalItems > 0 && page * PAGE_SIZE < totalItems
 

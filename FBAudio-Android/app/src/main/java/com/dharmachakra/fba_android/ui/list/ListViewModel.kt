@@ -26,23 +26,69 @@ data class ListUiState(
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = false,
     val error: String? = null,
-)
+    /** Series pages. */
+    val speaker: String = "",
+    val year: Int = 0,
+    val bannerUrl: String = "",
+    val catNum: String = "",
+    /** Saved progress per talk (Recently listened), for listened ticks and Resume Talk n. */
+    val saved: Map<String, SeriesProgress.Saved> = emptyMap(),
+    /** Small grey label above the title: PLACE, YEAR, SPEAKER, COLLECTION, SERIES. */
+    val label: String = "",
+) {
+    val seriesResume: SeriesProgress.Resume?
+        get() = if (isSeries) SeriesProgress.resume(items.map { it.catNum }, saved) else null
+}
 
 /** A paginated list of talks/series from any [ContentSource]. */
 @HiltViewModel
 class ListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val content: ContentRepository,
+    private val recentlyListened: com.dharmachakra.fba_android.data.local.RecentlyListenedDao,
+    private val talkRepository: com.dharmachakra.fba_android.data.repository.TalkRepository,
+    private val downloadRepository: com.dharmachakra.fba_android.data.repository.DownloadRepository,
+    private val settings: com.dharmachakra.fba_android.data.local.AppSettings,
 ) : ViewModel() {
+
+    /** Series: download every talk (fetches each talk's tracks, then queues its download). */
+    fun downloadAll() {
+        val items = _uiState.value.items.filter { !it.isSeries && !it.isBrowseLink && !it.isCollection }
+        viewModelScope.launch {
+            for (item in items) {
+                if (downloadRepository.getDownload(item.catNum) != null) continue
+                val talk = talkRepository.getTalkDetail(item.catNum) ?: continue
+                val useRemaster = talk.hasRemaster && settings.useRemaster(talk.catNum)
+                downloadRepository.startDownload(
+                    catNum = talk.catNum, title = talk.title, speaker = talk.speaker, imageUrl = talk.imageUrl,
+                    audioUrl = talk.audioUrl,
+                    trackUrls = talk.tracks.map { if (useRemaster && it.hasRemaster) it.remasterAudioUrl else it.audioUrl },
+                    transcriptUrl = talk.transcriptUrl,
+                    audioVersion = if (useRemaster) "remastered" else "original",
+                )
+            }
+        }
+    }
     private val source: ContentSource? = savedStateHandle.get<String>("source")?.let { ContentSource.decode(it) }
     private val initialTitle: String = savedStateHandle.get<String>("title") ?: ""
 
-    private val _uiState = MutableStateFlow(ListUiState(title = initialTitle, isSeries = source is ContentSource.Series))
+    private val _uiState = MutableStateFlow(
+        ListUiState(title = initialTitle, isSeries = source is ContentSource.Series, label = labelFor(source))
+    )
     val uiState: StateFlow<ListUiState> = _uiState
 
     private var lastPage: ListPage? = null
 
-    init { load() }
+    init {
+        load()
+        viewModelScope.launch {
+            recentlyListened.getRecentlyListened().collect { rows ->
+                _uiState.value = _uiState.value.copy(
+                    saved = rows.associate { it.catNum to SeriesProgress.Saved(it.positionMs, it.totalDurationSeconds, it.listenedAt) },
+                )
+            }
+        }
+    }
 
     fun load() {
         val src = source ?: run {
@@ -63,6 +109,11 @@ class ListViewModel @Inject constructor(
                     totalItems = page.totalItems,
                     hasMore = page.hasMore,
                     isLoading = false,
+                    // orEmpty(): pages cached (Gson) before these fields existed read back null.
+                    speaker = page.speaker.orEmpty(),
+                    year = page.year,
+                    bannerUrl = page.bannerUrl.orEmpty(),
+                    catNum = page.catNum.orEmpty(),
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = friendlyError(e))
@@ -92,4 +143,19 @@ class ListViewModel @Inject constructor(
             }
         }
     }
+}
+
+/** The grey label above a list's title, from where the list comes from. */
+fun labelFor(source: ContentSource?): String = when (source) {
+    is ContentSource.Series -> "SERIES"
+    is ContentSource.NamedCollection -> "COLLECTION"
+    is ContentSource.Browse -> when {
+        Regex("[?&]p=").containsMatchIn(source.path) -> "PLACE"
+        Regex("[?&]y=").containsMatchIn(source.path) -> "YEAR"
+        Regex("[?&]s=").containsMatchIn(source.path) -> "SPEAKER"
+        Regex("[?&](th|genre)=").containsMatchIn(source.path) -> "THEME"
+        Regex("[?&]lang=").containsMatchIn(source.path) -> "LANGUAGE"
+        else -> ""
+    }
+    else -> ""
 }

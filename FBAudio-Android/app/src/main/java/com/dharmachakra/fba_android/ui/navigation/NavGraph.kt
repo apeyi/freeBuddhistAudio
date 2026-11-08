@@ -214,6 +214,11 @@ fun NavGraph(
                 onItemClick = onItemClick,
                 onDonateClick = onDonate,
                 onBack = { navController.popBackStack() },
+                playerViewModel = playerViewModel,
+                onSpeakerClick = { navController.navigate(Routes.browseForSpeaker(it)) },
+                onYearClick = { year ->
+                    navController.navigate(Routes.list(ContentSource.Browse("/browse?y=$year"), "Talks from $year"))
+                },
             )
         }
         composable(

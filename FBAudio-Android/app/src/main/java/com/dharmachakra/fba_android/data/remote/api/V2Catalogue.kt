@@ -212,6 +212,10 @@ class V2Catalogue @Inject constructor(
         imageUrl = image ?: "",
         hasRemaster = hasRemaster,
         omOnly = omOnly,
+        speaker = speaker?.name ?: "",
+        year = year ?: 0,
+        bannerUrl = marqueeImage ?: "",
+        catNum = catNum,
     )
 
     private fun extractNum(path: String): String =
