@@ -107,6 +107,9 @@ data class ListPage(
     }
 }
 
+/** A featured post for the Home carousel (v2 `highlightedContent`). */
+data class Featured(val title: String, val imageUrl: String, val webUrl: String)
+
 /** Content of the website's Digital Legacy page. */
 data class DigitalLegacy(
     val title: String,

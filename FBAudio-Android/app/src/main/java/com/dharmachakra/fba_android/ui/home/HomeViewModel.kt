@@ -17,6 +17,8 @@ data class HomeUiState(
     val sangharakshitaTalkCount: Int = SangharakshitaData.allTalksAsSearchResults().size,
     val sangharakshitaSeriesCount: Int = SangharakshitaData.series.size,
     val digitalLegacy: DigitalLegacy? = null,
+    /** Featured posts, in random order like the website's carousel. */
+    val featured: List<com.dharmachakra.fba_android.domain.model.Featured> = emptyList(),
 )
 
 @HiltViewModel
@@ -34,6 +36,9 @@ class HomeViewModel @Inject constructor(
             // Warm the menu cache so Collections/Themes/People/Places open instantly.
             try { content.getMenu() } catch (_: Exception) { }
             _uiState.value = _uiState.value.copy(digitalLegacy = content.getDigitalLegacy())
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(featured = content.getFeatured().shuffled())
         }
     }
 }

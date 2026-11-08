@@ -149,6 +149,15 @@ class V2Catalogue @Inject constructor(
         catalogue.listRelatedTalks(catNum, pageSize = 24).items.map { it.toSearchResult() }
     }
 
+    // ---- home ---------------------------------------------------------------
+
+    /** Featured posts for the Home carousel (no description or band colour in v2 yet). */
+    suspend fun getFeatured(): List<com.dharmachakra.fba_android.domain.model.Featured> = withContext(Dispatchers.IO) {
+        service.getHome().highlightedContent.map {
+            com.dharmachakra.fba_android.domain.model.Featured(it.title, it.image ?: "", it.webUrl)
+        }
+    }
+
     // ---- digital legacy ----------------------------------------------------
 
     suspend fun getDigitalLegacy(): DigitalLegacy = withContext(Dispatchers.IO) {

@@ -100,6 +100,8 @@ fun NavGraph(
                     }
                 },
                 onOpenUrl = openUrl,
+                onTalkClick = { navController.navigate(Routes.detail(it)) },
+                onSeriesClick = { navController.navigate(Routes.list(ContentSource.seriesByCatNum(it))) },
             )
         }
         composable(Routes.SEARCH) {

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder tile symbol "lotus" from the v1.0 Figma (Dharmachakra is preparing the final set). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="74.88dp" android:height="58.24dp"
+    android:viewportWidth="74.88" android:viewportHeight="58.24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M22.061 25.415C26.52 27.846 30.446 31.148 33.605 35.1C35.048 36.907 36.335 38.857 37.427 40.924C38.532 38.857 39.806 36.92 41.249 35.1C44.408 31.135 48.334 27.833 52.793 25.415C58.214 22.464 64.415 20.8 70.954 20.8H72.241C73.684 20.8 74.854 21.97 74.854 23.413C74.854 42.653 59.267 58.24 40.027 58.24H34.801C15.587 58.24 0 42.653 0 23.413C0 21.97 1.17 20.8 2.613 20.8H3.9C10.452 20.8 16.653 22.464 22.061 25.415ZM39.507 0.78C41.704 2.847 47.489 9.022 51.077 19.279C45.8721 21.9027 41.2375 25.53 37.44 29.952C33.644 25.545 29.016 21.918 23.803 19.279C27.391 9.022 33.189 2.847 35.373 0.78C35.932 0.247 36.673 0 37.44 0C38.207 0 38.948 0.26 39.507 0.78Z" />
+</vector>

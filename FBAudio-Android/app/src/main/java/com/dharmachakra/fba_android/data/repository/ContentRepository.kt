@@ -217,6 +217,19 @@ class ContentRepository @Inject constructor(
         )
     }
 
+    /** Home carousel posts (cached like the other site content). */
+    suspend fun getFeatured(): List<com.dharmachakra.fba_android.domain.model.Featured> {
+        val cached = cache.get("featured", FeaturedList::class.java)
+        if (cached != null && cached.second) return cached.first.items
+        return try {
+            v2.getFeatured().also { cache.put("featured", FeaturedList(it)) }
+        } catch (_: Exception) {
+            cached?.first?.items ?: emptyList()
+        }
+    }
+
+    data class FeaturedList(val items: List<com.dharmachakra.fba_android.domain.model.Featured>)
+
     suspend fun getDigitalLegacy(): DigitalLegacy? {
         val cached = cache.get("digital_legacy", DigitalLegacy::class.java)
         if (cached != null && cached.second) return cached.first
