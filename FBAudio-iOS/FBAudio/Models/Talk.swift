@@ -22,6 +22,12 @@ struct Talk: Identifiable, Codable, Equatable {
     var bannerUrl: String
     /// The speaker's image, second choice for talk artwork.
     var speakerImageUrl: String
+    /// Where the talk was given (link to all talks from that place).
+    var placeName: String
+    /// The place's browse slug (`/browse?p=…`).
+    var placeSlug: String
+    /// 1 once the v2 fields above have been merged in; talks cached before that are refetched once.
+    var extrasVersion: Int
 
     var id: String { catNum }
 
@@ -32,7 +38,8 @@ struct Talk: Identifiable, Codable, Equatable {
          audioUrl: String = "", description: String = "", tracks: [Track] = [],
          transcriptUrl: String = "", series: String = "", seriesHref: String = "",
          omOnly: Bool = false, checkpoint: Checkpoint? = nil,
-         bannerUrl: String = "", speakerImageUrl: String = "") {
+         bannerUrl: String = "", speakerImageUrl: String = "",
+         placeName: String = "", placeSlug: String = "", extrasVersion: Int = 0) {
         self.catNum = catNum
         self.title = title
         self.speaker = speaker
@@ -50,6 +57,9 @@ struct Talk: Identifiable, Codable, Equatable {
         self.checkpoint = checkpoint
         self.bannerUrl = bannerUrl
         self.speakerImageUrl = speakerImageUrl
+        self.placeName = placeName
+        self.placeSlug = placeSlug
+        self.extrasVersion = extrasVersion
     }
 
     // Tolerant decoding: talks cached before these fields existed must still load.
@@ -72,6 +82,9 @@ struct Talk: Identifiable, Codable, Equatable {
         checkpoint = try c.decodeIfPresent(Checkpoint.self, forKey: .checkpoint)
         bannerUrl = try c.decodeIfPresent(String.self, forKey: .bannerUrl) ?? ""
         speakerImageUrl = try c.decodeIfPresent(String.self, forKey: .speakerImageUrl) ?? ""
+        placeName = try c.decodeIfPresent(String.self, forKey: .placeName) ?? ""
+        placeSlug = try c.decodeIfPresent(String.self, forKey: .placeSlug) ?? ""
+        extrasVersion = try c.decodeIfPresent(Int.self, forKey: .extrasVersion) ?? 0
     }
 }
 

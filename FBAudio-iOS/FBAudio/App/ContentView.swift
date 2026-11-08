@@ -288,6 +288,13 @@ struct ContentView: View {
                 },
                 onDonateClick: openDonate,
                 onJoinClick: { navigate(.join) },
+                onPlaceClick: { slug, name in
+                    let q = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
+                    navigate(.list(.browse("/browse?p=\(q)"), name))
+                },
+                onYearClick: { year in navigate(.list(.browse("/browse?y=\(year)"), "Talks from \(String(year))")) },
+                onTalkClick: { navigateToDetail($0) },
+                onDigitalLegacyClick: { navigate(.digitalLegacy) },
                 canDownload: canDownload
             )
         case .browse(let mode):

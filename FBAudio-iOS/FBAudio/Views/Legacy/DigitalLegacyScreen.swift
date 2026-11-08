@@ -89,7 +89,7 @@ struct DigitalLegacyScreen: View {
                     set: { sample.setVersion($0) }
                 )) {
                     Text("Original").tag(false)
-                    Text("Remastered").tag(true)
+                    Text("Enhanced").tag(true)
                 }
                 .pickerStyle(.segmented)
                 .disabled(!sample.isReady)
@@ -117,7 +117,7 @@ struct DigitalLegacyScreen: View {
                 in: 0...1
             )
             .disabled(!sample.isReady)
-            Text("\(formatDuration(Int(sample.positionMs / 1000))) / \(formatDuration(Int(sample.durationMs / 1000)))  ·  \(sample.useRemaster ? "remastered" : "original")")
+            Text("\(formatDuration(Int(sample.positionMs / 1000))) / \(formatDuration(Int(sample.durationMs / 1000)))  ·  \(sample.useRemaster ? "enhanced" : "original")")
                 .font(.caption2).foregroundStyle(.secondary)
         }
         .padding(16)

@@ -115,6 +115,29 @@ enum V2Catalogue {
         try await SearchAPI.search(kind: .series, q: query, pageSize: 50).items.map { toSearchResult($0.item) }
     }
 
+    // MARK: - talk page extras
+
+    /// Fields the v1.0 talk page needs that the scraped talk lacks.
+    struct TalkExtras {
+        let bannerUrl: String
+        let speakerImageUrl: String
+        let placeName: String
+        let placeSlug: String
+        let seriesTitle: String
+        let seriesCatNum: String
+    }
+
+    static func getTalkExtras(_ catNum: String) async throws -> TalkExtras {
+        let t = try await CatalogueAPI.getTalk(catNum: catNum)
+        return TalkExtras(bannerUrl: t.marqueeImage ?? "", speakerImageUrl: t.speaker.image ?? "",
+                          placeName: t.place?.name ?? "", placeSlug: t.place?.slug ?? "",
+                          seriesTitle: t.series.first?.title ?? "", seriesCatNum: t.series.first?.catNum ?? "")
+    }
+
+    static func getRelatedTalks(_ catNum: String) async throws -> [SearchResult] {
+        try await CatalogueAPI.listRelatedTalks(catNum: catNum, pageSize: 24).items.map(toSearchResult)
+    }
+
     // MARK: - digital legacy
 
     static func getDigitalLegacy() async throws -> DigitalLegacy {
