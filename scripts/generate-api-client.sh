@@ -5,12 +5,12 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SPEC="$ROOT/docs/openapi-v2.yaml"
-JAR="${OPENAPI_GENERATOR_JAR:-$ROOT/.cache/openapi-generator-cli.jar}"
+VER="${OPENAPI_GENERATOR_VERSION:-7.26.0}"   # pinned: newer versions reflow generated docs
+JAR="${OPENAPI_GENERATOR_JAR:-$ROOT/.cache/openapi-generator-cli-$VER.jar}"
 PKG="com.dharmachakra.fba_android.api"
 OUT="$(mktemp -d)"
 mkdir -p "$(dirname "$JAR")"
 if [ ! -f "$JAR" ]; then
-  VER="$(curl -s https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/maven-metadata.xml | grep -oE '<release>[^<]+' | sed 's/<release>//')"
   curl -s -o "$JAR" "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/$VER/openapi-generator-cli-$VER.jar"
 fi
 java -jar "$JAR" validate -i "$SPEC"

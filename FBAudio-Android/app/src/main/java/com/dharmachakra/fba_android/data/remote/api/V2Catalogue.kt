@@ -92,22 +92,8 @@ class V2Catalogue @Inject constructor(
 
     /** Synthesise the domain MenuNode's `link` from the v2 kind/target so the
      *  existing MenuNode.toSource()/collectionSlug/isExternal keep working. */
-    private fun V2MenuNode.toDomainNode(): MenuNode {
-        val t = target ?: ""
-        val link = when (kind) {
-            MenuNodeKind.LIST -> "/browse?cat=$t"
-            MenuNodeKind.COLLECTION -> "/collection/$t"
-            MenuNodeKind.SERIES -> "/series/details?num=$t"
-            MenuNodeKind.SPEAKER -> "/browse?s=$t"
-            MenuNodeKind.PLACE -> "/browse?p=$t"
-            MenuNodeKind.THEME -> "/browse?th=$t"
-            MenuNodeKind.YEAR -> "/browse?y=$t"
-            MenuNodeKind.LANGUAGE -> "/browse?lang=$t"
-            MenuNodeKind.GROUP -> "#"
-            MenuNodeKind.PAGE, MenuNodeKind.EXTERNAL, MenuNodeKind.UNKNOWN -> webUrl ?: "#"
-        }
-        return MenuNode(label = label, link = link, om = omOnly, children = children.map { it.toDomainNode() })
-    }
+    private fun V2MenuNode.toDomainNode(): MenuNode =
+        MenuNode(label = label, link = menuLink(kind, target, webUrl), om = omOnly, children = children.map { it.toDomainNode() })
 
     // ---- indexes (for the People/Places lists + fuzzy search) --------------
 
@@ -214,7 +200,6 @@ class V2Catalogue @Inject constructor(
         "seriessangharakshita" -> ListKind.SERIES_SANGHARAKSHITA
         "seriesotherspeakers" -> ListKind.SERIES_OTHER_SPEAKERS
         "allseries" -> ListKind.ALL_SERIES
-        "seriesthemes" -> ListKind.SERIES_THEMES
         "ordertalks", "order" -> ListKind.ORDER_TALKS
         else -> null
     }
@@ -222,5 +207,29 @@ class V2Catalogue @Inject constructor(
     companion object {
         private const val PAGE = ListPage.PAGE_SIZE
         private const val INDEX_PAGE = 1000   // indexes allow up to 1000; fetch whole
+
+        /**
+         * The domain MenuNode `link` for a v2 menu kind/target, in the website's URL
+         * shapes so MenuNode.toSource()/collectionSlug/talkCatNum keep routing it.
+         * `index` targets (speakers/places/years/themes) become `/browse?cat=…`,
+         * which [apiCollection] serves from the full index endpoints.
+         */
+        fun menuLink(kind: MenuNodeKind, target: String?, webUrl: String?): String {
+            val t = target ?: ""
+            return when (kind) {
+                MenuNodeKind.LIST -> "/browse?cat=$t"
+                MenuNodeKind.COLLECTION -> "/collection/$t"
+                MenuNodeKind.TALK -> "/audio/details?num=$t"
+                MenuNodeKind.SERIES -> "/series/details?num=$t"
+                MenuNodeKind.SPEAKER -> "/browse?s=$t"
+                MenuNodeKind.PLACE -> "/browse?p=$t"
+                MenuNodeKind.THEME -> "/browse?th=$t"
+                MenuNodeKind.YEAR -> "/browse?y=$t"
+                MenuNodeKind.LANGUAGE -> "/browse?lang=$t"
+                MenuNodeKind.INDEX -> "/browse?cat=$t"
+                MenuNodeKind.GROUP -> "#"
+                MenuNodeKind.PAGE, MenuNodeKind.EXTERNAL, MenuNodeKind.UNKNOWN -> webUrl ?: "#"
+            }
+        }
     }
 }

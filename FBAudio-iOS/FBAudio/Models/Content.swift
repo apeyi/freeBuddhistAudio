@@ -29,6 +29,13 @@ struct MenuNode: Codable, Equatable, Hashable, Identifiable {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    /// The catalogue number when this entry is a single talk (`/audio/details?num=…`).
+    var talkCatNum: String? {
+        guard link.contains("/audio/details"), let num = ContentSource.queryValue("num", in: link) else { return nil }
+        let trimmed = String(num.prefix { $0 != "#" }).trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     /// A ContentSource for this entry, or nil when it is a placeholder/external link.
     func toSource() -> ContentSource? {
         if let slug = collectionSlug { return .namedCollection(slug) }

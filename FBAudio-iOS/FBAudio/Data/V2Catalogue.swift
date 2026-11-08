@@ -65,21 +65,29 @@ enum V2Catalogue {
     /// Synthesise the domain MenuNode's `link` from the v2 kind/target so
     /// MenuNode.toSource()/collectionSlug and the English-only label filter keep working.
     private static func toDomainNode(_ n: V2MenuNode) -> MenuNode {
-        let t = n.target ?? ""
-        let link: String
-        switch n.kind {
-        case .list: link = "/browse?cat=\(t)"
-        case .collection: link = "/collection/\(t)"
-        case .series: link = "/series/details?num=\(t)"
-        case .speaker: link = "/browse?s=\(t)"
-        case .place: link = "/browse?p=\(t)"
-        case .theme: link = "/browse?th=\(t)"
-        case .year: link = "/browse?y=\(t)"
-        case .language: link = "/browse?lang=\(t)"
-        case .group: link = "#"
-        case .page, .external, .unknown: link = n.webUrl ?? "#"
+        MenuNode(label: n.label, link: menuLink(n.kind, target: n.target, webUrl: n.webUrl),
+                 om: n.omOnly, children: n.children.map(toDomainNode))
+    }
+
+    /// The domain MenuNode `link` for a v2 menu kind/target, in the website's URL shapes so
+    /// MenuNode.toSource()/collectionSlug/talkCatNum keep routing it. `index` targets
+    /// (speakers/places/years/themes) become `/browse?cat=…`, served from the full index endpoints.
+    static func menuLink(_ kind: V2MenuNodeKind, target: String?, webUrl: String?) -> String {
+        let t = target ?? ""
+        switch kind {
+        case .list: return "/browse?cat=\(t)"
+        case .collection: return "/collection/\(t)"
+        case .talk: return "/audio/details?num=\(t)"
+        case .series: return "/series/details?num=\(t)"
+        case .speaker: return "/browse?s=\(t)"
+        case .place: return "/browse?p=\(t)"
+        case .theme: return "/browse?th=\(t)"
+        case .year: return "/browse?y=\(t)"
+        case .language: return "/browse?lang=\(t)"
+        case .index: return "/browse?cat=\(t)"
+        case .group: return "#"
+        case .page, .external, .unknown: return webUrl ?? "#"
         }
-        return MenuNode(label: n.label, link: link, om: n.omOnly, children: n.children.map(toDomainNode))
     }
 
     // MARK: - indexes (People/Places lists + fuzzy search)
@@ -165,7 +173,6 @@ enum V2Catalogue {
         case "seriessangharakshita": return .seriessangharakshita
         case "seriesotherspeakers": return .seriesotherspeakers
         case "allseries": return .allseries
-        case "seriesthemes": return .seriesthemes
         case "ordertalks", "order": return .ordertalks
         default: return nil
         }

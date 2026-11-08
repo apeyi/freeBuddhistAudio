@@ -21,7 +21,6 @@ public enum V2ListKind: String, Codable, CaseIterable {
     case seriessangharakshita = "seriesSangharakshita"
     case seriesotherspeakers = "seriesOtherSpeakers"
     case allseries = "allSeries"
-    case seriesthemes = "seriesThemes"
     case ordertalks = "orderTalks"
     case unknown = "unknown"
 

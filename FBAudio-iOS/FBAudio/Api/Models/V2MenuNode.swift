@@ -17,7 +17,7 @@ public struct V2MenuNode: Codable, JSONEncodable, Hashable {
     /** Entity-decoded, no count or \"(series)\" suffix */
     public var label: String
     public var kind: V2MenuNodeKind
-    /** The list kind, slug, catalogue number, year or language code the kind's endpoint takes; `null` for `group`, `page` and `external`. */
+    /** The list kind, slug, catalogue number, year, language code or index name the kind's endpoint takes; `null` for `group`, `page` and `external`. */
     public var target: String?
     /** Derived from the label suffix, e.g. \"(deutsch)\" → `de`, until proper tags exist. */
     public var language: String?

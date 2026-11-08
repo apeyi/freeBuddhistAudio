@@ -35,9 +35,9 @@ import kotlinx.serialization.encoding.Encoder
 
 
 /**
- * What `target` refers to and which endpoint opens it: `list` → `/lists/{target}`, `collection` → `/collections/{target}`, `series` → `/series/{target}`, `speaker` → `/speakers/{target}/talks`, `place` → `/places/{target}/talks`, `theme` → `/themes/{target}/talks`, `year` → `/years/{target}/talks`, `language` → `/languages/{target}/talks`, `group` → a heading with children only, `page` and `external` → open `webUrl`. 
+ * What `target` refers to and which endpoint opens it: `list` → `/lists/{target}`, `collection` → `/collections/{target}`, `talk` → `/talks/{target}`, `series` → `/series/{target}`, `speaker` → `/speakers/{target}/talks`, `place` → `/places/{target}/talks`, `theme` → `/themes/{target}/talks`, `year` → `/years/{target}/talks`, `language` → `/languages/{target}/talks`, `index` → the full index named by `target`, one of `speakers`, `places`, `years` or `themes` (`/speakers`, `/places`, `/years`, `/themes`), `group` → a heading with children only, `page` and `external` → open `webUrl`. 
  *
- * Values: LIST,COLLECTION,SERIES,SPEAKER,PLACE,THEME,YEAR,LANGUAGE,GROUP,PAGE,EXTERNAL,UNKNOWN
+ * Values: LIST,COLLECTION,TALK,SERIES,SPEAKER,PLACE,THEME,YEAR,LANGUAGE,INDEX,GROUP,PAGE,EXTERNAL,UNKNOWN
  */
 @Serializable(with = MenuNodeKindSerializer::class)
 enum class MenuNodeKind(val value: kotlin.String) {
@@ -47,6 +47,9 @@ enum class MenuNodeKind(val value: kotlin.String) {
 
     @SerialName(value = "collection")
     COLLECTION("collection"),
+
+    @SerialName(value = "talk")
+    TALK("talk"),
 
     @SerialName(value = "series")
     SERIES("series"),
@@ -65,6 +68,9 @@ enum class MenuNodeKind(val value: kotlin.String) {
 
     @SerialName(value = "language")
     LANGUAGE("language"),
+
+    @SerialName(value = "index")
+    INDEX("index"),
 
     @SerialName(value = "group")
     GROUP("group"),

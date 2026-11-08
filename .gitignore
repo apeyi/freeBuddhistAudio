@@ -63,4 +63,10 @@ __pycache__/
 /docs/generating-clients.md
 /docs/api-v2-review.md
 /docs/well-known/
+
+# Dharmachakra v1.0 redesign handoff (unreleased designs, donation/entity strategy) — local only
+/docs/design/
 /docs/.~lock.*#
+
+# openapi-generator jar cache
+/.cache/

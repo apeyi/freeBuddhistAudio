@@ -37,7 +37,7 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * Response-only; may gain values. Treat an unrecognised value as `unknown`. Never send `unknown` in a request.
  *
- * Values: LATEST,POPULAR,TITLES,INTRODUCTIONS,MEDITATION,SERIES_LATEST,SERIES_SANGHARAKSHITA,SERIES_OTHER_SPEAKERS,ALL_SERIES,SERIES_THEMES,ORDER_TALKS,UNKNOWN
+ * Values: LATEST,POPULAR,TITLES,INTRODUCTIONS,MEDITATION,SERIES_LATEST,SERIES_SANGHARAKSHITA,SERIES_OTHER_SPEAKERS,ALL_SERIES,ORDER_TALKS,UNKNOWN
  */
 @Serializable(with = ListKindSerializer::class)
 enum class ListKind(val value: kotlin.String) {
@@ -68,9 +68,6 @@ enum class ListKind(val value: kotlin.String) {
 
     @SerialName(value = "allSeries")
     ALL_SERIES("allSeries"),
-
-    @SerialName(value = "seriesThemes")
-    SERIES_THEMES("seriesThemes"),
 
     @SerialName(value = "orderTalks")
     ORDER_TALKS("orderTalks"),

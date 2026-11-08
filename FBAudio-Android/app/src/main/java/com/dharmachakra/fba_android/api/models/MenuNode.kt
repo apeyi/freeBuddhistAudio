@@ -35,7 +35,7 @@ import kotlinx.serialization.Contextual
  * @param id Stable id for the node
  * @param label Entity-decoded, no count or \"(series)\" suffix
  * @param kind 
- * @param target The list kind, slug, catalogue number, year or language code the kind's endpoint takes; `null` for `group`, `page` and `external`.
+ * @param target The list kind, slug, catalogue number, year, language code or index name the kind's endpoint takes; `null` for `group`, `page` and `external`.
  * @param language Derived from the label suffix, e.g. \"(deutsch)\" → `de`, until proper tags exist.
  * @param omOnly 
  * @param image 
@@ -58,7 +58,7 @@ data class MenuNode (
     @Contextual @SerialName(value = "kind")
     val kind: MenuNodeKind,
 
-    /* The list kind, slug, catalogue number, year or language code the kind's endpoint takes; `null` for `group`, `page` and `external`. */
+    /* The list kind, slug, catalogue number, year, language code or index name the kind's endpoint takes; `null` for `group`, `page` and `external`. */
     @SerialName(value = "target")
     val target: kotlin.String?,
 

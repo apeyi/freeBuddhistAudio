@@ -17,6 +17,11 @@ data class MenuNode(
     val collectionSlug: String?
         get() = Regex("/collection/([^/?#]+)").find(link)?.groupValues?.get(1)?.trim()
 
+    /** The catalogue number when this entry is a single talk (`/audio/details?num=…`). */
+    val talkCatNum: String?
+        get() = Regex("/audio/details\\?num=([^&#]+)").find(link)?.groupValues?.get(1)?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
     /** A [ContentSource] for this entry, or null when it is a placeholder/external link. */
     fun toSource(): ContentSource? {
         val slug = collectionSlug

@@ -70,8 +70,9 @@ fun NavGraph(
         when {
             node.hasChildren -> navController.navigate(Routes.menu(parentPath + node.label, node.label))
             node.isExternal -> openUrl(node.link)
-            // A navigable list, else fall back to opening the web page (v2 `page`
-            // nodes like "all speakers" until FBA adds the `index` menu kind).
+            node.talkCatNum != null -> navController.navigate(Routes.detail(node.talkCatNum!!))
+            // A navigable list, else fall back to opening the web page (genuine
+            // site pages: about, contact, podcasts, transcript lists).
             else -> node.toSource()?.let { navController.navigate(Routes.list(it, node.label)) }
                 ?: node.link.takeIf { it.startsWith("http") }?.let { openUrl(it) }
         }

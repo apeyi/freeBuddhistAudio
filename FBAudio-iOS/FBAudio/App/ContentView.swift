@@ -213,8 +213,13 @@ struct ContentView: View {
             navigate(.menu(parentPath + [node.label], node.label))
         } else if node.isExternal {
             if let url = URL(string: node.link) { UIApplication.shared.open(url) }
+        } else if let catNum = node.talkCatNum {
+            navigateToDetail(catNum)
         } else if let source = node.toSource() {
             navigate(.list(source, node.label))
+        } else if node.link.hasPrefix("http"), let url = URL(string: node.link) {
+            // Genuine site pages (about, contact, podcasts…): open the website (parity with Android).
+            UIApplication.shared.open(url)
         }
     }
 

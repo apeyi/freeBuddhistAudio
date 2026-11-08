@@ -10,16 +10,18 @@ import Foundation
 import AnyCodable
 #endif
 
-/** What &#x60;target&#x60; refers to and which endpoint opens it: &#x60;list&#x60; → &#x60;/lists/{target}&#x60;, &#x60;collection&#x60; → &#x60;/collections/{target}&#x60;, &#x60;series&#x60; → &#x60;/series/{target}&#x60;, &#x60;speaker&#x60; → &#x60;/speakers/{target}/talks&#x60;, &#x60;place&#x60; → &#x60;/places/{target}/talks&#x60;, &#x60;theme&#x60; → &#x60;/themes/{target}/talks&#x60;, &#x60;year&#x60; → &#x60;/years/{target}/talks&#x60;, &#x60;language&#x60; → &#x60;/languages/{target}/talks&#x60;, &#x60;group&#x60; → a heading with children only, &#x60;page&#x60; and &#x60;external&#x60; → open &#x60;webUrl&#x60;.  */
+/** What &#x60;target&#x60; refers to and which endpoint opens it: &#x60;list&#x60; → &#x60;/lists/{target}&#x60;, &#x60;collection&#x60; → &#x60;/collections/{target}&#x60;, &#x60;talk&#x60; → &#x60;/talks/{target}&#x60;, &#x60;series&#x60; → &#x60;/series/{target}&#x60;, &#x60;speaker&#x60; → &#x60;/speakers/{target}/talks&#x60;, &#x60;place&#x60; → &#x60;/places/{target}/talks&#x60;, &#x60;theme&#x60; → &#x60;/themes/{target}/talks&#x60;, &#x60;year&#x60; → &#x60;/years/{target}/talks&#x60;, &#x60;language&#x60; → &#x60;/languages/{target}/talks&#x60;, &#x60;index&#x60; → the full index named by &#x60;target&#x60;, one of &#x60;speakers&#x60;, &#x60;places&#x60;, &#x60;years&#x60; or &#x60;themes&#x60; (&#x60;/speakers&#x60;, &#x60;/places&#x60;, &#x60;/years&#x60;, &#x60;/themes&#x60;), &#x60;group&#x60; → a heading with children only, &#x60;page&#x60; and &#x60;external&#x60; → open &#x60;webUrl&#x60;.  */
 public enum V2MenuNodeKind: String, Codable, CaseIterable {
     case list = "list"
     case collection = "collection"
+    case talk = "talk"
     case series = "series"
     case speaker = "speaker"
     case place = "place"
     case theme = "theme"
     case year = "year"
     case language = "language"
+    case index = "index"
     case group = "group"
     case page = "page"
     case external = "external"

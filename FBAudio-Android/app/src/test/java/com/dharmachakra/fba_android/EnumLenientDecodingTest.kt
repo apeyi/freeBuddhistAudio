@@ -36,7 +36,7 @@ class EnumLenientDecodingTest {
         // A single new menu kind must not blank the entire /menu.
         val menuJson = """
             {"items":[
-              {"id":"1","label":"A","kind":"talk","target":"LOC1","language":null,"omOnly":false,
+              {"id":"1","label":"A","kind":"podcast","target":"fba","language":null,"omOnly":false,
                "image":null,"country":null,"webUrl":"https://x","children":[]},
               {"id":"2","label":"B","kind":"collection","target":"c","language":null,"omOnly":false,
                "image":null,"country":null,"webUrl":"https://y","children":[]}
@@ -44,7 +44,7 @@ class EnumLenientDecodingTest {
         """.trimIndent()
         val menu = json.decodeFromString<Menu>(menuJson)
         assertEquals(2, menu.items.size)
-        assertEquals(MenuNodeKind.UNKNOWN, menu.items[0].kind)      // "talk" unknown in draft.4
+        assertEquals(MenuNodeKind.UNKNOWN, menu.items[0].kind)      // a kind this build doesn't know
         assertEquals(MenuNodeKind.COLLECTION, menu.items[1].kind)
     }
 }
