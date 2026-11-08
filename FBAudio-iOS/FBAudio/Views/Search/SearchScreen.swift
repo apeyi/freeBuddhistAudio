@@ -196,7 +196,7 @@ struct SearchScreen: View {
                             CompactTalkRow(title: capitalizedFirst(r.title), meta: r.metaLine, imageUrl: r.imageUrl,
                                            onClick: { open(r) },
                                            onPlay: r.isTalk ? { play(r) } : nil,
-                                           isCurrent: r.isTalk && player.currentTalk?.catNum == r.catNum,
+                                           isCurrent: r.isTalk && player.activeCatNum == r.catNum,
                                            isPlaying: player.isPlaying)
                             FbaColors.divider.frame(height: 1)
                         }

@@ -75,6 +75,12 @@ workflows:
           page talk-LOC7132 "fbaudio://talk/LOC7132"
           page talk-remastered "fbaudio://talk/131"
           page series-X06 "fbaudio://series/X06"
+          # My FBA pages via -fbaRoute
+          for R in continue history settings help; do
+            xcrun simctl terminate "$SIM_ID" "$BUNDLE" 2>/dev/null
+            xcrun simctl launch "$SIM_ID" "$BUNDLE" -fbaAccent "$ACCENT" -fbaRoute "$R"
+            shot "myfba-$R" 8
+          done
           ls -la ~/screens
           true
 

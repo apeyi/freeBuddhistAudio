@@ -18,6 +18,10 @@ class AudioPlayer: ObservableObject {
     /// Something has played since the app opened. Until then the Now Playing bar shows the
     /// restored talk as "Continue listening · N min left" (parity with Android).
     @Published var playedThisSession = false
+
+    /// The talk lists mark as current ("Playing"): only once something has played this session,
+    /// not the restored talk waiting in the bar as "Continue listening".
+    var activeCatNum: String? { playedThisSession ? currentTalk?.catNum : nil }
     /// Where playback was started ("Home", "Search", ...), shown as "Playing from" in the player.
     @Published var playingFrom = ""
     /// The tab to return to from "Playing from".

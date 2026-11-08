@@ -73,7 +73,7 @@ struct ListScreen: View {
     @ViewBuilder
     private func row(_ index: Int, _ item: SearchResult) -> some View {
         let isTalk = !item.isSeries && !item.isCollection && !item.isBrowseLink
-        let current = isTalk && player.currentTalk?.catNum == item.catNum
+        let current = isTalk && player.activeCatNum == item.catNum
         if source.isSeries {
             let s = saved[item.catNum]
             let state = SeriesProgress.state(s)

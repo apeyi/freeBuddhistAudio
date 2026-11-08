@@ -25,6 +25,20 @@ class DownloadManager: ObservableObject {
         case pending, downloading, complete, failed
     }
 
+    /// Wi-Fi only: no cellular, and wait for Wi-Fi rather than fail (Settings, Playback).
+    private static let wifiOnlySession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.allowsCellularAccess = false
+        config.allowsExpensiveNetworkAccess = false
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForResource = 7 * 24 * 60 * 60
+        return URLSession(configuration: config)
+    }()
+
+    private var downloadSession: URLSession {
+        UserDefaults.standard.bool(forKey: AppSettings.wifiOnlyDownloadsKey) ? Self.wifiOnlySession : .shared
+    }
+
     private var downloadsDir: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("downloads")
@@ -185,7 +199,7 @@ class DownloadManager: ObservableObject {
                 // download(from:) streams to a temp file — never buffers the whole
                 // MP3 in memory (multi-track talks are easily 100+ MB, which used
                 // to spike RAM and freeze the main thread on the write).
-                let (tempUrl, response) = try await URLSession.shared.download(from: url)
+                let (tempUrl, response) = try await downloadSession.download(from: url)
                 guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                     let code = (response as? HTTPURLResponse)?.statusCode ?? 0
                     print("DownloadManager: HTTP \(code) for \(urlString)")

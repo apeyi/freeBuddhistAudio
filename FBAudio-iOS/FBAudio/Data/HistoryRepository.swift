@@ -94,6 +94,19 @@ final class HistoryRepository {
                        ["catNum": catNum, "trackId": trackId, "timeSeconds": positionSeconds])
     }
 
+    /// Remove every listen of `catNums` from the account's history (Clear listening history).
+    func deleteFromAccount(_ catNums: [String]) async {
+        guard auth.isLoggedIn else { return }
+        for cat in catNums {
+            let encoded = cat.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? cat
+            guard let u = URL(string: "\(Self.base)/api/v1/history/\(encoded)/") else { continue }
+            var request = URLRequest(url: u)
+            request.httpMethod = "DELETE"
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            _ = try? await FbaSession.shared.data(for: request) // offline: the phone copy is still cleared
+        }
+    }
+
     private func getJson(_ url: String) async -> [String: Any]? {
         guard let u = URL(string: url) else { return nil }
         var request = URLRequest(url: u)

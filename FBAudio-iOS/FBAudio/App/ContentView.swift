@@ -62,7 +62,7 @@ struct ContentView: View {
                     onTalkClick: { navigateToDetail($0) },
                     onSourceClick: { source, title in navigate(.list(source, title)) },
                     onMenuClick: { path, title in navigate(.menu(path, title)) },
-                    onContinueSeeAll: { selectedTab = Tab.myFba },
+                    onContinueSeeAll: { navigate(.continueListening) },
                     onDigitalLegacyClick: { navigate(.digitalLegacy) },
                     onDonateClick: openDonate
                 )
@@ -94,7 +94,12 @@ struct ContentView: View {
                     onTalkClick: { navigateToDetail($0) },
                     onDonateClick: openDonate,
                     onLoginClick: { showLogin = true },
-                    onDownloadsClick: { navigate(canDownload ? .downloads : .join) }
+                    onDownloadsClick: { navigate(canDownload ? .downloads : .join) },
+                    onContinueSeeAll: { navigate(.continueListening) },
+                    onHistoryClick: { navigate(.history) },
+                    onSettingsClick: { navigate(.settings) },
+                    onHelpClick: { navigate(.help) },
+                    onExploreClick: { selectedTab = Tab.explore }
                 )
                 .navigationDestination(for: Route.self) { route in routeView(route) }
             }
@@ -143,6 +148,12 @@ struct ContentView: View {
             if let link = UserDefaults.standard.string(forKey: "fbaDeepLink"), let url = URL(string: link) {
                 handleDeepLink(url)
             }
+            // Debug/CI hook: `-fbaRoute settings|help|continue|history` opens a My FBA page.
+            let routes: [String: Route] = ["settings": .settings, "help": .help, "continue": .continueListening, "history": .history]
+            if let name = UserDefaults.standard.string(forKey: "fbaRoute"), let route = routes[name] {
+                selectedTab = Tab.myFba
+                myFbaPath.append(route)
+            }
         }
         .alert("Delete download?", isPresented: $player.showDeleteDownloadPrompt) {
             Button("Delete", role: .destructive) { player.confirmDeleteAfterPlayback() }
@@ -188,6 +199,10 @@ struct ContentView: View {
         case digitalLegacy
         case join
         case downloads
+        case continueListening
+        case history
+        case settings
+        case help
 
         /// Series links from talk pages / search are hrefs; resolve them to the series list.
         static func seriesFromHref(_ href: String) -> Route {
@@ -345,6 +360,14 @@ struct ContentView: View {
             JoinScreen(onDonateClick: openDonate)
         case .downloads:
             DownloadsScreen(onTalkClick: { navigateToDetail($0) })
+        case .continueListening:
+            HistoryScreen(continueOnly: true, onTalkClick: { navigateToDetail($0) }, onFullHistory: { navigate(.history) })
+        case .history:
+            HistoryScreen(continueOnly: false, onTalkClick: { navigateToDetail($0) })
+        case .settings:
+            SettingsScreen(onDownloadsClick: { navigate(canDownload ? .downloads : .join) }, onContactSupport: { navigate(.help) })
+        case .help:
+            HelpScreen()
         case .collections:
             CollectionsScreen(
                 onCollectionClick: { openMenuNode($0, parentPath: ["collections"]) },

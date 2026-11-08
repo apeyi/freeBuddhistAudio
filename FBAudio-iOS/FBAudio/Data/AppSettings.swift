@@ -9,6 +9,7 @@ final class AppSettings: ObservableObject {
     private let defaults = UserDefaults.standard
     private static let englishOnlyKey = "english_only"
     private static let preferRemasteredKey = "prefer_remastered"
+    static let wifiOnlyDownloadsKey = "wifi_only_downloads"
 
     /// Hide talks and lists in languages other than English (default on).
     @Published var englishOnly: Bool {
@@ -20,7 +21,13 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(preferRemastered, forKey: Self.preferRemasteredKey) }
     }
 
+    /// Download over Wi-Fi only (default off): downloads wait for Wi-Fi.
+    @Published var wifiOnlyDownloads: Bool {
+        didSet { defaults.set(wifiOnlyDownloads, forKey: Self.wifiOnlyDownloadsKey) }
+    }
+
     init() {
+        wifiOnlyDownloads = defaults.bool(forKey: Self.wifiOnlyDownloadsKey)
         englishOnly = defaults.object(forKey: Self.englishOnlyKey) as? Bool ?? true
         preferRemastered = defaults.object(forKey: Self.preferRemasteredKey) as? Bool ?? true
     }

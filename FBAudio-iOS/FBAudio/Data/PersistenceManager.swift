@@ -98,6 +98,24 @@ class PersistenceManager {
         }
     }
 
+    /// Mark a talk finished (Continue listening swipe): it leaves the list; its resume point goes.
+    func markFinished(_ catNum: String) {
+        var list = getRecentlyListened()
+        guard let i = list.firstIndex(where: { $0.catNum == catNum }) else { return }
+        list[i].positionMs = Int64(list[i].totalDurationSeconds) * 1000
+        replaceRecentlyListened(list)
+        for prefix in ["last_position_", "last_track_index_"] { defaults.removeObject(forKey: prefix + catNum) }
+    }
+
+    /// Clear listening history: the list and every resume point on this phone.
+    func clearRecentlyListened() {
+        defaults.removeObject(forKey: recentlyListenedKey)
+        let prefixes = ["last_position_", "last_track_index_", "last_duration_"]
+        for key in defaults.dictionaryRepresentation().keys where prefixes.contains(where: key.hasPrefix) {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     // MARK: - Playback State
 
     func savePlaybackState(catNum: String, position: Int64, trackIndex: Int, duration: Int64) {

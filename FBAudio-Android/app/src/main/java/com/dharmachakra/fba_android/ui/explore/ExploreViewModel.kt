@@ -56,10 +56,7 @@ class ExploreViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             recentlyListened.getRecentlyListened().collect { rows ->
-                val unfinished = rows.filter { r ->
-                    r.positionMs >= TalkProgress.STARTED_AFTER_MS &&
-                        (r.totalDurationSeconds <= 0 || r.positionMs / 1000 < r.totalDurationSeconds - TalkProgress.FINISHED_WITHIN_SECONDS)
-                }
+                val unfinished = com.dharmachakra.fba_android.ui.myfba.MyFbaRules.continueListening(rows, System.currentTimeMillis())
                 update { it.copy(continueListening = unfinished.take(6), isNewListener = rows.isEmpty()) }
             }
         }

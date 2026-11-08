@@ -40,10 +40,7 @@ struct ExploreScreen: View {
     static let languageOrder = ["hi", "de", "es", "fr", "no", "nl", "pl", "pt", "ru", "fi", "sv"]
 
     private var continueListening: [PersistenceManager.RecentlyListened] {
-        recent.filter { r in
-            r.positionMs >= TalkProgress.startedAfterMs &&
-                (r.totalDurationSeconds <= 0 || Int(r.positionMs / 1000) < r.totalDurationSeconds - TalkProgress.finishedWithinSeconds)
-        }.prefix(6).map { $0 }
+        Array(MyFbaRules.continueListening(recent, now: Date()).prefix(6))
     }
 
     var body: some View {

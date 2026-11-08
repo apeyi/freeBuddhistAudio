@@ -31,6 +31,12 @@ enum ReportProblem {
                      body: "\n\n\n" + details.joined(separator: "\n"))
     }
 
+    /// Help and support, Email us: the app version, device and sign-in state under the message.
+    static func supportRequest(device: String, appVersion: String, signedIn: Bool) -> Email {
+        let details = ["App version: \(appVersion)", "Device: \(device)", "Signed in: \(signedIn ? "yes" : "no")"]
+        return Email(to: supportEmail, subject: "FBA app support", body: "\n\n\n" + details.joined(separator: "\n"))
+    }
+
     /// A mailto: URL for `email` (Mail or the default mail app).
     static func mailtoURL(_ email: Email) -> URL? {
         var c = URLComponents()
