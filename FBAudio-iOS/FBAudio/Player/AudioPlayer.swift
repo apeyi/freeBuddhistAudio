@@ -18,6 +18,17 @@ class AudioPlayer: ObservableObject {
     /// Something has played since the app opened. Until then the Now Playing bar shows the
     /// restored talk as "Continue listening · N min left" (parity with Android).
     @Published var playedThisSession = false
+    /// Where playback was started ("Home", "Search", ...), shown as "Playing from" in the player.
+    @Published var playingFrom = ""
+    /// The tab to return to from "Playing from".
+    @Published var playingFromTab: Int?
+    /// The section the listener is in; recorded into `playingFrom` when playback starts.
+    var section: (label: String, tab: Int?) = ("", nil)
+
+    // MARK: Sleep timer (SPEC "Sleep timer sheet")
+    @Published private(set) var sleepOption: SleepOption = .off
+    private var sleepEndsAt: Date?
+    private var sleepTimer: Timer?
     @Published var showDeleteDownloadPrompt = false
     @Published var playbackError: String?
     @Published var isReconnecting = false
@@ -132,6 +143,8 @@ class AudioPlayer: ObservableObject {
         autoRetryCount = 0
         useRemaster = talk.hasRemaster && AppSettings.shared.useRemaster(talk.catNum)
         versionLocked = downloadManager.trackFileUrl(catNum: talk.catNum, trackIndex: 0) != nil
+        playingFrom = section.label
+        playingFromTab = section.tab
         // Mirror the website's history so web and app listening stay in step.
         Task { await HistoryRepository.shared.recordStreamStart(talk.catNum) }
 
@@ -324,8 +337,16 @@ class AudioPlayer: ObservableObject {
         guard let talk = currentTalk else { return }
         let nextIndex = currentTrackIndex + 1
         if nextIndex < talk.tracks.count {
+            if sleepOption == .endOfTrack {
+                // Sleep timer: load the next track but stay paused, so play continues from it.
+                setSleepTimer(.off)
+                playTrackByIndex(nextIndex)
+                pause()
+                return
+            }
             playTrackByIndex(nextIndex)
         } else {
+            if sleepOption == .endOfTrack || sleepOption == .endOfTalk { setSleepTimer(.off) }
             isPlaying = false
             savePlaybackState() // records "completed" in recently listened
             // Clear the resume point so replaying starts from the beginning
@@ -478,14 +499,16 @@ class AudioPlayer: ObservableObject {
         updateNowPlayingInfo()
     }
 
+    /// Forward 30 s (v1.0 design; same on the lock screen).
     func seekForward() {
-        let newPos = currentPosition + 10
+        let newPos = currentPosition + 30
         // With unknown duration (0), don't clamp — min(newPos, 0) would jump to the start.
         seekTo(duration > 0 ? min(newPos, duration) : newPos)
     }
 
+    /// Back 15 s (v1.0 design; same on the lock screen).
     func seekBack() {
-        let newPos = currentPosition - 10
+        let newPos = currentPosition - 15
         seekTo(max(newPos, 0))
     }
 
@@ -497,6 +520,29 @@ class AudioPlayer: ObservableObject {
     func previousTrack() {
         guard currentTrackIndex > 0 else { return }
         playTrackByIndex(currentTrackIndex - 1)
+    }
+
+    /// Pause after a while with a short fade out, or at the end of the track or talk.
+    func setSleepTimer(_ option: SleepOption) {
+        sleepTimer?.invalidate()
+        sleepTimer = nil
+        sleepEndsAt = nil
+        player?.volume = 1
+        sleepOption = option
+        guard let minutes = option.minutes else { return }
+        let ends = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        sleepEndsAt = ends
+        sleepTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let end = self.sleepEndsAt else { return }
+                let remaining = end.timeIntervalSinceNow
+                self.player?.volume = SleepFade.volume(remaining: remaining)
+                if remaining <= 0 {
+                    self.pause()
+                    self.setSleepTimer(.off)
+                }
+            }
+        }
     }
 
     func setPlaybackSpeed(_ speed: Float) {
@@ -632,12 +678,12 @@ class AudioPlayer: ObservableObject {
             Task { @MainActor in self?.togglePlayPause() }
             return .success
         }
-        center.skipForwardCommand.preferredIntervals = [10]
+        center.skipForwardCommand.preferredIntervals = [30]
         center.skipForwardCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.seekForward() }
             return .success
         }
-        center.skipBackwardCommand.preferredIntervals = [10]
+        center.skipBackwardCommand.preferredIntervals = [15]
         center.skipBackwardCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.seekBack() }
             return .success

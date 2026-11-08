@@ -83,17 +83,21 @@ struct Artwork: View {
     @State private var failed = false
 
     var body: some View {
-        ZStack {
-            if let image {
-                Image(uiImage: image).resizable().scaledToFill()
-            } else if !ArtworkRule.usable(url) || failed {
-                BundleImage(name: "various").scaledToFill()
-            } else {
-                FbaColors.circle
+        // Color.clear takes exactly the size it's offered; the image is drawn as an overlay.
+        // A scaledToFill image as the layout child would report its natural size instead,
+        // so a wide 4:1 banner at 240pt high claimed ~960pt and pushed the page off-screen.
+        Color.clear
+            .overlay {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else if !ArtworkRule.usable(url) || failed {
+                    BundleImage(name: "various").scaledToFill()
+                } else {
+                    FbaColors.circle
+                }
             }
-        }
-        .clipped()
-        .task(id: url) {
+            .clipped()
+            .task(id: url) {
             image = nil
             failed = false
             guard let url, ArtworkRule.usable(url) else { return }

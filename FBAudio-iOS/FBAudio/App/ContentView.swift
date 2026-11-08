@@ -19,6 +19,15 @@ struct ContentView: View {
     /// Tabs (v1.0 design order): Home, Explore, Donate, Search, My FBA.
     enum Tab { static let home = 0, explore = 1, donate = 2, search = 3, myFba = 4 }
 
+    static func tabLabel(_ tab: Int) -> String {
+        switch tab {
+        case Tab.explore: return "Explore"
+        case Tab.search: return "Search"
+        case Tab.myFba: return "My FBA"
+        default: return "Home"
+        }
+    }
+
     /// Downloads are member-only when gating is on; non-members land on Join.
     private var canDownload: Bool { !FeatureFlags.membershipGating || membership.isMember }
 
@@ -98,6 +107,19 @@ struct ContentView: View {
                 onSpeakerClick: { speaker in
                     showPlayer = false
                     navigateToBrowse(.speaker(speaker))
+                },
+                onSeriesClick: { href in
+                    showPlayer = false
+                    navigate(Route.seriesFromHref(href))
+                },
+                onTranscriptClick: { url, catNum in
+                    showPlayer = false
+                    navigate(.transcript(url, catNum))
+                },
+                onDonateClick: openDonate,
+                onPlayingFromClick: { tab in
+                    showPlayer = false
+                    selectedTab = tab
                 }
             )
         }
@@ -107,6 +129,9 @@ struct ContentView: View {
         .onOpenURL { url in
             handleDeepLink(url)
         }
+        // "Playing from" in the player: the section playback is started in.
+        .onAppear { player.section = (Self.tabLabel(selectedTab), selectedTab) }
+        .onChange(of: selectedTab) { tab in player.section = (Self.tabLabel(tab), tab) }
         .onAppear {
             // Debug/CI hook: `-fbaDeepLink <url>` opens a page at launch without the
             // "Open in FBAudio?" prompt that `simctl openurl` triggers.
