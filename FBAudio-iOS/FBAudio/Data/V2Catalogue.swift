@@ -145,6 +145,20 @@ enum V2Catalogue {
         try await ServiceAPI.getHome().highlightedContent.map { Featured(title: $0.title, imageUrl: $0.image ?? "", webUrl: $0.webUrl) }
     }
 
+    /// Home sections by kind ("speakers", "places", ...), for Explore rows.
+    static func getHomeSections() async throws -> [String: [SearchResult]] {
+        var out: [String: [SearchResult]] = [:]
+        for section in try await ServiceAPI.getHome().sections { out[section.kind.rawValue] = section.items.map(toSearchResult) }
+        return out
+    }
+
+    struct LanguageEntry: Codable, Equatable { let code: String; let name: String; let nativeName: String }
+
+    /// The site's talk languages (from /meta), for Explore and the Talk languages setting.
+    static func getLanguages() async throws -> [LanguageEntry] {
+        try await ServiceAPI.getMeta().languages.map { LanguageEntry(code: $0.code, name: $0.name, nativeName: $0.nativeName ?? $0.name) }
+    }
+
     // MARK: - digital legacy
 
     static func getDigitalLegacy() async throws -> DigitalLegacy {

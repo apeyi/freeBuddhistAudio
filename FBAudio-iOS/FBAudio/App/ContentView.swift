@@ -56,12 +56,15 @@ struct ContentView: View {
             .tabItem { Label("Home", systemImage: "house.fill") }
             .tag(Tab.home)
 
-            // Explore. Interim: the Collections hub, until the Explore screen (design area 7) lands.
             NavigationStack(path: $explorePath) {
-                CollectionsScreen(
-                    onCollectionClick: { openMenuNode($0, parentPath: ["collections"]) },
+                ExploreScreen(
+                    onItemClick: { openItem($0) },
+                    onTalkClick: { navigateToDetail($0) },
                     onSourceClick: { source, title in navigate(.list(source, title)) },
-                    onMenuClick: { path, title in navigate(.menu(path, title)) }
+                    onMenuClick: { path, title in navigate(.menu(path, title)) },
+                    onContinueSeeAll: { selectedTab = Tab.myFba },
+                    onDigitalLegacyClick: { navigate(.digitalLegacy) },
+                    onDonateClick: openDonate
                 )
                 .navigationDestination(for: Route.self) { route in routeView(route) }
             }

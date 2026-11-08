@@ -221,6 +221,27 @@ final class ContentRepository {
         return cached?.0 ?? []
     }
 
+    /// /home sections (speakers, places, ...) for Explore, cached.
+    func getHomeSections() async -> [String: [SearchResult]] {
+        let cached: ([String: [SearchResult]], Bool)? = await cache.get("home_sections", [String: [SearchResult]].self)
+        if let cached, cached.1 { return cached.0 }
+        if let fresh = try? await V2Catalogue.getHomeSections() {
+            await cache.put("home_sections", fresh)
+            return fresh
+        }
+        return cached?.0 ?? [:]
+    }
+
+    func getLanguages() async -> [V2Catalogue.LanguageEntry] {
+        let cached: ([V2Catalogue.LanguageEntry], Bool)? = await cache.get("languages", [V2Catalogue.LanguageEntry].self)
+        if let cached, cached.1 { return cached.0 }
+        if let fresh = try? await V2Catalogue.getLanguages() {
+            await cache.put("languages", fresh)
+            return fresh
+        }
+        return cached?.0 ?? []
+    }
+
     func getDigitalLegacy() async -> DigitalLegacy? {
         let cached: (DigitalLegacy, Bool)? = await cache.get("digital_legacy", DigitalLegacy.self)
         if let cached, cached.1 { return cached.0 }
