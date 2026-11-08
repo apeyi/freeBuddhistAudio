@@ -4,6 +4,7 @@ struct MyFbaScreen: View {
     let onTalkClick: (String) -> Void
     let onDonateClick: () -> Void
     let onLoginClick: () -> Void
+    var onDownloadsClick: () -> Void = {}
 
     @ObservedObject private var auth = AuthRepository.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
@@ -14,6 +15,19 @@ struct MyFbaScreen: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 8) {
                 accountCard
+                // Library: Downloads moved here from the tab bar in the v1.0 design.
+                Button(action: onDownloadsClick) {
+                    HStack {
+                        Text("Downloads").foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(.secondary).font(.footnote)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Divider().padding(.horizontal, 16).padding(.bottom, 8)
                 Button(action: onDonateClick) { Text("Donate").frame(maxWidth: .infinity) }
                     .buttonStyle(.borderedProminent)
                     .padding(.horizontal, 16)
@@ -112,7 +126,7 @@ struct MyFbaScreen: View {
                     Text(auth.state.isOrderMember ? "Order member" : "FBA account")
                         .font(.caption).foregroundStyle(.secondary)
                 } else if FeatureFlags.auth {
-                    Text("Not logged in").font(.headline)
+                    Text("Keep your place on every device").font(.headline)
                     Text("Sign in to sync your FBA history and continue listening on any phone, tablet or at freebuddhistaudio.com.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {

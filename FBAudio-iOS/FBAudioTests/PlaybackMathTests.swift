@@ -72,4 +72,19 @@ final class PlaybackMathTests: XCTestCase {
         XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 1_000, refBytes: 0, refSeconds: 3491), 0)
         XCTAssertEqual(PlaybackMath.estimateDurationSeconds(bytes: 1_000, refBytes: 27_933_382, refSeconds: 0), 0)
     }
+
+    func testRemainingAcrossTracksAndLabel() {
+        // LOC7132: track 1 (3649 s) finished, 11:02 into track 2 (1746 s)
+        let tracks = [track(3649), track(1746)]
+        let left = PlaybackMath.remainingSeconds(totalSeconds: 5395, tracks: tracks, trackIndex: 1, positionInTrackMs: 662_000)
+        XCTAssertEqual(left, 1084)
+        XCTAssertEqual(PlaybackMath.timeLeftLabel(left), "19 min left")
+        XCTAssertEqual(PlaybackMath.timeLeftLabel(18 * 60), "18 min left")
+        XCTAssertEqual(PlaybackMath.timeLeftLabel(5), "1 min left")
+        XCTAssertEqual(PlaybackMath.timeLeftLabel(3600), "1 hr left")
+        XCTAssertEqual(PlaybackMath.timeLeftLabel(3900), "1 hr 5 min left")
+        XCTAssertNil(PlaybackMath.timeLeftLabel(0))
+        XCTAssertEqual(PlaybackMath.remainingSeconds(totalSeconds: 0, tracks: tracks, trackIndex: 0, positionInTrackMs: 0), 0)
+        XCTAssertEqual(PlaybackMath.remainingSeconds(totalSeconds: 100, tracks: [], trackIndex: 0, positionInTrackMs: 200_000), 0)
+    }
 }

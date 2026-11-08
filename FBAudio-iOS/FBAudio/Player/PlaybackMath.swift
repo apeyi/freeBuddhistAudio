@@ -56,4 +56,22 @@ enum PlaybackMath {
         let estimate = Int(Double(bytes) / bytesPerSecond)
         return isPlausibleDuration(estimate) ? estimate : 0
     }
+
+    /// Seconds left in the whole talk from `trackIndex`/`positionInTrackMs`; 0 when unknown or done.
+    static func remainingSeconds(totalSeconds: Int, tracks: [Track], trackIndex: Int, positionInTrackMs: Int64) -> Int {
+        guard totalSeconds > 0 else { return 0 }
+        let listened = cumulativePositionMs(tracks: tracks, trackIndex: trackIndex, positionInTrackMs: positionInTrackMs) / 1000
+        return max(totalSeconds - Int(listened), 0)
+    }
+
+    /// "18 min left", "1 hr left", "1 hr 5 min left" (design copy). Rounds up so a few
+    /// seconds left still reads "1 min left"; nil when nothing is left or it's unknown.
+    static func timeLeftLabel(_ remainingSeconds: Int) -> String? {
+        guard remainingSeconds > 0 else { return nil }
+        let minutes = (remainingSeconds + 59) / 60
+        let h = minutes / 60, m = minutes % 60
+        if h == 0 { return "\(m) min left" }
+        if m == 0 { return "\(h) hr left" }
+        return "\(h) hr \(m) min left"
+    }
 }

@@ -36,6 +36,10 @@ data class Talk(
     /** Restricted to members of the Triratna Buddhist Order. */
     val omOnly: Boolean = false,
     val checkpoint: Checkpoint? = null,
+    /** Wide banner ("marquee") image, first choice for talk artwork. */
+    val bannerUrl: String = "",
+    /** The speaker's image, second choice for talk artwork. */
+    val speakerImageUrl: String = "",
 ) {
     val hasRemaster: Boolean get() = tracks.any { it.hasRemaster }
 }

@@ -70,4 +70,27 @@ object PlaybackMath {
         val estimate = (bytes / bytesPerSecond).toInt()
         return if (isPlausibleDuration(estimate)) estimate else 0
     }
+
+    /** Seconds left in the whole talk from [trackIndex]/[positionInTrackMs]; 0 when unknown or done. */
+    fun remainingSeconds(totalSeconds: Int, tracks: List<Track>, trackIndex: Int, positionInTrackMs: Long): Int {
+        if (totalSeconds <= 0) return 0
+        val listened = cumulativePositionMs(tracks, trackIndex, positionInTrackMs) / 1000L
+        return (totalSeconds - listened).coerceAtLeast(0).toInt()
+    }
+
+    /**
+     * "18 min left", "1 hr left", "1 hr 5 min left" (design copy). Rounds up so a few
+     * seconds left still reads "1 min left"; null when nothing is left or it's unknown.
+     */
+    fun timeLeftLabel(remainingSeconds: Int): String? {
+        if (remainingSeconds <= 0) return null
+        val minutes = (remainingSeconds + 59) / 60
+        val h = minutes / 60
+        val m = minutes % 60
+        return when {
+            h == 0 -> "$m min left"
+            m == 0 -> "$h hr left"
+            else -> "$h hr $m min left"
+        }
+    }
 }

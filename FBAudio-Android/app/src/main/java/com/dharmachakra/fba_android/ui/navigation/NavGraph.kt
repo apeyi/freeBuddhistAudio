@@ -149,6 +149,7 @@ fun NavGraph(
                 onJoinClick = { navController.navigate(Routes.JOIN) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onAccountClick = { navController.navigate(Routes.ACCOUNT) },
+                onDownloadsClick = { navController.navigate(if (canDownload) Routes.DOWNLOADS else Routes.JOIN) },
             )
         }
         composable(Routes.SETTINGS) {
@@ -164,6 +165,15 @@ fun NavGraph(
             composable(Routes.LOGIN) {
                 LoginScreen(onDone = { navController.popBackStack() })
             }
+        }
+        // Explore tab. Interim: the Collections hub, until the Explore screen (design area 7) lands.
+        composable(Routes.EXPLORE) {
+            CollectionsScreen(
+                onCollectionClick = { node -> onMenuNodeClick(listOf("collections"), node) },
+                onSourceClick = { source, title -> navController.navigate(Routes.list(source, title)) },
+                onMenuClick = { path, title -> navController.navigate(Routes.menu(path, title)) },
+                onBack = { navController.popBackStack() },
+            )
         }
         composable(Routes.COLLECTIONS) {
             CollectionsScreen(

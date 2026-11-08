@@ -66,9 +66,15 @@ workflows:
             xcrun simctl launch "$SIM_ID" "$BUNDLE" -fbaAccent "$ACCENT" -fbaTab "$TAB"
             shot "tab$TAB" 10
           done
-          xcrun simctl openurl "$SIM_ID" "fbaudio://talk/LOC7132"; shot talk-LOC7132 10
-          xcrun simctl openurl "$SIM_ID" "fbaudio://talk/131"; shot talk-remastered 10
-          xcrun simctl openurl "$SIM_ID" "fbaudio://series/X06"; shot series-X06 10
+          # Pages open via -fbaDeepLink (simctl openurl shows an "Open in FBAudio?" prompt)
+          page() {
+            xcrun simctl terminate "$SIM_ID" "$BUNDLE" 2>/dev/null
+            xcrun simctl launch "$SIM_ID" "$BUNDLE" -fbaAccent "$ACCENT" -fbaTab 0 -fbaDeepLink "$2"
+            shot "$1" 12
+          }
+          page talk-LOC7132 "fbaudio://talk/LOC7132"
+          page talk-remastered "fbaudio://talk/131"
+          page series-X06 "fbaudio://series/X06"
           ls -la ~/screens
           true
 

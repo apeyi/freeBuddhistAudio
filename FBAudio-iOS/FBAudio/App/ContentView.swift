@@ -9,14 +9,22 @@ struct ContentView: View {
     @State private var selectedTab = UserDefaults.standard.integer(forKey: "fbaTab")
     @State private var showPlayer = false
     @State private var showLogin = false
-    @State private var navigationPath = NavigationPath()
+    // One stack per tab: a talk opened from a list is pushed on top of that list, and
+    // back returns to it at the same scroll position (v1.0 navigation rule).
+    @State private var homePath = NavigationPath()
+    @State private var explorePath = NavigationPath()
+    @State private var searchPath = NavigationPath()
+    @State private var myFbaPath = NavigationPath()
+
+    /// Tabs (v1.0 design order): Home, Explore, Donate, Search, My FBA.
+    enum Tab { static let home = 0, explore = 1, donate = 2, search = 3, myFba = 4 }
 
     /// Downloads are member-only when gating is on; non-members land on Join.
     private var canDownload: Bool { !FeatureFlags.membershipGating || membership.isMember }
 
     var body: some View {
         TabView(selection: tabSelection) {
-            NavigationStack(path: $navigationPath) {
+            NavigationStack(path: $homePath) {
                 HomeScreen(
                     onSangharakshitaByYearClick: { navigateToBrowse(.sangharakshitaByYear) },
                     onSangharakshitaSeriesClick: {
@@ -28,83 +36,67 @@ struct ContentView: View {
                     onMenuClick: { path, title in navigate(.menu(path, title)) },
                     onDonateClick: openDonate,
                     onLoginClick: { showLogin = true },
-                    onAccountClick: { selectedTab = 4 },
+                    onAccountClick: { selectedTab = Tab.myFba },
                     onOpenUrl: { url in if let u = URL(string: url) { UIApplication.shared.open(u) } }
                 )
-                .navigationDestination(for: Route.self) { route in
-                    routeView(route)
-                }
+                .navigationDestination(for: Route.self) { route in routeView(route) }
             }
             .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
-            .tabItem { Label("Home", systemImage: "house") }
-            .tag(0)
+            .tabItem { Label("Home", systemImage: "house.fill") }
+            .tag(Tab.home)
 
-            NavigationStack {
-                SearchScreen(
-                    onTalkClick: { catNum in
-                        // navigationPath is plain state — appending works even while
-                        // tab 0 is offscreen, no delay needed.
-                        selectedTab = 0
-                        navigateToDetail(catNum)
-                    },
-                    onItemClick: { item in
-                        selectedTab = 0
-                        openItem(item)
-                    }
+            // Explore. Interim: the Collections hub, until the Explore screen (design area 7) lands.
+            NavigationStack(path: $explorePath) {
+                CollectionsScreen(
+                    onCollectionClick: { openMenuNode($0, parentPath: ["collections"]) },
+                    onSourceClick: { source, title in navigate(.list(source, title)) },
+                    onMenuClick: { path, title in navigate(.menu(path, title)) }
                 )
+                .navigationDestination(for: Route.self) { route in routeView(route) }
+            }
+            .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
+            .tabItem { Label("Explore", systemImage: "square.grid.2x2.fill") }
+            .tag(Tab.explore)
+
+            // Donate opens the FBA donation page directly (see tabSelection); the tab
+            // is never actually shown.
+            Color.clear
+                .tabItem { Label("Donate", systemImage: "heart.fill") }
+                .tag(Tab.donate)
+
+            NavigationStack(path: $searchPath) {
+                SearchScreen(
+                    onTalkClick: { navigateToDetail($0) },
+                    onItemClick: { openItem($0) }
+                )
+                .navigationDestination(for: Route.self) { route in routeView(route) }
             }
             .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
             .tabItem { Label("Search", systemImage: "magnifyingglass") }
-            .tag(1)
+            .tag(Tab.search)
 
-            NavigationStack {
-                if canDownload {
-                    DownloadsScreen(onTalkClick: { catNum in
-                        selectedTab = 0
-                        navigateToDetail(catNum)
-                    })
-                } else {
-                    // Downloads are a membership benefit: the tab explains how to join.
-                    JoinScreen(onDonateClick: openDonate)
-                }
-            }
-            .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
-            .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
-            .tag(2)
-
-            // Donate opens the FBA donation page directly (see tabSelection); the tab
-            // is never actually shown. Join stays reachable from download gating for later.
-            Color.clear
-                .tabItem { Label("Donate", systemImage: "heart") }
-                .tag(3)
-
-            NavigationStack {
+            NavigationStack(path: $myFbaPath) {
                 MyFbaScreen(
-                    onTalkClick: { catNum in
-                        selectedTab = 0
-                        navigateToDetail(catNum)
-                    },
+                    onTalkClick: { navigateToDetail($0) },
                     onDonateClick: openDonate,
-                    onLoginClick: { showLogin = true }
+                    onLoginClick: { showLogin = true },
+                    onDownloadsClick: { navigate(canDownload ? .downloads : .join) }
                 )
+                .navigationDestination(for: Route.self) { route in routeView(route) }
             }
             .miniPlayerInset(player: player, isHidden: showPlayer) { showPlayer = true }
-            .tabItem { Label("My FBA", systemImage: "person.crop.circle") }
-            .tag(4)
+            .tabItem { Label("My FBA", systemImage: "person.crop.circle.fill") }
+            .tag(Tab.myFba)
         }
         .fullScreenCover(isPresented: $showPlayer) {
             PlayerScreen(
                 player: player,
                 onNavigateToDetail: { catNum in
                     showPlayer = false
-                    // The push goes onto the Home tab's stack — switch to it, or the
-                    // navigation lands invisibly behind another tab.
-                    selectedTab = 0
                     navigateToDetail(catNum)
                 },
                 onSpeakerClick: { speaker in
                     showPlayer = false
-                    selectedTab = 0
                     navigateToBrowse(.speaker(speaker))
                 }
             )
@@ -115,6 +107,13 @@ struct ContentView: View {
         .onOpenURL { url in
             handleDeepLink(url)
         }
+        .onAppear {
+            // Debug/CI hook: `-fbaDeepLink <url>` opens a page at launch without the
+            // "Open in FBAudio?" prompt that `simctl openurl` triggers.
+            if let link = UserDefaults.standard.string(forKey: "fbaDeepLink"), let url = URL(string: link) {
+                handleDeepLink(url)
+            }
+        }
         .alert("Delete download?", isPresented: $player.showDeleteDownloadPrompt) {
             Button("Delete", role: .destructive) { player.confirmDeleteAfterPlayback() }
             Button("Keep", role: .cancel) { player.dismissDeletePrompt() }
@@ -123,18 +122,22 @@ struct ContentView: View {
         }
     }
 
-    // Tapping the already-selected Home tab pops to root
+    // Donate opens the web page; tapping the already-selected tab pops it to its root.
     private var tabSelection: Binding<Int> {
         Binding(
             get: { selectedTab },
             set: { newTab in
-                if newTab == 3 {
-                    // Donate: open the web page, stay on the current tab
+                if newTab == Tab.donate {
                     openDonate()
                     return
                 }
-                if newTab == selectedTab && newTab == 0 {
-                    navigationPath = NavigationPath()
+                if newTab == selectedTab {
+                    switch newTab {
+                    case Tab.explore: explorePath = NavigationPath()
+                    case Tab.search: searchPath = NavigationPath()
+                    case Tab.myFba: myFbaPath = NavigationPath()
+                    default: homePath = NavigationPath()
+                    }
                 }
                 selectedTab = newTab
             }
@@ -154,6 +157,7 @@ struct ContentView: View {
         case collections
         case digitalLegacy
         case join
+        case downloads
 
         /// Series links from talk pages / search are hrefs; resolve them to the series list.
         static func seriesFromHref(_ href: String) -> Route {
@@ -180,16 +184,22 @@ struct ContentView: View {
         }
     }
 
+    /// Pushes onto the current tab's stack.
     private func navigate(_ route: Route) {
-        navigationPath.append(route)
+        switch selectedTab {
+        case Tab.explore: explorePath.append(route)
+        case Tab.search: searchPath.append(route)
+        case Tab.myFba: myFbaPath.append(route)
+        default: homePath.append(route)
+        }
     }
 
     private func navigateToDetail(_ catNum: String) {
-        navigationPath.append(Route.detail(catNum))
+        navigate(.detail(catNum))
     }
 
     private func navigateToBrowse(_ mode: BrowseModeRoute) {
-        navigationPath.append(Route.browse(mode))
+        navigate(.browse(mode))
     }
 
     /// Talks → detail; series → series list; speaker/place/year tiles → their listing.
@@ -228,7 +238,7 @@ struct ContentView: View {
     // fbaudio://talk/01, fbaudio://series/X04, fbaudio://speaker/Name,
     // and https://(www.)freebuddhistaudio.com/audio/details?num=…  (parity with Android)
     private func handleDeepLink(_ url: URL) {
-        selectedTab = 0
+        selectedTab = Tab.home
         if url.scheme == "fbaudio" {
             let id = url.pathComponents.count > 1 ? url.pathComponents[1] : nil
             guard let id else { return }
@@ -274,7 +284,7 @@ struct ContentView: View {
                 onSpeakerClick: { navigateToBrowse(.speaker($0)) },
                 onSeriesClick: { navigate(Route.seriesFromHref($0)) },
                 onTranscriptClick: { url, catNum in
-                    navigationPath.append(Route.transcript(url, catNum))
+                    navigate(.transcript(url, catNum))
                 },
                 onDonateClick: openDonate,
                 onJoinClick: { navigate(.join) },
@@ -294,6 +304,8 @@ struct ContentView: View {
             MenuListScreen(path: path, title: title, onNodeClick: { openMenuNode($0, parentPath: path) })
         case .join:
             JoinScreen(onDonateClick: openDonate)
+        case .downloads:
+            DownloadsScreen(onTalkClick: { navigateToDetail($0) })
         case .collections:
             CollectionsScreen(
                 onCollectionClick: { openMenuNode($0, parentPath: ["collections"]) },

@@ -111,6 +111,10 @@ class PersistenceManager {
         defaults.string(forKey: "last_cat_num")
     }
 
+    func clearLastCatNum() {
+        defaults.removeObject(forKey: "last_cat_num")
+    }
+
     func getLastPosition(_ catNum: String) -> Int64 {
         Int64(defaults.integer(forKey: "last_position_\(catNum)"))
     }

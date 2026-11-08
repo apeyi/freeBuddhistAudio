@@ -48,7 +48,22 @@ data class PlayerUiState(
     val useRemaster: Boolean = false,
     /** Playing from a download, so the version can't be switched. */
     val versionLocked: Boolean = false,
-)
+    /** Something has played since the app opened. Until then the Now Playing bar shows
+     *  the restored talk as "Continue listening · N min left". */
+    val playedThisSession: Boolean = false,
+) {
+    /** "Continue listening · 18 min left" while the restored talk hasn't been played yet. */
+    val continueListeningLabel: String?
+        get() {
+            val talk = currentTalk ?: return null
+            if (playedThisSession) return null
+            val total = PlaybackMath.totalDurationSeconds(talk.durationSeconds, talk.tracks, duration)
+            val left = PlaybackMath.timeLeftLabel(
+                PlaybackMath.remainingSeconds(total, talk.tracks, currentTrackIndex, currentPosition)
+            )
+            return if (left != null) "Continue listening · $left" else "Continue listening"
+        }
+}
 
 /**
  * UI-side controller for playback. The queue itself is built by
@@ -99,6 +114,9 @@ class PlayerViewModel @Inject constructor(
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             mediaController?.let { _uiState.value = _uiState.value.copy(isPlaying = it.isPlayingForUi()) }
             if (isPlaying) {
+                if (!_uiState.value.playedThisSession) {
+                    _uiState.value = _uiState.value.copy(playedThisSession = true)
+                }
                 // Successful playback — clear any prior error and reset retry budget
                 autoRetryCount = 0
                 if (_uiState.value.playbackError != null || _uiState.value.isReconnecting) {
@@ -408,6 +426,22 @@ class PlayerViewModel @Inject constructor(
             if (controller.isPlaying) controller.pause()
             else controller.play()
         }
+    }
+
+    /**
+     * The Now Playing bar was swiped away: stop, clear the queue and forget the
+     * restore point, so the bar stays hidden until something is played again.
+     * The talk's own resume position (per-talk prefs, account checkpoint) is kept.
+     */
+    fun dismissNowPlaying() {
+        pendingRestore = null
+        mediaController?.run {
+            pause()
+            stop()
+            clearMediaItems()
+        }
+        prefs.edit().remove("last_cat_num").apply()
+        _uiState.value = _uiState.value.copy(currentTalk = null, isVisible = false, isPlaying = false)
     }
 
     /** Explicit pause (e.g. when the Digital Legacy sample starts playing). */

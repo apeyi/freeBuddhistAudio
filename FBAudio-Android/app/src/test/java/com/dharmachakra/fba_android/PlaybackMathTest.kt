@@ -83,4 +83,20 @@ class PlaybackMathTest {
         assertEquals(0, PlaybackMath.estimateDurationSeconds(1_000L, 0L, 3491))
         assertEquals(0, PlaybackMath.estimateDurationSeconds(1_000L, 27_933_382L, 0))
     }
+
+    @Test
+    fun remainingAcrossTracksAndLabel() {
+        // LOC7132: track 1 (3649 s) finished, 11:02 into track 2 (1746 s) -> 18 min left of the talk
+        val tracks = listOf(track(3649), track(1746))
+        val left = PlaybackMath.remainingSeconds(5395, tracks, 1, 662_000L)
+        assertEquals(1084, left)
+        assertEquals("19 min left", PlaybackMath.timeLeftLabel(left))
+        assertEquals("18 min left", PlaybackMath.timeLeftLabel(18 * 60))
+        assertEquals("1 min left", PlaybackMath.timeLeftLabel(5))
+        assertEquals("1 hr left", PlaybackMath.timeLeftLabel(3600))
+        assertEquals("1 hr 5 min left", PlaybackMath.timeLeftLabel(3900))
+        assertEquals(null, PlaybackMath.timeLeftLabel(0))
+        assertEquals(0, PlaybackMath.remainingSeconds(0, tracks, 0, 0))
+        assertEquals(0, PlaybackMath.remainingSeconds(100, emptyList(), 0, 200_000))
+    }
 }

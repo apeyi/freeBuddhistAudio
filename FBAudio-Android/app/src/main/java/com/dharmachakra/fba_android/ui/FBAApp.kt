@@ -7,7 +7,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.dharmachakra.fba_android.ui.theme.FbaColors
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -57,6 +68,10 @@ fun FBAApp(
         val appViewModel: AppViewModel = hiltViewModel()
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
+        // The active tab is the section the screen belongs to: the nearest tab in the back
+        // stack (a talk opened from Search keeps Search active; deep links fall back to Home).
+        val backStack by navController.currentBackStack.collectAsStateWithLifecycle()
+        val currentTab = backStack.lastOrNull { it.destination.route in TAB_ROUTES }?.destination?.route
         val isMember by appViewModel.isMember.collectAsStateWithLifecycle()
         val canDownload = !FeatureFlags.MEMBERSHIP_GATING || isMember
 
@@ -110,52 +125,11 @@ fun FBAApp(
                                 navController.navigate(Routes.PLAYER) { launchSingleTop = true }
                             },
                         )
-                        NavigationBar {
-                            // Standard bottom-bar pattern: single-top + save/restore state so
-                            // re-tapping a tab doesn't recreate its ViewModel (wiping e.g.
-                            // search results), and switching tabs preserves each tab's state.
-                            fun navigateToTab(route: String) {
-                                // If the tab is already in the back stack (e.g. Downloads →
-                                // talk detail), pop back to it — plain navigate+restoreState
-                                // would restore the saved stack INCLUDING the detail screen,
-                                // so the tap would appear to do nothing.
-                                if (navController.popBackStack(route, inclusive = false)) return
-                                navController.navigate(route) {
-                                    popUpTo(Routes.HOME) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
-
-                            @Composable
-                            fun tab(route: String, label: String, icon: ImageVector, onClick: () -> Unit = { navigateToTab(route) }) {
-                                NavigationBarItem(
-                                    icon = { Icon(icon, contentDescription = label) },
-                                    // Five tabs: keep labels on one line on narrow phones / large fonts
-                                    label = { Text(label, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelSmall) },
-                                    selected = currentRoute == route,
-                                    onClick = onClick,
-                                )
-                            }
-
-                            tab(Routes.HOME, "Home", Icons.Default.Home)
-                            tab(Routes.SEARCH, "Search", Icons.Default.Search)
-                            // Downloads are a membership benefit when gating is on: the tab
-                            // takes non-members to Join (existing downloads stay playable
-                            // from talk pages).
-                            tab(Routes.DOWNLOADS, "Downloads", Icons.Default.Download) {
-                                navigateToTab(if (canDownload) Routes.DOWNLOADS else Routes.JOIN)
-                            }
-                            // Donate opens the FBA donation page directly; it is never "selected".
-                            // (Join stays reachable from download gating / My FBA for later.)
-                            NavigationBarItem(
-                                icon = { Icon(Icons.Default.Favorite, contentDescription = "Donate") },
-                                label = { Text("Donate", maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelSmall) },
-                                selected = false,
-                                onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL))) },
-                            )
-                            tab(Routes.MY_FBA, "My FBA", Icons.Default.Person)
-                        }
+                        FbaNavigationBar(
+                            currentTab = currentTab,
+                            navController = navController,
+                            onDonate = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL))) },
+                        )
                     }
                 }
             }
@@ -179,6 +153,68 @@ fun FBAApp(
                     canDownload = canDownload,
                 )
             }
+        }
+    }
+}
+
+private val TAB_ROUTES = setOf(Routes.HOME, Routes.EXPLORE, Routes.SEARCH, Routes.MY_FBA)
+
+/** One tab: route, label, filled (selected) and outlined icons. */
+private data class FbaTab(val route: String?, val label: String, val selectedIcon: ImageVector, val icon: ImageVector)
+
+/**
+ * M3 navigation bar from the Android Candidate Release: Home, Explore, Donate, Search, My FBA.
+ * Active indicator = accent tint, active icon filled in accent deep, others outlined, labels
+ * always shown (active label bold). Donate opens the donation page and is never "selected".
+ */
+@Composable
+private fun FbaNavigationBar(
+    currentTab: String?,
+    navController: androidx.navigation.NavHostController,
+    onDonate: () -> Unit,
+) {
+    // Single-top + save/restore state so re-tapping a tab doesn't recreate its ViewModel,
+    // and if the tab is already in the back stack (e.g. Search → talk), pop back to it.
+    fun navigateToTab(route: String) {
+        if (navController.popBackStack(route, inclusive = false)) return
+        navController.navigate(route) {
+            popUpTo(Routes.HOME) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+    val tabs = listOf(
+        FbaTab(Routes.HOME, "Home", Icons.Filled.Home, Icons.Outlined.Home),
+        FbaTab(Routes.EXPLORE, "Explore", Icons.Filled.GridView, Icons.Outlined.GridView),
+        FbaTab(null, "Donate", Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder),
+        FbaTab(Routes.SEARCH, "Search", Icons.Filled.Search, Icons.Outlined.Search),
+        FbaTab(Routes.MY_FBA, "My FBA", Icons.Filled.AccountCircle, Icons.Outlined.AccountCircle),
+    )
+    val unselected = Color(0xFF4A4A4A)
+    NavigationBar(containerColor = FbaColors.circle) {
+        tabs.forEach { tab ->
+            val selected = tab.route != null && currentTab == tab.route
+            NavigationBarItem(
+                selected = selected,
+                onClick = { if (tab.route == null) onDonate() else navigateToTab(tab.route) },
+                icon = { Icon(if (selected) tab.selectedIcon else tab.icon, contentDescription = null) },
+                label = {
+                    Text(
+                        tab.label,
+                        maxLines = 1,
+                        softWrap = false,
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    )
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    selectedTextColor = FbaColors.black,
+                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                    unselectedIconColor = unselected,
+                    unselectedTextColor = unselected,
+                ),
+            )
         }
     }
 }

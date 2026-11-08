@@ -18,6 +18,10 @@ struct Talk: Identifiable, Codable, Equatable {
     let omOnly: Bool
     /// The listener's saved position on the FBA website (only present when logged in).
     let checkpoint: Checkpoint?
+    /// Wide banner ("marquee") image, first choice for talk artwork.
+    var bannerUrl: String
+    /// The speaker's image, second choice for talk artwork.
+    var speakerImageUrl: String
 
     var id: String { catNum }
 
@@ -27,7 +31,8 @@ struct Talk: Identifiable, Codable, Equatable {
          genre: String = "", durationSeconds: Int = 0, imageUrl: String = "",
          audioUrl: String = "", description: String = "", tracks: [Track] = [],
          transcriptUrl: String = "", series: String = "", seriesHref: String = "",
-         omOnly: Bool = false, checkpoint: Checkpoint? = nil) {
+         omOnly: Bool = false, checkpoint: Checkpoint? = nil,
+         bannerUrl: String = "", speakerImageUrl: String = "") {
         self.catNum = catNum
         self.title = title
         self.speaker = speaker
@@ -43,6 +48,8 @@ struct Talk: Identifiable, Codable, Equatable {
         self.seriesHref = seriesHref
         self.omOnly = omOnly
         self.checkpoint = checkpoint
+        self.bannerUrl = bannerUrl
+        self.speakerImageUrl = speakerImageUrl
     }
 
     // Tolerant decoding: talks cached before these fields existed must still load.
@@ -63,6 +70,8 @@ struct Talk: Identifiable, Codable, Equatable {
         seriesHref = try c.decodeIfPresent(String.self, forKey: .seriesHref) ?? ""
         omOnly = try c.decodeIfPresent(Bool.self, forKey: .omOnly) ?? false
         checkpoint = try c.decodeIfPresent(Checkpoint.self, forKey: .checkpoint)
+        bannerUrl = try c.decodeIfPresent(String.self, forKey: .bannerUrl) ?? ""
+        speakerImageUrl = try c.decodeIfPresent(String.self, forKey: .speakerImageUrl) ?? ""
     }
 }
 

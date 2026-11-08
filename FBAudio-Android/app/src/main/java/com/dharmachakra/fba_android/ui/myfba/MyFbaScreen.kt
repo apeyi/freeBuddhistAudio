@@ -1,6 +1,7 @@
 package com.dharmachakra.fba_android.ui.myfba
 
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -56,6 +57,7 @@ fun MyFbaScreen(
     onJoinClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
+    onDownloadsClick: () -> Unit = {},
     viewModel: MyFbaViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -135,7 +137,7 @@ fun MyFbaScreen(
                                     )
                                 }
                                 FeatureFlags.AUTH -> {
-                                    Text("Not logged in", style = MaterialTheme.typography.titleMedium)
+                                    Text("Keep your place on every device", style = MaterialTheme.typography.titleMedium)
                                     Text(
                                         "Sign in to sync your FBA history and continue listening on any phone, tablet or at freebuddhistaudio.com.",
                                         style = MaterialTheme.typography.bodySmall,
@@ -162,6 +164,19 @@ fun MyFbaScreen(
                         }
                     }
                 }
+            }
+
+            // --- Library (Downloads moved here from the tab bar in the v1.0 design) ---
+            item {
+                androidx.compose.material3.ListItem(
+                    headlineContent = { Text("Downloads") },
+                    trailingContent = {
+                        Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onDownloadsClick),
+                )
+                androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                Spacer(Modifier.height(16.dp))
             }
 
             // --- Donate ---

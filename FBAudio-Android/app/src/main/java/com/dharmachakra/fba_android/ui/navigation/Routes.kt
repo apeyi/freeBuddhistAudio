@@ -5,6 +5,7 @@ import com.dharmachakra.fba_android.domain.model.ContentSource
 
 object Routes {
     const val HOME = "home"
+    const val EXPLORE = "explore"
     const val SEARCH = "search"
     const val DETAIL = "detail/{catNum}"
     const val DOWNLOADS = "downloads"

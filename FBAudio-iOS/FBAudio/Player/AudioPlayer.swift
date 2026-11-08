@@ -15,6 +15,9 @@ class AudioPlayer: ObservableObject {
     @Published var currentTrackIndex = 0
     @Published var playbackSpeed: Float = 1.0
     @Published var isVisible = false
+    /// Something has played since the app opened. Until then the Now Playing bar shows the
+    /// restored talk as "Continue listening · N min left" (parity with Android).
+    @Published var playedThisSession = false
     @Published var showDeleteDownloadPrompt = false
     @Published var playbackError: String?
     @Published var isReconnecting = false
@@ -422,7 +425,34 @@ class AudioPlayer: ObservableObject {
         player.play()
         player.rate = playbackSpeed
         isPlaying = true
+        playedThisSession = true
         updateNowPlayingInfo()
+    }
+
+    /// "Continue listening · 18 min left" while the restored talk hasn't been played yet.
+    var continueListeningLabel: String? {
+        guard let talk = currentTalk, !playedThisSession else { return nil }
+        let total = PlaybackMath.totalDurationSeconds(talkDurationSeconds: talk.durationSeconds,
+                                                      tracks: talk.tracks, playerDurationMs: Int64(duration * 1000))
+        let left = PlaybackMath.timeLeftLabel(PlaybackMath.remainingSeconds(
+            totalSeconds: total, tracks: talk.tracks, trackIndex: currentTrackIndex,
+            positionInTrackMs: Int64(currentPosition * 1000)))
+        return left.map { "Continue listening · \($0)" } ?? "Continue listening"
+    }
+
+    /// The Now Playing bar was swiped away: stop, drop the queue and forget the restore
+    /// point so the bar stays hidden until something is played again. The talk's own
+    /// resume position (and the account checkpoint) is kept.
+    func dismissNowPlaying() {
+        if isPlaying { pause() }
+        cleanupPlayer()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+        persistence.clearLastCatNum()
+        currentTalk = nil
+        isVisible = false
+        isPlaying = false
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
     /// Explicit pause — see play().
